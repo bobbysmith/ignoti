@@ -427,30 +427,4 @@ describe('GhostID', () => {
       );
     });
   });
-
-  describe('optionsFromServer with excludeCredentials', () => {
-    it('maps excludeCredentials through base64UrlToBuffer', async () => {
-      stubCreateIdentityMocks(
-        makeOptions({
-          excludeCredentials: [{ id: 'excl-id', type: 'public-key', transports: ['usb'] }],
-        })
-      );
-      await initializedSdk().createIdentity();
-
-      const calls = mockBase64UrlToBuffer.mock.calls.map((args: unknown[]) => args[0]);
-      expect(calls).toContain('excl-id');
-    });
-  });
-
-  describe('requestOptionsFromServer with allowCredentials', () => {
-    it('maps allowCredentials through base64UrlToBuffer', async () => {
-      await withSession({
-        challengeOptions: makeOptions({
-          allowCredentials: [{ id: 'allow-id', type: 'public-key', transports: ['internal'] }],
-        }),
-      });
-      const calls = mockBase64UrlToBuffer.mock.calls.map((args: unknown[]) => args[0]);
-      expect(calls).toContain('allow-id');
-    });
-  });
 });

@@ -13,11 +13,14 @@
 import { ApiClient, createApiClient } from './api/client';
 import { signDeviceBindingJWS } from './api/root-jws';
 import { signSessionBindingJWS } from './api/session-jws';
+import {
+  creationOptionsFromServer,
+  extractChallenge,
+  requestOptionsFromServer,
+} from './auth/options';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
 import { UA_HINTS } from './constants';
 import {
-  base64UrlToBuffer,
-  bufferToBase64Url,
   deriveRootKeysFromMnemonic,
   generateMnemonic,
   generateSessionSigningKeypair,
@@ -98,7 +101,7 @@ export class GhostID {
       const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });
       const { userId, options } = registerResponse;
 
-      const passkeyOptions = optionsFromServer(options);
+      const passkeyOptions = creationOptionsFromServer(options);
       const passkeyResponse = await createPasskey(passkeyOptions);
 
       const challengeB64Url = extractChallenge(passkeyOptions);
@@ -194,7 +197,7 @@ export class GhostID {
       const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
       const { userId, options } = recoverResponse;
 
-      const passkeyOptions = optionsFromServer(options);
+      const passkeyOptions = creationOptionsFromServer(options);
       const passkeyResponse = await createPasskey(passkeyOptions);
       const challengeB64Url = extractChallenge(passkeyOptions);
       const rootSignature = await signDeviceBindingJWS(
@@ -323,71 +326,4 @@ export class GhostID {
     const match = UA_HINTS.find(([token]) => ua.includes(token));
     return match ? match[1] : 'Unknown Device';
   }
-}
-
-/**
- * Converts a server-issued `PublicKeyCredentialCreationOptionsJSON` (base64url
- * strings) into the browser's `PublicKeyCredentialCreationOptions` (ArrayBuffers).
- */
-function optionsFromServer(optsJson: Record<string, unknown>): PublicKeyCredentialCreationOptions {
-  const j = optsJson as {
-    challenge: string;
-    user: { id: string; name: string; displayName: string };
-    rp: PublicKeyCredentialRpEntity;
-    pubKeyCredParams: PublicKeyCredentialParameters[];
-    authenticatorSelection?: AuthenticatorSelectionCriteria;
-    timeout?: number;
-    attestation?: AttestationConveyancePreference;
-    excludeCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
-  };
-  return {
-    challenge: base64UrlToBuffer(j.challenge),
-    rp: j.rp,
-    user: {
-      id: base64UrlToBuffer(j.user.id),
-      name: j.user.name,
-      displayName: j.user.displayName,
-    },
-    pubKeyCredParams: j.pubKeyCredParams,
-    authenticatorSelection: j.authenticatorSelection,
-    timeout: j.timeout ?? 60000,
-    attestation: j.attestation ?? 'none',
-    excludeCredentials: j.excludeCredentials?.map(c => ({
-      id: base64UrlToBuffer(c.id),
-      type: c.type,
-      transports: c.transports as AuthenticatorTransport[] | undefined,
-    })),
-  };
-}
-
-/** Re-extracts the base64url challenge from the converted options for binding. */
-function extractChallenge(opts: PublicKeyCredentialCreationOptions): string {
-  return bufferToBase64Url(opts.challenge as ArrayBuffer);
-}
-
-/**
- * Converts a server-issued `PublicKeyCredentialRequestOptionsJSON` (base64url
- * strings) into the browser's `PublicKeyCredentialRequestOptions` (ArrayBuffers).
- */
-function requestOptionsFromServer(
-  optsJson: Record<string, unknown>
-): PublicKeyCredentialRequestOptions {
-  const j = optsJson as {
-    challenge: string;
-    timeout?: number;
-    rpId?: string;
-    userVerification?: UserVerificationRequirement;
-    allowCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
-  };
-  return {
-    challenge: base64UrlToBuffer(j.challenge),
-    timeout: j.timeout ?? 60000,
-    rpId: j.rpId,
-    userVerification: j.userVerification ?? 'required',
-    allowCredentials: j.allowCredentials?.map(c => ({
-      id: base64UrlToBuffer(c.id),
-      type: c.type,
-      transports: c.transports as AuthenticatorTransport[] | undefined,
-    })),
-  };
 }
