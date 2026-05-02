@@ -93,11 +93,13 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
     return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_SIGNATURE);
   }
 
-  await touchSession(sessionId);
-
   req.sessionContext = {
     sessionId,
     userId: session.user_id,
     deviceId: session.device_id,
   };
+
+  touchSession(sessionId).catch(err => {
+    req.log.error({ err, sessionId }, 'touchSession failed');
+  });
 }
