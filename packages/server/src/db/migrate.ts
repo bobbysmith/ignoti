@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,9 +51,7 @@ async function main(): Promise<void> {
 
   const applied = await getApplied();
 
-  const files = (await readdir(MIGRATIONS_DIR))
-    .filter(f => extname(f) === '.sql')
-    .sort();
+  const files = (await readdir(MIGRATIONS_DIR)).filter(f => extname(f) === '.sql').sort();
 
   let ran = 0;
 
@@ -65,18 +63,20 @@ async function main(): Promise<void> {
       if (applied.get(filename) !== hash) {
         throw new Error(
           `Checksum mismatch for already-applied migration "${filename}". ` +
-          'Applied migrations must not be edited. Create a new migration instead.'
+            'Applied migrations must not be edited. Create a new migration instead.'
         );
       }
+
+      // biome-ignore lint/suspicious/noConsole: <until logs added>
       console.log(`  skip  ${filename}`);
       continue;
     }
-
+    // biome-ignore lint/suspicious/noConsole: <until logs added>
     console.log(`  apply ${filename}`);
     await runMigration(filename, content, hash);
     ran++;
   }
-
+  // biome-ignore lint/suspicious/noConsole: <until logs added>
   console.log(ran > 0 ? `\n${ran} migration(s) applied.` : '\nNo new migrations.');
   await sql.end();
 }

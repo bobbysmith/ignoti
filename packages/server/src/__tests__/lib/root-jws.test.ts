@@ -1,5 +1,5 @@
-import { exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { verifyDeviceBindingJWS } from '../../lib/root-jws.js';

@@ -1,13 +1,12 @@
-import {
-  PROTOCOL_VALIDATION,
-  SERVER_ERROR_CODES,
-  SESSION_AUTH_SCHEME,
-} from '@ghostid/shared';
 import type { ServerErrorCode } from '@ghostid/shared';
+import { PROTOCOL_VALIDATION, SERVER_ERROR_CODES, SESSION_AUTH_SCHEME } from '@ghostid/shared';
 
-export { PROTOCOL_VALIDATION as VALIDATION };
-export { SERVER_ERROR_CODES as ERROR_CODES, SESSION_AUTH_SCHEME };
 export type { ServerErrorCode };
+export {
+  PROTOCOL_VALIDATION as VALIDATION,
+  SERVER_ERROR_CODES as ERROR_CODES,
+  SESSION_AUTH_SCHEME,
+};
 
 export const WEBAUTHN_TIMEOUT_MS = 60_000;
 
@@ -32,8 +31,7 @@ export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
   [SERVER_ERROR_CODES.DEVICE_NOT_FOUND]: 'Device not found',
   [SERVER_ERROR_CODES.INVALID_OR_EXPIRED_CHALLENGE]: 'Challenge is invalid or has expired',
   [SERVER_ERROR_CODES.INVALID_ROOT_SIGNATURE]: 'Root key signature verification failed',
-  [SERVER_ERROR_CODES.ATTESTATION_VERIFICATION_FAILED]:
-    'WebAuthn attestation verification failed',
+  [SERVER_ERROR_CODES.ATTESTATION_VERIFICATION_FAILED]: 'WebAuthn attestation verification failed',
   [SERVER_ERROR_CODES.ASSERTION_VERIFICATION_FAILED]: 'WebAuthn assertion verification failed',
   [SERVER_ERROR_CODES.INVALID_SESSION_BINDING]: 'Session binding verification failed',
   [SERVER_ERROR_CODES.INVALID_OR_EXPIRED_SESSION_CHALLENGE]:
@@ -41,8 +39,7 @@ export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
   [SERVER_ERROR_CODES.MISSING_SESSION_HEADERS]:
     'Required session authentication headers are missing',
   [SERVER_ERROR_CODES.INVALID_AUTHORIZATION_SCHEME]: 'Invalid authorization scheme',
-  [SERVER_ERROR_CODES.MALFORMED_SESSION_HEADERS]:
-    'Session authentication headers are malformed',
+  [SERVER_ERROR_CODES.MALFORMED_SESSION_HEADERS]: 'Session authentication headers are malformed',
   [SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE]:
     'Request timestamp is outside the acceptable range',
   [SERVER_ERROR_CODES.SESSION_NOT_FOUND]: 'Session not found',

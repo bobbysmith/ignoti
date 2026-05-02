@@ -1,5 +1,5 @@
-import { decodeJwt, importJWK, type JWTPayload, jwtVerify } from 'jose';
 import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS, type RootPurpose } from '@ghostid/shared';
+import { decodeJwt, importJWK, type JWTPayload, jwtVerify } from 'jose';
 
 export interface ExpectedClaims {
   purpose: RootPurpose;

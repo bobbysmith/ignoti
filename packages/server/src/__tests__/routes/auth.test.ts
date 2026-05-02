@@ -137,7 +137,9 @@ describe('auth', () => {
     await app.ready();
   });
 
-  afterAll(async () => { await app.close(); });
+  afterAll(async () => {
+    await app.close();
+  });
 
   beforeEach(() => {
     vi.resetAllMocks();

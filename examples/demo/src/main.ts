@@ -1,5 +1,6 @@
 import { GhostID } from '@ghostid/sdk';
 
+// biome-ignore lint/style/noNonNullAssertion: <just a demo chill bro>
 const out = document.getElementById('out')!;
 const log = (msg: unknown) => {
   out.textContent += `\n${typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2)}`;
@@ -9,6 +10,7 @@ const ghost = new GhostID({ backendUrl: 'http://localhost:8787' });
 ghost.init();
 log('GhostID initialized.');
 
+// biome-ignore lint/style/noNonNullAssertion: <just a demo chill bro>
 document.getElementById('signup')!.addEventListener('click', async () => {
   try {
     const result = await ghost.createIdentity();
@@ -18,6 +20,7 @@ document.getElementById('signup')!.addEventListener('click', async () => {
   }
 });
 
+// biome-ignore lint/style/noNonNullAssertion: <just a demo chill bro>
 document.getElementById('login')!.addEventListener('click', async () => {
   try {
     const result = await ghost.login();
@@ -27,6 +30,7 @@ document.getElementById('login')!.addEventListener('click', async () => {
   }
 });
 
+// biome-ignore lint/style/noNonNullAssertion: <just a demo chill bro>
 document.getElementById('recover')!.addEventListener('click', async () => {
   const mnemonic = (document.getElementById('mnemonic') as HTMLInputElement).value.trim();
   if (!mnemonic) {

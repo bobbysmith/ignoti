@@ -72,7 +72,9 @@ describe('devices', () => {
       await app.ready();
     });
 
-    afterAll(async () => { await app.close(); });
+    afterAll(async () => {
+      await app.close();
+    });
 
     beforeEach(() => {
       vi.mocked(requireSession).mockImplementation(async (req: FastifyRequest) => {
@@ -160,7 +162,9 @@ describe('devices', () => {
       await app.ready();
     });
 
-    afterAll(async () => { await app.close(); });
+    afterAll(async () => {
+      await app.close();
+    });
 
     beforeEach(() => {
       vi.mocked(getDeviceById).mockReset();

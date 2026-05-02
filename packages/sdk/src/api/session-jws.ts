@@ -13,8 +13,8 @@
  * `ghostid-root-binding+jwt`.
  */
 
-import { importJWK, SignJWT } from 'jose';
 import { SESSION_BINDING_TYP } from '@ghostid/shared';
+import { importJWK, SignJWT } from 'jose';
 
 import { CryptoUtils } from '../core/crypto';
 

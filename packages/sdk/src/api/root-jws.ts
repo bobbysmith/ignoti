@@ -9,8 +9,8 @@
  * misread as any other JWT in the application.
  */
 
-import { importJWK, SignJWT } from 'jose';
 import { ROOT_BINDING_TYP, type RootPurpose } from '@ghostid/shared';
+import { importJWK, SignJWT } from 'jose';
 
 import { CryptoUtils } from '../core/crypto';
 

@@ -16,7 +16,12 @@ const envSchema = z.object({
   RP_ORIGIN: z
     .string()
     .default('http://localhost:5173')
-    .transform(v => v.split(',').map(s => s.trim()).filter(Boolean))
+    .transform(v =>
+      v
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    )
     .pipe(z.array(z.string().url({ message: 'Each RP_ORIGIN entry must be a valid URL' }))),
   CHALLENGE_TTL_SECONDS: z.coerce.number().default(300),
   SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60 * 24),
