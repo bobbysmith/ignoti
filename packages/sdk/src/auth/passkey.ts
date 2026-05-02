@@ -1,0 +1,138 @@
+import { ERROR_MESSAGES } from '@/constants';
+import type { FormattedCreatePasskeyResponse, FormattedGetPasskeyAssertionResponse } from '@/types';
+import { CryptoUtils } from '../core/crypto';
+import { ErrorCodes, GhostIDError } from '../core/errors';
+
+declare const window: {
+  PublicKeyCredential: typeof PublicKeyCredential;
+} & typeof globalThis;
+
+/**
+ * Creates a new passkey credential for device authentication.
+ * Returns a `RegistrationResponseJSON`-shaped object compatible with
+ * `@simplewebauthn/server`'s `verifyRegistrationResponse`.
+ */
+export async function createPasskey(
+  options: PublicKeyCredentialCreationOptions
+): Promise<FormattedCreatePasskeyResponse> {
+  if (typeof window === 'undefined' || !('credentials' in navigator)) {
+    throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+  }
+
+  try {
+    const cred = (await navigator.credentials.create({
+      publicKey: options,
+    })) as PublicKeyCredential | null;
+
+    if (!cred) {
+      throw new GhostIDError(
+        'Failed to create passkey credential - user may have cancelled',
+        ErrorCodes.INVALID_INPUT
+      );
+    }
+
+    const resp = cred.response as AuthenticatorAttestationResponse;
+    const transports =
+      typeof resp.getTransports === 'function'
+        ? (resp.getTransports() as AuthenticatorTransport[])
+        : undefined;
+    const authenticatorAttachment =
+      (cred as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
+        .authenticatorAttachment ?? undefined;
+
+    return {
+      id: cred.id,
+      rawId: CryptoUtils.bufferToBase64Url(cred.rawId),
+      type: cred.type as 'public-key',
+      authenticatorAttachment,
+      clientExtensionResults: cred.getClientExtensionResults(),
+      response: {
+        clientDataJSON: CryptoUtils.bufferToBase64Url(resp.clientDataJSON),
+        attestationObject: CryptoUtils.bufferToBase64Url(resp.attestationObject),
+        transports,
+      },
+    };
+  } catch (error) {
+    if (error instanceof GhostIDError) {
+      throw error;
+    }
+
+    throw new GhostIDError(
+      `Passkey creation failed: ${(error as Error).message}`,
+      ErrorCodes.CRYPTOGRAPHY_ERROR,
+      error as Error
+    );
+  }
+}
+
+/**
+ * Authenticates using an existing passkey credential.
+ * Returns an `AuthenticationResponseJSON`-shaped object compatible with
+ * `@simplewebauthn/server`'s `verifyAuthenticationResponse`.
+ */
+export async function getPasskeyAssertion(
+  options: PublicKeyCredentialRequestOptions
+): Promise<FormattedGetPasskeyAssertionResponse> {
+  if (typeof window === 'undefined' || !('credentials' in navigator)) {
+    throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+  }
+
+  try {
+    const assertion = (await navigator.credentials.get({
+      publicKey: options,
+    })) as PublicKeyCredential | null;
+    if (!assertion) {
+      throw new GhostIDError(
+        'Failed to get passkey assertion - user may have cancelled or no credentials found',
+        ErrorCodes.INVALID_INPUT
+      );
+    }
+
+    const resp = assertion.response as AuthenticatorAssertionResponse;
+    const authenticatorAttachment =
+      (assertion as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
+        .authenticatorAttachment ?? undefined;
+
+    return {
+      id: assertion.id,
+      rawId: CryptoUtils.bufferToBase64Url(assertion.rawId),
+      type: assertion.type as 'public-key',
+      authenticatorAttachment,
+      clientExtensionResults: assertion.getClientExtensionResults(),
+      response: {
+        clientDataJSON: CryptoUtils.bufferToBase64Url(resp.clientDataJSON),
+        authenticatorData: CryptoUtils.bufferToBase64Url(resp.authenticatorData),
+        signature: CryptoUtils.bufferToBase64Url(resp.signature),
+        userHandle: resp.userHandle
+          ? CryptoUtils.bufferToBase64Url(resp.userHandle as ArrayBuffer)
+          : null,
+      },
+    };
+  } catch (error) {
+    if (error instanceof GhostIDError) {
+      throw error;
+    }
+    throw new GhostIDError(
+      `Passkey authentication failed: ${(error as Error).message}`,
+      ErrorCodes.CRYPTOGRAPHY_ERROR,
+      error as Error
+    );
+  }
+}
+
+export function isWebAuthnSupported(): boolean {
+  return (
+    typeof window !== 'undefined' && 'credentials' in navigator && 'PublicKeyCredential' in window
+  );
+}
+
+export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
+  if (!isWebAuthnSupported()) {
+    return false;
+  }
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}

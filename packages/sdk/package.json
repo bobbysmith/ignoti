@@ -1,0 +1,64 @@
+{
+  "name": "@ghostid/sdk",
+  "version": "0.0.1",
+  "description": "Anonymous, self-sovereign authentication SDK using passkeys and BIP39 mnemonics.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "publishConfig": {
+    "main": "./dist/ghostid.umd.cjs",
+    "module": "./dist/ghostid.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/ghostid.js",
+        "require": "./dist/ghostid.umd.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "authentication",
+    "passkey",
+    "webauthn",
+    "cryptography",
+    "identity",
+    "privacy",
+    "self-sovereign",
+    "anonymous"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ghostid/shared": "workspace:*",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "@scure/bip39": "^1.2.1",
+    "jose": "^6.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "vite": "^7.1.5",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^3.2.4"
+  }
+}

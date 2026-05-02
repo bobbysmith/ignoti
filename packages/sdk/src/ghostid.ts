@@ -1,0 +1,385 @@
+/**
+ * @file ghostid.ts
+ * Main GhostID SDK class. Three-layer identity model:
+ *   1. Root identity (BIP39 mnemonic and Ed25519) - recovery and high-stakes ops.
+ *   2. Device identity (WebAuthn passkey) - daily auth.
+ *   3. Session identity (ephemeral Ed25519) - silent request signing.
+ *
+ * The SDK persists nothing. Callers receive identifiers (userId, deviceId,
+ * mnemonic) from operations and are responsible for storing them. Sessions
+ * exist only in memory; logging out or refreshing the page ends them.
+ */
+
+import { ApiClient, createApiClient } from './api/client';
+import { signDeviceBindingJWS } from './api/root-jws';
+import { signSessionBindingJWS } from './api/session-jws';
+import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
+import { UA_HINTS } from './constants';
+import { CryptoUtils } from './core/crypto';
+import { ErrorCodes, GhostIDError } from './core/errors';
+import type {
+  CreateIdentityResult,
+  CreateSessionResponse,
+  DeviceInfo,
+  GhostIDOptions,
+  LoginResult,
+  RecoverIdentityResult,
+  SessionInfo,
+} from './types';
+
+interface ActiveSession {
+  sessionId: string;
+  userId: string;
+  deviceId: string;
+  expiresAt: number;
+  sessionPrivateKey: Uint8Array;
+}
+
+export class GhostID {
+  private readonly apiClient: ApiClient;
+  private readonly defaultDeviceName?: string;
+  private initialized = false;
+  private session: ActiveSession | null = null;
+
+  constructor(options: GhostIDOptions) {
+    this.apiClient = createApiClient({
+      baseUrl: options.backendUrl,
+      ...options.apiClientOptions,
+    });
+    this.defaultDeviceName = options.defaultDeviceName;
+  }
+
+  init(): void {
+    this.initialized = true;
+  }
+
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new GhostIDError(
+        'GhostID not initialized: call init() first',
+        ErrorCodes.NOT_INITIALIZED
+      );
+    }
+  }
+
+  /**
+   * Creates a new identity end-to-end:
+   *   1. Generate mnemonic and root keys.
+   *   2. POST /register with rootPublicKey -> server returns userId and WebAuthn options.
+   *   3. Browser produces a passkey credential.
+   *   4. SDK signs `register-device|userId|credentialId|challenge` with root key.
+   *   5. POST /register/device with the registration response and root signature.
+   *
+   * Caller must persist the returned mnemonic offline (it is the only recovery path)
+   * and should persist userId and deviceId to skip recovery on return visits.
+   */
+  async createIdentity(): Promise<CreateIdentityResult> {
+    this.ensureInitialized();
+    if (!isWebAuthnSupported()) {
+      throw new GhostIDError(
+        'WebAuthn/Passkeys not supported in this environment',
+        ErrorCodes.INVALID_INPUT
+      );
+    }
+
+    const mnemonic = CryptoUtils.generateMnemonic();
+    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
+    const rootPublicKey = CryptoUtils.toBase64(rootKeySet.signing.publicKey);
+
+    try {
+      const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });
+      const { userId, options } = registerResponse;
+
+      const passkeyOptions = optionsFromServer(options);
+      const passkeyResponse = await createPasskey(passkeyOptions);
+
+      const challengeB64Url = extractChallenge(passkeyOptions);
+      const rootSignature = await signDeviceBindingJWS(
+        {
+          purpose: 'register-device',
+          userId,
+          credentialId: passkeyResponse.id,
+          challenge: challengeB64Url,
+        },
+        rootKeySet.signing.privateKey,
+        rootKeySet.signing.publicKey
+      );
+
+      const deviceResponse = await this.apiClient.auth.registerDevice({
+        userId,
+        registrationResponse: passkeyResponse,
+        rootSignature,
+        deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
+      });
+
+      return { mnemonic, userId, deviceId: deviceResponse.deviceId };
+    } finally {
+      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+    }
+  }
+
+  /**
+   * Authenticates with a passkey and creates a session:
+   *   1. POST /challenge → server returns discoverable-credential options
+   *      (empty allowCredentials so the browser shows all authenticators,
+   *      including password manager extensions).
+   *   2. Browser produces an assertion.
+   *   3. POST /login with the assertion → server looks up the device by
+   *      credential ID, verifies, returns `{ sessionChallenge, deviceId }`.
+   *   4. SDK generates an ephemeral session keypair, signs a session-binding
+   *      JWS (session pubkey in the JWK header and sessionChallenge claim).
+   *   5. POST /session → server verifies PoP, persists the session row,
+   *      returns `{ sessionId, expiresAt }`.
+   */
+  async login(): Promise<LoginResult> {
+    this.ensureInitialized();
+
+    const challengeResponse = await this.apiClient.auth.requestChallenge();
+    const assertionOptions = requestOptionsFromServer(challengeResponse.options);
+    const assertion = await getPasskeyAssertion(assertionOptions);
+
+    const loginResponse = await this.apiClient.auth.login({ assertion });
+
+    const sessionKeyPair = CryptoUtils.generateSessionSigningKeypair();
+    let sessionResponse: CreateSessionResponse;
+    try {
+      const sessionBinding = await signSessionBindingJWS(
+        { sessionChallenge: loginResponse.sessionChallenge },
+        sessionKeyPair.privateKey,
+        sessionKeyPair.publicKey
+      );
+      sessionResponse = await this.apiClient.auth.createSession({ sessionBinding });
+    } catch (err) {
+      CryptoUtils.secureWipe(sessionKeyPair.privateKey);
+      throw err;
+    }
+
+    this.session = {
+      sessionId: sessionResponse.sessionId,
+      userId: sessionResponse.userId,
+      deviceId: loginResponse.deviceId,
+      expiresAt: sessionResponse.expiresAt,
+      sessionPrivateKey: sessionKeyPair.privateKey,
+    };
+
+    return { sessionId: sessionResponse.sessionId, expiresAt: sessionResponse.expiresAt };
+  }
+
+  /**
+   * Recovers an account using the mnemonic. Server looks up the user by the
+   * derived root public key and issues a registration challenge for a new
+   * device. The returned userId matches the original; the deviceId is new.
+   */
+  async recoverIdentity(mnemonic: string): Promise<RecoverIdentityResult> {
+    this.ensureInitialized();
+    if (!isWebAuthnSupported()) {
+      throw new GhostIDError(
+        'WebAuthn/Passkeys not supported in this environment',
+        ErrorCodes.INVALID_INPUT
+      );
+    }
+
+    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
+    const rootPublicKey = CryptoUtils.toBase64(rootKeySet.signing.publicKey);
+
+    try {
+      const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
+      const { userId, options } = recoverResponse;
+
+      const passkeyOptions = optionsFromServer(options);
+      const passkeyResponse = await createPasskey(passkeyOptions);
+      const challengeB64Url = extractChallenge(passkeyOptions);
+      const rootSignature = await signDeviceBindingJWS(
+        {
+          purpose: 'recover-device',
+          userId,
+          credentialId: passkeyResponse.id,
+          challenge: challengeB64Url,
+        },
+        rootKeySet.signing.privateKey,
+        rootKeySet.signing.publicKey
+      );
+
+      const deviceResponse = await this.apiClient.auth.registerDevice({
+        userId,
+        registrationResponse: passkeyResponse,
+        rootSignature,
+        deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
+      });
+
+      return { userId, deviceId: deviceResponse.deviceId };
+    } finally {
+      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+    }
+  }
+
+  /** Signs a payload with the in-memory session key. Throws if no session. */
+  async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
+    }
+    if (Date.now() > this.session.expiresAt) {
+      await this.logout();
+      throw new GhostIDError('Session expired: please login again', ErrorCodes.EXPIRED_CHALLENGE);
+    }
+    return ApiClient.signRequest(payload, this.session.sessionPrivateKey);
+  }
+
+  async logout(): Promise<void> {
+    this.ensureInitialized();
+    if (this.session) {
+      CryptoUtils.secureWipe(this.session.sessionPrivateKey);
+      this.session = null;
+    }
+  }
+
+  async getDevices(): Promise<DeviceInfo[]> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
+    }
+    const iat = Math.floor(Date.now() / 1000);
+    const signature = ApiClient.signRequest(
+      { sessionId: this.session.sessionId, iat },
+      this.session.sessionPrivateKey
+    );
+    const response = await this.apiClient.devices.getDevices(
+      this.session.sessionId,
+      iat,
+      signature
+    );
+    return response.devices;
+  }
+
+  /**
+   * Revokes a device using the root key derived from the mnemonic.
+   * Fetches the device list first to obtain the credential ID needed for the JWS.
+   */
+  async revokeDevice(deviceId: string, mnemonic: string): Promise<void> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
+    }
+
+    const devices = await this.getDevices();
+    const device = devices.find(d => d.id === deviceId);
+    if (!device) {
+      throw new GhostIDError('Device not found', ErrorCodes.INVALID_INPUT);
+    }
+
+    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
+    try {
+      const rootSignature = await signDeviceBindingJWS(
+        {
+          purpose: 'revoke-device',
+          userId: this.session.userId,
+          credentialId: device.credentialId,
+          challenge: deviceId,
+        },
+        rootKeySet.signing.privateKey,
+        rootKeySet.signing.publicKey
+      );
+      await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
+    } finally {
+      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+    }
+  }
+
+  /**
+   * Returns information about the active session, or null if logged out.
+   * The session private key is intentionally not exposed.
+   */
+  getSession(): SessionInfo | null {
+    if (!this.session) return null;
+    return {
+      sessionId: this.session.sessionId,
+      deviceId: this.session.deviceId,
+      expiresAt: this.session.expiresAt,
+    };
+  }
+
+  destroy(): void {
+    if (this.session) {
+      CryptoUtils.secureWipe(this.session.sessionPrivateKey);
+      this.session = null;
+    }
+    this.initialized = false;
+  }
+
+  private guessDeviceName(): string {
+    if (typeof navigator === 'undefined') {
+      return 'Unknown Device';
+    }
+    const ua = navigator.userAgent;
+    const match = UA_HINTS.find(([token]) => ua.includes(token));
+    return match ? match[1] : 'Unknown Device';
+  }
+}
+
+/**
+ * Converts a server-issued `PublicKeyCredentialCreationOptionsJSON` (base64url
+ * strings) into the browser's `PublicKeyCredentialCreationOptions` (ArrayBuffers).
+ */
+function optionsFromServer(optsJson: Record<string, unknown>): PublicKeyCredentialCreationOptions {
+  const j = optsJson as {
+    challenge: string;
+    user: { id: string; name: string; displayName: string };
+    rp: PublicKeyCredentialRpEntity;
+    pubKeyCredParams: PublicKeyCredentialParameters[];
+    authenticatorSelection?: AuthenticatorSelectionCriteria;
+    timeout?: number;
+    attestation?: AttestationConveyancePreference;
+    excludeCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
+  };
+  return {
+    challenge: CryptoUtils.base64UrlToBuffer(j.challenge),
+    rp: j.rp,
+    user: {
+      id: CryptoUtils.base64UrlToBuffer(j.user.id),
+      name: j.user.name,
+      displayName: j.user.displayName,
+    },
+    pubKeyCredParams: j.pubKeyCredParams,
+    authenticatorSelection: j.authenticatorSelection,
+    timeout: j.timeout ?? 60000,
+    attestation: j.attestation ?? 'none',
+    excludeCredentials: j.excludeCredentials?.map(c => ({
+      id: CryptoUtils.base64UrlToBuffer(c.id),
+      type: c.type,
+      transports: c.transports as AuthenticatorTransport[] | undefined,
+    })),
+  };
+}
+
+/** Re-extracts the base64url challenge from the converted options for binding. */
+function extractChallenge(opts: PublicKeyCredentialCreationOptions): string {
+  return CryptoUtils.bufferToBase64Url(opts.challenge as ArrayBuffer);
+}
+
+/**
+ * Converts a server-issued `PublicKeyCredentialRequestOptionsJSON` (base64url
+ * strings) into the browser's `PublicKeyCredentialRequestOptions` (ArrayBuffers).
+ */
+function requestOptionsFromServer(
+  optsJson: Record<string, unknown>
+): PublicKeyCredentialRequestOptions {
+  const j = optsJson as {
+    challenge: string;
+    timeout?: number;
+    rpId?: string;
+    userVerification?: UserVerificationRequirement;
+    allowCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
+  };
+  return {
+    challenge: CryptoUtils.base64UrlToBuffer(j.challenge),
+    timeout: j.timeout ?? 60000,
+    rpId: j.rpId,
+    userVerification: j.userVerification ?? 'required',
+    allowCredentials: j.allowCredentials?.map(c => ({
+      id: CryptoUtils.base64UrlToBuffer(c.id),
+      type: c.type,
+      transports: c.transports as AuthenticatorTransport[] | undefined,
+    })),
+  };
+}
