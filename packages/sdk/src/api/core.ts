@@ -62,8 +62,8 @@ export class CoreApiClient {
     }
     // Strip trailing slash so `${baseUrl}${path}` always produces one slash.
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
-    this.timeout = options.timeout || TIMEOUTS.DEFAULT_REQUEST;
-    this.retryAttempts = options.retryAttempts || RETRY.DEFAULT_ATTEMPTS;
+    this.timeout = options.timeout ?? TIMEOUTS.DEFAULT_REQUEST;
+    this.retryAttempts = options.retryAttempts ?? RETRY.DEFAULT_ATTEMPTS;
     if (this.timeout <= 0 || this.timeout > 300_000) {
       throw new GhostIDError('Invalid timeout value', ErrorCodes.INVALID_INPUT);
     }
@@ -149,7 +149,6 @@ export class CoreApiClient {
 
   /** Truncates long error messages to avoid runaway log lines. */
   private capErrorMessage(message: string): string {
-    if (!message) return 'An error occurred';
     return message.length > 500 ? `${message.substring(0, 500)}...` : message;
   }
 

@@ -12,8 +12,5 @@ export class GhostIDError extends Error {
   ) {
     super(message, cause ? { cause } : undefined);
     this.name = 'GhostIDError';
-    if (cause !== undefined && !('cause' in this)) {
-      Object.defineProperty(this, 'cause', { value: cause, enumerable: false });
-    }
   }
 }
