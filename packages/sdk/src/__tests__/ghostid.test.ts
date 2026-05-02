@@ -296,6 +296,12 @@ describe('GhostID', () => {
       await expect(g.getDevices()).rejects.toThrow(GhostIDError);
     });
 
+    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      await expect(g.getDevices()).rejects.toThrow('expired');
+      expect(g.getSession()).toBeNull();
+    });
+
     it('returns device list on success', async () => {
       const { g } = await withSession();
       mockGetDevices.mockResolvedValue({

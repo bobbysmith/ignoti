@@ -250,6 +250,10 @@ export class GhostID {
     if (!this.session) {
       throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
     }
+    if (Date.now() > this.session.expiresAt) {
+      await this.logout();
+      throw new GhostIDError('Session expired: please login again', ErrorCodes.EXPIRED_CHALLENGE);
+    }
     const iat = Math.floor(Date.now() / 1000);
     const signature = ApiClient.signRequest(
       { sessionId: this.session.sessionId, iat },
@@ -266,7 +270,7 @@ export class GhostID {
   /**
    * Revokes a device using the root key derived from the mnemonic.
    * `userId` and `credentialId` are available from `createIdentity`, `recoverIdentity`,
-   * or a prior `getDdeviceId: string, mnemonic: string, p0: string, p1: string
+   * or a prior `getDevices()` call.
    */
   async revokeDevice(
     deviceId: string,
