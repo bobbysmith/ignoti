@@ -42,33 +42,30 @@ export class CoreApiClient {
 
   constructor(options: ApiClientOptions) {
     if (!options.baseUrl) {
-      throw new GhostIDError('Invalid baseUrl provided', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_BASE_URL, ErrorCodes.INVALID_INPUT);
     }
     let parsed: URL;
     try {
       parsed = new URL(options.baseUrl);
     } catch {
-      throw new GhostIDError('Invalid URL format for baseUrl', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_BASE_URL_FORMAT, ErrorCodes.INVALID_INPUT);
     }
     const isHttps = parsed.protocol === 'https:';
     const isLocalhost =
       parsed.protocol === 'http:' &&
       (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
     if (!isHttps && !isLocalhost) {
-      throw new GhostIDError(
-        'baseUrl must use HTTPS (HTTP is only permitted for localhost)',
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new GhostIDError(ERROR_MESSAGES.BASE_URL_REQUIRES_HTTPS, ErrorCodes.INVALID_INPUT);
     }
     // Strip trailing slash so `${baseUrl}${path}` always produces one slash.
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.timeout = options.timeout ?? TIMEOUTS.DEFAULT_REQUEST;
     this.retryAttempts = options.retryAttempts ?? RETRY.DEFAULT_ATTEMPTS;
     if (this.timeout <= 0 || this.timeout > 300_000) {
-      throw new GhostIDError('Invalid timeout value', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_TIMEOUT, ErrorCodes.INVALID_INPUT);
     }
     if (this.retryAttempts < 0 || this.retryAttempts > 10) {
-      throw new GhostIDError('Invalid retry attempts value', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_RETRY_ATTEMPTS, ErrorCodes.INVALID_INPUT);
     }
   }
 
@@ -78,7 +75,7 @@ export class CoreApiClient {
         method as (typeof SECURITY.ALLOWED_HTTP_METHODS)[number]
       )
     ) {
-      throw new GhostIDError(`Invalid HTTP method: ${method}`, ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HTTP_METHOD}: ${method}`, ErrorCodes.INVALID_INPUT);
     }
   }
 
@@ -88,13 +85,13 @@ export class CoreApiClient {
    */
   private validatePath(path: string): string {
     if (!path) {
-      throw new GhostIDError('Invalid path provided', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_PATH, ErrorCodes.INVALID_INPUT);
     }
     if (path.length > SECURITY.MAX_PATH_LENGTH) {
-      throw new GhostIDError('Path too long', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.PATH_TOO_LONG, ErrorCodes.INVALID_INPUT);
     }
     if (!PATH_RE.test(path)) {
-      throw new GhostIDError('Invalid path format', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_PATH_FORMAT, ErrorCodes.INVALID_INPUT);
     }
     return path;
   }
@@ -111,14 +108,14 @@ export class CoreApiClient {
         name.length > SECURITY.MAX_HEADER_NAME_LENGTH ||
         !HEADER_NAME_RE.test(name)
       ) {
-        throw new GhostIDError(`Invalid header name: ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HEADER_NAME}: ${name}`, ErrorCodes.INVALID_INPUT);
       }
       const lower = name.toLowerCase();
       if (FORBIDDEN_REQUEST_HEADERS.has(lower)) {
-        throw new GhostIDError(`Forbidden header: ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(`${ERROR_MESSAGES.FORBIDDEN_HEADER}: ${name}`, ErrorCodes.INVALID_INPUT);
       }
       if (value.length > SECURITY.MAX_HEADER_VALUE_LENGTH || !HEADER_VALUE_RE.test(value)) {
-        throw new GhostIDError(`Invalid header value for ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HEADER_VALUE} ${name}`, ErrorCodes.INVALID_INPUT);
       }
       out[lower] = value;
     }
@@ -135,14 +132,10 @@ export class CoreApiClient {
     try {
       stringified = JSON.stringify(data);
     } catch (error) {
-      throw new GhostIDError(
-        'Failed to serialize request data',
-        ErrorCodes.INVALID_INPUT,
-        error as Error
-      );
+      throw new GhostIDError(ERROR_MESSAGES.FAILED_TO_SERIALIZE, ErrorCodes.INVALID_INPUT, error as Error);
     }
     if (stringified.length > SECURITY.MAX_REQUEST_BODY_SIZE) {
-      throw new GhostIDError('Request body too large', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.REQUEST_BODY_TOO_LARGE, ErrorCodes.INVALID_INPUT);
     }
     return stringified;
   }
@@ -211,18 +204,14 @@ export class CoreApiClient {
           try {
             return (await response.json()) as T;
           } catch (parseError) {
-            throw new GhostIDError(
-              'Failed to parse response JSON',
-              ErrorCodes.API_ERROR,
-              parseError as Error
-            );
+            throw new GhostIDError(ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE, ErrorCodes.API_ERROR, parseError as Error);
           }
         } catch (error) {
           lastError = error as Error;
           // Timeout - the AbortController has fired; retrying against the same
           // already-aborted signal would fail instantly, so surface immediately.
           if (error instanceof Error && error.name === 'AbortError') {
-            throw new GhostIDError('Request timed out', ErrorCodes.API_ERROR, error);
+            throw new GhostIDError(ERROR_MESSAGES.REQUEST_TIMED_OUT, ErrorCodes.API_ERROR, error);
           }
           // Network-level failure (DNS, TCP). Not transient in the way a 5xx is.
           if (error instanceof TypeError) throw error;

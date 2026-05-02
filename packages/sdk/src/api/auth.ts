@@ -3,7 +3,7 @@
  * Authentication methods for API client
  */
 
-import { API_ENDPOINTS, HTTP_METHODS, VALIDATION } from '@/constants';
+import { API_ENDPOINTS, ERROR_MESSAGES, HTTP_METHODS, VALIDATION } from '@/constants';
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -77,7 +77,7 @@ export class AuthApiClient extends BaseApiClient {
     };
 
     if (!request.registrationResponse || typeof request.registrationResponse !== 'object') {
-      throw new GhostIDError('Invalid registrationResponse provided', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_REGISTRATION_RESPONSE, ErrorCodes.INVALID_INPUT);
     }
 
     return this.makeRequest<RegisterDeviceResponse>(
@@ -108,7 +108,7 @@ export class AuthApiClient extends BaseApiClient {
    */
   async login(request: LoginRequest): Promise<LoginResponse> {
     if (!request.assertion || typeof request.assertion !== 'object') {
-      throw new GhostIDError('Invalid assertion provided', ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(ERROR_MESSAGES.INVALID_ASSERTION_RESPONSE, ErrorCodes.INVALID_INPUT);
     }
     return this.makeRequest<LoginResponse>(HTTP_METHODS.POST, API_ENDPOINTS.AUTH.LOGIN, {
       assertion: request.assertion,

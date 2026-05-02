@@ -25,10 +25,7 @@ export async function createPasskey(
     })) as PublicKeyCredential | null;
 
     if (!cred) {
-      throw new GhostIDError(
-        'Failed to create passkey credential - user may have cancelled',
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new GhostIDError(ERROR_MESSAGES.PASSKEY_CREATION_CANCELLED, ErrorCodes.INVALID_INPUT);
     }
 
     const resp = cred.response as AuthenticatorAttestationResponse;
@@ -58,7 +55,7 @@ export async function createPasskey(
     }
 
     throw new GhostIDError(
-      `Passkey creation failed: ${(error as Error).message}`,
+      `${ERROR_MESSAGES.PASSKEY_CREATION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
     );
@@ -82,10 +79,7 @@ export async function getPasskeyAssertion(
       publicKey: options,
     })) as PublicKeyCredential | null;
     if (!assertion) {
-      throw new GhostIDError(
-        'Failed to get passkey assertion - user may have cancelled or no credentials found',
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new GhostIDError(ERROR_MESSAGES.PASSKEY_ASSERTION_CANCELLED, ErrorCodes.INVALID_INPUT);
     }
 
     const resp = assertion.response as AuthenticatorAssertionResponse;
@@ -111,7 +105,7 @@ export async function getPasskeyAssertion(
       throw error;
     }
     throw new GhostIDError(
-      `Passkey authentication failed: ${(error as Error).message}`,
+      `${ERROR_MESSAGES.PASSKEY_ASSERTION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
     );

@@ -19,7 +19,7 @@ import {
   requestOptionsFromServer,
 } from './auth/options';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
-import { UA_HINTS } from './constants';
+import { ERROR_MESSAGES, UA_HINTS } from './constants';
 import {
   deriveRootKeysFromMnemonic,
   generateMnemonic,
@@ -66,10 +66,7 @@ export class GhostID {
 
   private ensureInitialized(): void {
     if (!this.initialized) {
-      throw new GhostIDError(
-        'GhostID not initialized: call init() first',
-        ErrorCodes.NOT_INITIALIZED
-      );
+      throw new GhostIDError(ERROR_MESSAGES.NOT_INITIALIZED, ErrorCodes.NOT_INITIALIZED);
     }
   }
 
@@ -87,10 +84,7 @@ export class GhostID {
   async createIdentity(): Promise<CreateIdentityResult> {
     this.ensureInitialized();
     if (!isWebAuthnSupported()) {
-      throw new GhostIDError(
-        'WebAuthn/Passkeys not supported in this environment',
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
     }
 
     const mnemonic = generateMnemonic();
@@ -184,10 +178,7 @@ export class GhostID {
   async recoverIdentity(mnemonic: string): Promise<RecoverIdentityResult> {
     this.ensureInitialized();
     if (!isWebAuthnSupported()) {
-      throw new GhostIDError(
-        'WebAuthn/Passkeys not supported in this environment',
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
     }
 
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
@@ -228,11 +219,11 @@ export class GhostID {
   async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     if (Date.now() > this.session.expiresAt) {
       await this.logout();
-      throw new GhostIDError('Session expired: please login again', ErrorCodes.EXPIRED_CHALLENGE);
+      throw new GhostIDError(ERROR_MESSAGES.SESSION_EXPIRED, ErrorCodes.EXPIRED_CHALLENGE);
     }
     return ApiClient.signRequest(payload, this.session.sessionPrivateKey);
   }
@@ -248,22 +239,12 @@ export class GhostID {
   async getDevices(): Promise<DeviceInfo[]> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
-    if (Date.now() > this.session.expiresAt) {
-      await this.logout();
-      throw new GhostIDError('Session expired: please login again', ErrorCodes.EXPIRED_CHALLENGE);
-    }
+    const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = ApiClient.signRequest(
-      { sessionId: this.session.sessionId, iat },
-      this.session.sessionPrivateKey
-    );
-    const response = await this.apiClient.devices.getDevices(
-      this.session.sessionId,
-      iat,
-      signature
-    );
+    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const response = await this.apiClient.devices.getDevices(sessionId, iat, signature);
     return response.devices;
   }
 

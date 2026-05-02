@@ -177,18 +177,59 @@ export const UA_HINTS: Array<[string, string]> = [
 // ============================================================================
 
 export const ERROR_MESSAGES = {
-  API_REQUEST_FAILED: 'API request failed after multiple retries',
-  CHALLENGE_EXPIRED: 'Challenge has expired',
-  CRYPTO_INIT_FAILED: 'Failed to initialize cryptographic library',
-  DEVICE_NOT_FOUND: 'Device not found',
-  INVALID_CHALLENGE: 'Invalid challenge provided',
+  // Core / lifecycle
+  NOT_INITIALIZED: 'GhostID not initialized: call init() first',
+  NO_ACTIVE_SESSION: 'No active session: login() first',
+  SESSION_EXPIRED: 'Session expired: please login again',
+
+  // Crypto / keys
   INVALID_MNEMONIC: 'Invalid BIP39 mnemonic phrase provided',
   KEY_DERIVATION_FAILED: 'Failed to derive root keys from BIP39 mnemonic',
-  NOT_INITIALIZED: 'GhostID not initialized. Call init() first.',
-  SESSION_EXPIRED: 'Session has expired',
+  SIGNING_FAILED: 'Failed to sign request payload',
+  INVALID_SIGNING_PAYLOAD: 'Invalid payload for signing',
+  INVALID_SIGNING_KEY: 'Invalid private key for signing',
   SIGNATURE_VERIFICATION_FAILED: 'Signature verification failed',
-  USER_NOT_FOUND: 'User not found',
+  CRYPTO_INIT_FAILED: 'Failed to initialize cryptographic library',
+
+  // WebAuthn / passkeys
   WEB_AUTHN_NOT_SUPPORTED: 'WebAuthn not available in this environment',
+  PASSKEY_CREATION_CANCELLED: 'Failed to create passkey: user may have cancelled',
+  PASSKEY_ASSERTION_CANCELLED: 'Failed to get passkey assertion: user may have cancelled or no credentials found',
+  PASSKEY_CREATION_FAILED: 'Passkey creation failed',
+  PASSKEY_ASSERTION_FAILED: 'Passkey authentication failed',
+
+  // API client configuration
+  INVALID_BASE_URL: 'Invalid baseUrl provided',
+  INVALID_BASE_URL_FORMAT: 'Invalid URL format for baseUrl',
+  BASE_URL_REQUIRES_HTTPS: 'baseUrl must use HTTPS (HTTP is only permitted for localhost)',
+  INVALID_TIMEOUT: 'Invalid timeout value',
+  INVALID_RETRY_ATTEMPTS: 'Invalid retry attempts value',
+
+  // Request validation
+  INVALID_HTTP_METHOD: 'Invalid HTTP method',
+  INVALID_PATH: 'Invalid path provided',
+  PATH_TOO_LONG: 'Path too long',
+  INVALID_PATH_FORMAT: 'Invalid path format',
+  INVALID_HEADER_NAME: 'Invalid header name',
+  FORBIDDEN_HEADER: 'Forbidden header',
+  INVALID_HEADER_VALUE: 'Invalid header value for',
+
+  // Request / response handling
+  FAILED_TO_SERIALIZE: 'Failed to serialize request data',
+  REQUEST_BODY_TOO_LARGE: 'Request body too large',
+  FAILED_TO_PARSE_RESPONSE: 'Failed to parse response JSON',
+  REQUEST_TIMED_OUT: 'Request timed out',
+
+  // Auth
+  INVALID_REGISTRATION_RESPONSE: 'Invalid registrationResponse provided',
+  INVALID_ASSERTION_RESPONSE: 'Invalid assertion provided',
+
+  // Misc
+  API_REQUEST_FAILED: 'API request failed after multiple retries',
+  CHALLENGE_EXPIRED: 'Challenge has expired',
+  DEVICE_NOT_FOUND: 'Device not found',
+  INVALID_CHALLENGE: 'Invalid challenge provided',
+  USER_NOT_FOUND: 'User not found',
 } as const;
 
 // ============================================================================

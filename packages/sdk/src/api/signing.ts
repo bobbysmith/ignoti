@@ -3,6 +3,7 @@
  * Request signing utilities for API client
  */
 
+import { ERROR_MESSAGES } from '@/constants';
 import { fromBase64, sign, stringToBytes, toBase64, verify } from '../core/crypto';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
@@ -13,12 +14,11 @@ import { ErrorCodes, GhostIDError } from '../core/errors';
  * @returns Base64-encoded signature
  */
 export function signRequest(payload: Record<string, unknown>, privateKey: Uint8Array): string {
-  // Validate inputs
   if (!payload || typeof payload !== 'object') {
-    throw new GhostIDError('Invalid payload for signing', ErrorCodes.INVALID_INPUT);
+    throw new GhostIDError(ERROR_MESSAGES.INVALID_SIGNING_PAYLOAD, ErrorCodes.INVALID_INPUT);
   }
-  if (!privateKey || !(privateKey instanceof Uint8Array) || privateKey.length === 0) {
-    throw new GhostIDError('Invalid private key for signing', ErrorCodes.INVALID_INPUT);
+  if (privateKey.length === 0) {
+    throw new GhostIDError(ERROR_MESSAGES.INVALID_SIGNING_KEY, ErrorCodes.INVALID_INPUT);
   }
 
   try {
@@ -27,11 +27,7 @@ export function signRequest(payload: Record<string, unknown>, privateKey: Uint8A
     const signature = sign(payloadBytes, privateKey);
     return toBase64(signature);
   } catch (error) {
-    throw new GhostIDError(
-      'Failed to sign request payload',
-      ErrorCodes.CRYPTOGRAPHY_ERROR,
-      error as Error
-    );
+    throw new GhostIDError(ERROR_MESSAGES.SIGNING_FAILED, ErrorCodes.CRYPTOGRAPHY_ERROR, error as Error);
   }
 }
 
@@ -48,14 +44,13 @@ export function verifyRequest(
   publicKey: Uint8Array
 ): boolean {
   try {
-    // Validate inputs
     if (!payload || typeof payload !== 'object') {
       return false;
     }
-    if (!signature || typeof signature !== 'string' || signature.trim().length === 0) {
+    if (!signature || signature.trim().length === 0) {
       return false;
     }
-    if (!publicKey || !(publicKey instanceof Uint8Array) || publicKey.length === 0) {
+    if (publicKey.length === 0) {
       return false;
     }
 
