@@ -1,4 +1,4 @@
-import { ROOT_BINDING_TYP } from '@ghostid/shared';
+import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { decodeJwt, decodeProtectedHeader, importJWK, jwtVerify } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { signDeviceBindingJWS } from '@/api/root-jws.ts';
@@ -33,6 +33,8 @@ describe('signDeviceBindingJWS', () => {
     expect(payload.credentialId).toBe(VALID_CLAIMS.credentialId);
     expect(payload.challenge).toBe(VALID_CLAIMS.challenge);
     expect(typeof payload.iat).toBe('number');
+    expect(typeof payload.exp).toBe('number');
+    expect(payload.exp).toBe((payload.iat as number) + ROOT_JWS_MAX_AGE_SECONDS);
   });
 
   it('signature verifies against the public key', async () => {

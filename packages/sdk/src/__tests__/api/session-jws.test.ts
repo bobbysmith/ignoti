@@ -1,4 +1,4 @@
-import { SESSION_BINDING_TYP } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { decodeJwt, decodeProtectedHeader, importJWK, jwtVerify } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { signSessionBindingJWS } from '@/api/session-jws.ts';
@@ -21,6 +21,8 @@ describe('signSessionBindingJWS', () => {
     const payload = decodeJwt(jws);
     expect(payload.sessionChallenge).toBe(VALID_CLAIMS.sessionChallenge);
     expect(typeof payload.iat).toBe('number');
+    expect(typeof payload.exp).toBe('number');
+    expect(payload.exp).toBe((payload.iat as number) + SESSION_JWS_MAX_AGE_SECONDS);
   });
 
   it('embeds the session public key as jwk in the protected header', async () => {

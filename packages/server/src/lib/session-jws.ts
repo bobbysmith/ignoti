@@ -13,7 +13,7 @@
  * a valid Ed25519 keypair, and that keypair becomes the session's identity.
  */
 
-import { SESSION_BINDING_TYP } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { decodeProtectedHeader, EmbeddedJWK, type JWTPayload, jwtVerify } from 'jose';
 
 interface VerifiedSessionBinding {
@@ -55,6 +55,7 @@ export async function verifySessionBindingJWS(jws: string): Promise<VerifiedSess
   const { payload } = await jwtVerify(jws, EmbeddedJWK, {
     algorithms: ['EdDSA'],
     typ: SESSION_BINDING_TYP,
+    maxTokenAge: SESSION_JWS_MAX_AGE_SECONDS,
   });
 
   if (typeof payload.sessionChallenge !== 'string' || payload.sessionChallenge.length === 0) {

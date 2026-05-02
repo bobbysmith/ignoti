@@ -1,4 +1,4 @@
-import { SESSION_BINDING_TYP } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -175,6 +175,29 @@ describe('verifySessionBindingJWS', () => {
     it('throws when the payload segment is tampered', async () => {
       const jws = await signSessionJWS(CHALLENGE, keypair);
       await expect(verifySessionBindingJWS(tamperPayload(jws))).rejects.toThrow();
+    });
+  });
+
+  describe('expiry enforcement', () => {
+    it('rejects a JWS whose exp is in the past', async () => {
+      const jwk = {
+        kty: 'OKP',
+        crv: 'Ed25519',
+        d: Buffer.from(keypair.privateKey).toString('base64url'),
+        x: keypair.publicKeyB64,
+      };
+      const key = await importJWK(jwk, 'EdDSA');
+      const expiredIat = Math.floor(Date.now() / 1000) - SESSION_JWS_MAX_AGE_SECONDS - 1;
+      const jws = await new SignJWT({ sessionChallenge: CHALLENGE })
+        .setProtectedHeader({
+          alg: 'EdDSA',
+          typ: SESSION_BINDING_TYP,
+          jwk: { kty: 'OKP', crv: 'Ed25519', x: keypair.publicKeyB64 },
+        })
+        .setIssuedAt(expiredIat)
+        .setExpirationTime(expiredIat + SESSION_JWS_MAX_AGE_SECONDS)
+        .sign(key);
+      await expect(verifySessionBindingJWS(jws)).rejects.toThrow();
     });
   });
 

@@ -7,9 +7,12 @@ export const SESSION_BINDING_TYP = 'ghostid-session-binding+jwt';
 export type RootPurpose = 'register-device' | 'recover-device' | 'revoke-device';
 
 // Maximum age of a root-key JWS (register-device / recover-device / revoke-device).
-// The SDK sets `iat` via setIssuedAt(); the server rejects tokens older than this.
-// Both sides must agree so the SDK can set `exp = iat + ROOT_JWS_MAX_AGE_SECONDS`.
+// SDK sets exp = iat + ROOT_JWS_MAX_AGE_SECONDS; server enforces via maxTokenAge.
 export const ROOT_JWS_MAX_AGE_SECONDS = 300;
+
+// Maximum age of a session-binding JWS (POST /session).
+// SDK sets exp = iat + SESSION_JWS_MAX_AGE_SECONDS; server enforces via maxTokenAge.
+export const SESSION_JWS_MAX_AGE_SECONDS = 60;
 
 // Authorization header scheme used for session-authenticated requests
 export const SESSION_AUTH_SCHEME = 'GhostID-Session';

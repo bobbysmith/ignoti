@@ -9,7 +9,7 @@
  * misread as any other JWT in the application.
  */
 
-import { ROOT_BINDING_TYP, type RootPurpose } from '@ghostid/shared';
+import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS, type RootPurpose } from '@ghostid/shared';
 import { importJWK, SignJWT } from 'jose';
 
 import { toBase64 } from '../core/crypto';
@@ -45,5 +45,6 @@ export async function signDeviceBindingJWS(
   return new SignJWT({ ...claims })
     .setProtectedHeader({ alg: 'EdDSA', typ: ROOT_BINDING_TYP })
     .setIssuedAt()
+    .setExpirationTime(`${ROOT_JWS_MAX_AGE_SECONDS}s`)
     .sign(key);
 }

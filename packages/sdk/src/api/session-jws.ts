@@ -13,7 +13,7 @@
  * `ghostid-root-binding+jwt`.
  */
 
-import { SESSION_BINDING_TYP } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { importJWK, SignJWT } from 'jose';
 
 import { toBase64 } from '../core/crypto';
@@ -51,5 +51,6 @@ export async function signSessionBindingJWS(
       jwk: { kty: 'OKP', crv: 'Ed25519', x: xB64 },
     })
     .setIssuedAt()
+    .setExpirationTime(`${SESSION_JWS_MAX_AGE_SECONDS}s`)
     .sign(key);
 }

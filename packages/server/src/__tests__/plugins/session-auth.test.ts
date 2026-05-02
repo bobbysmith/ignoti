@@ -60,7 +60,11 @@ function makeMockReply() {
 }
 
 function makeReq(headers: Record<string, string | string[] | undefined> = {}) {
-  return { headers, sessionContext: null } as unknown as Parameters<typeof requireSession>[0];
+  return {
+    headers,
+    sessionContext: null,
+    log: { error: vi.fn() },
+  } as unknown as Parameters<typeof requireSession>[0];
 }
 
 let keypair: Keypair;
@@ -457,6 +461,20 @@ describe('session auth', () => {
           reply as never
         );
         expect(reply.send).not.toHaveBeenCalled();
+      });
+
+      it('logs error when touchSession rejects', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        vi.mocked(touchSession).mockRejectedValue(new Error('db down'));
+        const iat = Math.floor(Date.now() / 1000);
+        const req = makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        await requireSession(req, makeMockReply() as never);
+        // fire-and-forget: flush the microtask queue so the .catch runs
+        await Promise.resolve();
+        expect(req.log.error).toHaveBeenCalledWith(
+          expect.objectContaining({ sessionId: SESSION_ID }),
+          'touchSession failed'
+        );
       });
 
       it('calls touchSession with the sessionId on success', async () => {
