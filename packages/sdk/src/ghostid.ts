@@ -265,29 +265,21 @@ export class GhostID {
 
   /**
    * Revokes a device using the root key derived from the mnemonic.
-   * Fetches the device list first to obtain the credential ID needed for the JWS.
+   * `userId` and `credentialId` are available from `createIdentity`, `recoverIdentity`,
+   * or a prior `getDdeviceId: string, mnemonic: string, p0: string, p1: string
    */
-  async revokeDevice(deviceId: string, mnemonic: string): Promise<void> {
+  async revokeDevice(
+    deviceId: string,
+    mnemonic: string,
+    userId: string,
+    credentialId: string
+  ): Promise<void> {
     this.ensureInitialized();
-    if (!this.session) {
-      throw new GhostIDError('No active session: login() first', ErrorCodes.NO_KEYS);
-    }
-
-    const devices = await this.getDevices();
-    const device = devices.find(d => d.id === deviceId);
-    if (!device) {
-      throw new GhostIDError('Device not found', ErrorCodes.INVALID_INPUT);
-    }
 
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
     try {
       const rootSignature = await signDeviceBindingJWS(
-        {
-          purpose: 'revoke-device',
-          userId: this.session.userId,
-          credentialId: device.credentialId,
-          challenge: deviceId,
-        },
+        { purpose: 'revoke-device', userId, credentialId, challenge: deviceId },
         rootKeySet.signing.privateKey,
         rootKeySet.signing.publicKey
       );

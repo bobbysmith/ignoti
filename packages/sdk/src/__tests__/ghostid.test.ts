@@ -308,40 +308,35 @@ describe('GhostID', () => {
   });
 
   describe('revokeDevice', () => {
-    it('throws NO_KEYS when no session', async () => {
+    const MNEMONIC = 'word '.repeat(12).trim();
+
+    it('works without an active session', async () => {
       const g = initializedSdk();
-      await expect(g.revokeDevice('device-1', 'mnemonic')).rejects.toThrow(GhostIDError);
-    });
-
-    it('throws INVALID_INPUT when device not found in list', async () => {
-      const { g } = await withSession();
-      mockGetDevices.mockResolvedValue({ devices: [] });
-      await expect(g.revokeDevice('unknown-id', 'mnemonic')).rejects.toThrow('Device not found');
-    });
-
-    it('calls revokeDevice API and wipes root key on success', async () => {
-      const { g } = await withSession();
-      mockGetDevices.mockResolvedValue({
-        devices: [{ id: 'device-1', credentialId: 'cred-id', name: 'My Device', createdAt: 0 }],
-      });
       mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
       mockRevokeDevice.mockResolvedValue({ ok: true });
 
-      await g.revokeDevice('device-1', 'word '.repeat(12).trim());
+      await expect(
+        g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id')
+      ).resolves.toBeUndefined();
+    });
+
+    it('calls revokeDevice API with correct deviceId and root signature', async () => {
+      const g = initializedSdk();
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      mockRevokeDevice.mockResolvedValue({ ok: true });
+
+      await g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id');
 
       expect(mockRevokeDevice).toHaveBeenCalledWith('device-1', 'root-sig');
       expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
     });
 
     it('wipes root key even when revokeDevice API throws', async () => {
-      const { g } = await withSession();
-      mockGetDevices.mockResolvedValue({
-        devices: [{ id: 'device-1', credentialId: 'cred-id', name: 'My Device', createdAt: 0 }],
-      });
+      const g = initializedSdk();
       mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
       mockRevokeDevice.mockRejectedValue(new Error('network'));
 
-      await expect(g.revokeDevice('device-1', 'word '.repeat(12).trim())).rejects.toThrow(
+      await expect(g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id')).rejects.toThrow(
         'network'
       );
       expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
