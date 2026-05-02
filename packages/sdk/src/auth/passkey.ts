@@ -1,6 +1,6 @@
 import { ERROR_MESSAGES } from '@/constants';
 import type { FormattedCreatePasskeyResponse, FormattedGetPasskeyAssertionResponse } from '@/types';
-import { CryptoUtils } from '../core/crypto';
+import { bufferToBase64Url } from '../core/crypto';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
 declare const window: {
@@ -42,13 +42,13 @@ export async function createPasskey(
 
     return {
       id: cred.id,
-      rawId: CryptoUtils.bufferToBase64Url(cred.rawId),
+      rawId: bufferToBase64Url(cred.rawId),
       type: cred.type as 'public-key',
       authenticatorAttachment,
       clientExtensionResults: cred.getClientExtensionResults(),
       response: {
-        clientDataJSON: CryptoUtils.bufferToBase64Url(resp.clientDataJSON),
-        attestationObject: CryptoUtils.bufferToBase64Url(resp.attestationObject),
+        clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
+        attestationObject: bufferToBase64Url(resp.attestationObject),
         transports,
       },
     };
@@ -95,17 +95,15 @@ export async function getPasskeyAssertion(
 
     return {
       id: assertion.id,
-      rawId: CryptoUtils.bufferToBase64Url(assertion.rawId),
+      rawId: bufferToBase64Url(assertion.rawId),
       type: assertion.type as 'public-key',
       authenticatorAttachment,
       clientExtensionResults: assertion.getClientExtensionResults(),
       response: {
-        clientDataJSON: CryptoUtils.bufferToBase64Url(resp.clientDataJSON),
-        authenticatorData: CryptoUtils.bufferToBase64Url(resp.authenticatorData),
-        signature: CryptoUtils.bufferToBase64Url(resp.signature),
-        userHandle: resp.userHandle
-          ? CryptoUtils.bufferToBase64Url(resp.userHandle as ArrayBuffer)
-          : null,
+        clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
+        authenticatorData: bufferToBase64Url(resp.authenticatorData),
+        signature: bufferToBase64Url(resp.signature),
+        userHandle: resp.userHandle ? bufferToBase64Url(resp.userHandle as ArrayBuffer) : null,
       },
     };
   } catch (error) {

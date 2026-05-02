@@ -16,7 +16,7 @@
 import { SESSION_BINDING_TYP } from '@ghostid/shared';
 import { importJWK, SignJWT } from 'jose';
 
-import { CryptoUtils } from '../core/crypto';
+import { toBase64 } from '../core/crypto';
 
 export interface SessionBindingClaims {
   /** Server-issued nonce returned from POST /login. Single-use, short-lived. */
@@ -36,11 +36,11 @@ export async function signSessionBindingJWS(
   if (sessionPrivateKey.length !== 32 || sessionPublicKey.length !== 32) {
     throw new Error('Ed25519 keys must be 32 bytes (seed and public key)');
   }
-  const xB64 = CryptoUtils.toBase64(sessionPublicKey);
+  const xB64 = toBase64(sessionPublicKey);
   const jwk = {
     kty: 'OKP',
     crv: 'Ed25519',
-    d: CryptoUtils.toBase64(sessionPrivateKey),
+    d: toBase64(sessionPrivateKey),
     x: xB64,
   };
   const key = await importJWK(jwk, 'EdDSA');

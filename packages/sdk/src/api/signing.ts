@@ -3,7 +3,7 @@
  * Request signing utilities for API client
  */
 
-import { CryptoUtils } from '../core/crypto';
+import { fromBase64, sign, stringToBytes, toBase64, verify } from '../core/crypto';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
 /**
@@ -23,9 +23,9 @@ export function signRequest(payload: Record<string, unknown>, privateKey: Uint8A
 
   try {
     const payloadString = JSON.stringify(payload);
-    const payloadBytes = CryptoUtils.stringToBytes(payloadString);
-    const signature = CryptoUtils.sign(payloadBytes, privateKey);
-    return CryptoUtils.toBase64(signature);
+    const payloadBytes = stringToBytes(payloadString);
+    const signature = sign(payloadBytes, privateKey);
+    return toBase64(signature);
   } catch (error) {
     throw new GhostIDError(
       'Failed to sign request payload',
@@ -60,9 +60,9 @@ export function verifyRequest(
     }
 
     const payloadString = JSON.stringify(payload);
-    const payloadBytes = CryptoUtils.stringToBytes(payloadString);
-    const signatureBytes = CryptoUtils.fromBase64(signature.trim());
-    return CryptoUtils.verify(signatureBytes, payloadBytes, publicKey);
+    const payloadBytes = stringToBytes(payloadString);
+    const signatureBytes = fromBase64(signature.trim());
+    return verify(signatureBytes, payloadBytes, publicKey);
   } catch {
     return false;
   }

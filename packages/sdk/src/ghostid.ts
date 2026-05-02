@@ -15,7 +15,15 @@ import { signDeviceBindingJWS } from './api/root-jws';
 import { signSessionBindingJWS } from './api/session-jws';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
 import { UA_HINTS } from './constants';
-import { CryptoUtils } from './core/crypto';
+import {
+  base64UrlToBuffer,
+  bufferToBase64Url,
+  deriveRootKeysFromMnemonic,
+  generateMnemonic,
+  generateSessionSigningKeypair,
+  secureWipe,
+  toBase64,
+} from './core/crypto';
 import { ErrorCodes, GhostIDError } from './core/errors';
 import type {
   CreateIdentityResult,
@@ -82,9 +90,9 @@ export class GhostID {
       );
     }
 
-    const mnemonic = CryptoUtils.generateMnemonic();
-    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
-    const rootPublicKey = CryptoUtils.toBase64(rootKeySet.signing.publicKey);
+    const mnemonic = generateMnemonic();
+    const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
+    const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
     try {
       const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });
@@ -114,7 +122,7 @@ export class GhostID {
 
       return { mnemonic, userId, deviceId: deviceResponse.deviceId };
     } finally {
-      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+      secureWipe(rootKeySet.signing.privateKey);
     }
   }
 
@@ -140,7 +148,7 @@ export class GhostID {
 
     const loginResponse = await this.apiClient.auth.login({ assertion });
 
-    const sessionKeyPair = CryptoUtils.generateSessionSigningKeypair();
+    const sessionKeyPair = generateSessionSigningKeypair();
     let sessionResponse: CreateSessionResponse;
     try {
       const sessionBinding = await signSessionBindingJWS(
@@ -150,7 +158,7 @@ export class GhostID {
       );
       sessionResponse = await this.apiClient.auth.createSession({ sessionBinding });
     } catch (err) {
-      CryptoUtils.secureWipe(sessionKeyPair.privateKey);
+      secureWipe(sessionKeyPair.privateKey);
       throw err;
     }
 
@@ -179,8 +187,8 @@ export class GhostID {
       );
     }
 
-    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
-    const rootPublicKey = CryptoUtils.toBase64(rootKeySet.signing.publicKey);
+    const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
+    const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
     try {
       const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
@@ -209,7 +217,7 @@ export class GhostID {
 
       return { userId, deviceId: deviceResponse.deviceId };
     } finally {
-      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+      secureWipe(rootKeySet.signing.privateKey);
     }
   }
 
@@ -229,7 +237,7 @@ export class GhostID {
   async logout(): Promise<void> {
     this.ensureInitialized();
     if (this.session) {
-      CryptoUtils.secureWipe(this.session.sessionPrivateKey);
+      secureWipe(this.session.sessionPrivateKey);
       this.session = null;
     }
   }
@@ -268,7 +276,7 @@ export class GhostID {
       throw new GhostIDError('Device not found', ErrorCodes.INVALID_INPUT);
     }
 
-    const rootKeySet = await CryptoUtils.deriveRootKeysFromMnemonic(mnemonic);
+    const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
     try {
       const rootSignature = await signDeviceBindingJWS(
         {
@@ -282,7 +290,7 @@ export class GhostID {
       );
       await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
     } finally {
-      CryptoUtils.secureWipe(rootKeySet.signing.privateKey);
+      secureWipe(rootKeySet.signing.privateKey);
     }
   }
 
@@ -301,7 +309,7 @@ export class GhostID {
 
   destroy(): void {
     if (this.session) {
-      CryptoUtils.secureWipe(this.session.sessionPrivateKey);
+      secureWipe(this.session.sessionPrivateKey);
       this.session = null;
     }
     this.initialized = false;
@@ -333,10 +341,10 @@ function optionsFromServer(optsJson: Record<string, unknown>): PublicKeyCredenti
     excludeCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
   };
   return {
-    challenge: CryptoUtils.base64UrlToBuffer(j.challenge),
+    challenge: base64UrlToBuffer(j.challenge),
     rp: j.rp,
     user: {
-      id: CryptoUtils.base64UrlToBuffer(j.user.id),
+      id: base64UrlToBuffer(j.user.id),
       name: j.user.name,
       displayName: j.user.displayName,
     },
@@ -345,7 +353,7 @@ function optionsFromServer(optsJson: Record<string, unknown>): PublicKeyCredenti
     timeout: j.timeout ?? 60000,
     attestation: j.attestation ?? 'none',
     excludeCredentials: j.excludeCredentials?.map(c => ({
-      id: CryptoUtils.base64UrlToBuffer(c.id),
+      id: base64UrlToBuffer(c.id),
       type: c.type,
       transports: c.transports as AuthenticatorTransport[] | undefined,
     })),
@@ -354,7 +362,7 @@ function optionsFromServer(optsJson: Record<string, unknown>): PublicKeyCredenti
 
 /** Re-extracts the base64url challenge from the converted options for binding. */
 function extractChallenge(opts: PublicKeyCredentialCreationOptions): string {
-  return CryptoUtils.bufferToBase64Url(opts.challenge as ArrayBuffer);
+  return bufferToBase64Url(opts.challenge as ArrayBuffer);
 }
 
 /**
@@ -372,12 +380,12 @@ function requestOptionsFromServer(
     allowCredentials?: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
   };
   return {
-    challenge: CryptoUtils.base64UrlToBuffer(j.challenge),
+    challenge: base64UrlToBuffer(j.challenge),
     timeout: j.timeout ?? 60000,
     rpId: j.rpId,
     userVerification: j.userVerification ?? 'required',
     allowCredentials: j.allowCredentials?.map(c => ({
-      id: CryptoUtils.base64UrlToBuffer(c.id),
+      id: base64UrlToBuffer(c.id),
       type: c.type,
       transports: c.transports as AuthenticatorTransport[] | undefined,
     })),

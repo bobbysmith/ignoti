@@ -12,7 +12,7 @@
 import { ROOT_BINDING_TYP, type RootPurpose } from '@ghostid/shared';
 import { importJWK, SignJWT } from 'jose';
 
-import { CryptoUtils } from '../core/crypto';
+import { toBase64 } from '../core/crypto';
 
 export interface DeviceBindingClaims {
   purpose: RootPurpose;
@@ -38,8 +38,8 @@ export async function signDeviceBindingJWS(
   const jwk = {
     kty: 'OKP',
     crv: 'Ed25519',
-    d: CryptoUtils.toBase64(rootPrivateKey),
-    x: CryptoUtils.toBase64(rootPublicKey),
+    d: toBase64(rootPrivateKey),
+    x: toBase64(rootPublicKey),
   };
   const key = await importJWK(jwk, 'EdDSA');
   return new SignJWT({ ...claims })

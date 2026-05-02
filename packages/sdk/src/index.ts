@@ -14,7 +14,22 @@ export {
   VALIDATION,
   WEBAUTHN,
 } from './constants';
-export { CryptoUtils } from './core/crypto';
+export {
+  base64UrlToBuffer,
+  bufferToBase64Url,
+  constantTimeEqual,
+  fromBase64,
+  generateMnemonic,
+  generateNonce,
+  generateSessionSigningKeypair,
+  hash,
+  secureWipe,
+  sign,
+  stringToBytes,
+  toBase64,
+  validateMnemonic,
+  verify,
+} from './core/crypto';
 export { ErrorCodes, GhostIDError } from './core/errors';
 export { GhostID } from './ghostid';
 export type {
