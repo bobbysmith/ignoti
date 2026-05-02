@@ -57,7 +57,10 @@ export function base64UrlToBuffer(base64Url: string): ArrayBuffer {
   return ab;
 }
 
-/** @param privateKey 32-byte Ed25519 seed */
+/**
+ * @param message
+ * @param privateKey 32-byte Ed25519 seed
+ */
 export function sign(message: Uint8Array, privateKey: Uint8Array): Uint8Array {
   return ed25519.sign(message, privateKey);
 }

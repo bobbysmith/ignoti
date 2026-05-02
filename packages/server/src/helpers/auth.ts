@@ -1,27 +1,27 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server';
+import { z } from 'zod';
 import { config } from '../config.js';
 import { WEBAUTHN_TIMEOUT_MS } from '../constants';
-
-interface ClientDataJSON {
-  challenge: string;
-}
 
 interface WebAuthnResponse {
   response: { clientDataJSON: string };
 }
 
+const clientDataSchema = z.object({ challenge: z.string().min(1) });
+
 export function extractChallenge(resp: WebAuthnResponse): string {
-  let parsed: ClientDataJSON;
+  let parsed: unknown;
   try {
     const json = Buffer.from(resp.response.clientDataJSON, 'base64url').toString('utf-8');
-    parsed = JSON.parse(json) as ClientDataJSON;
+    parsed = JSON.parse(json);
   } catch {
     throw new Error('malformed clientDataJSON');
   }
-  if (typeof parsed.challenge !== 'string' || !parsed.challenge) {
+  const result = clientDataSchema.safeParse(parsed);
+  if (!result.success) {
     throw new Error('missing challenge in clientDataJSON');
   }
-  return parsed.challenge;
+  return result.data.challenge;
 }
 
 export async function buildRegistrationOptions(userId: string) {

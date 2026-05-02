@@ -19,47 +19,45 @@ export async function createPasskey(
     throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
   }
 
+  let cred: PublicKeyCredential | null;
+
   try {
-    const cred = (await navigator.credentials.create({
+    cred = (await navigator.credentials.create({
       publicKey: options,
     })) as PublicKeyCredential | null;
-
-    if (!cred) {
-      throw new GhostIDError(ERROR_MESSAGES.PASSKEY_CREATION_CANCELLED, ErrorCodes.INVALID_INPUT);
-    }
-
-    const resp = cred.response as AuthenticatorAttestationResponse;
-    const transports =
-      typeof resp.getTransports === 'function'
-        ? (resp.getTransports() as AuthenticatorTransport[])
-        : undefined;
-    const authenticatorAttachment =
-      (cred as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
-        .authenticatorAttachment ?? undefined;
-
-    return {
-      id: cred.id,
-      rawId: bufferToBase64Url(cred.rawId),
-      type: cred.type as 'public-key',
-      authenticatorAttachment,
-      clientExtensionResults: cred.getClientExtensionResults(),
-      response: {
-        clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
-        attestationObject: bufferToBase64Url(resp.attestationObject),
-        transports,
-      },
-    };
   } catch (error) {
-    if (error instanceof GhostIDError) {
-      throw error;
-    }
-
     throw new GhostIDError(
       `${ERROR_MESSAGES.PASSKEY_CREATION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
     );
   }
+
+  if (!cred) {
+    throw new GhostIDError(ERROR_MESSAGES.PASSKEY_CREATION_CANCELLED, ErrorCodes.INVALID_INPUT);
+  }
+
+  const resp = cred.response as AuthenticatorAttestationResponse;
+  const transports =
+    typeof resp.getTransports === 'function'
+      ? (resp.getTransports() as AuthenticatorTransport[])
+      : undefined;
+  const authenticatorAttachment =
+    (cred as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
+      .authenticatorAttachment ?? undefined;
+
+  return {
+    id: cred.id,
+    rawId: bufferToBase64Url(cred.rawId),
+    type: cred.type as 'public-key',
+    authenticatorAttachment,
+    clientExtensionResults: cred.getClientExtensionResults(),
+    response: {
+      clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
+      attestationObject: bufferToBase64Url(resp.attestationObject),
+      transports,
+    },
+  };
 }
 
 /**
@@ -74,42 +72,42 @@ export async function getPasskeyAssertion(
     throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
   }
 
+  let assertion: PublicKeyCredential | null;
+
   try {
-    const assertion = (await navigator.credentials.get({
+    assertion = (await navigator.credentials.get({
       publicKey: options,
     })) as PublicKeyCredential | null;
-    if (!assertion) {
-      throw new GhostIDError(ERROR_MESSAGES.PASSKEY_ASSERTION_CANCELLED, ErrorCodes.INVALID_INPUT);
-    }
-
-    const resp = assertion.response as AuthenticatorAssertionResponse;
-    const authenticatorAttachment =
-      (assertion as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
-        .authenticatorAttachment ?? undefined;
-
-    return {
-      id: assertion.id,
-      rawId: bufferToBase64Url(assertion.rawId),
-      type: assertion.type as 'public-key',
-      authenticatorAttachment,
-      clientExtensionResults: assertion.getClientExtensionResults(),
-      response: {
-        clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
-        authenticatorData: bufferToBase64Url(resp.authenticatorData),
-        signature: bufferToBase64Url(resp.signature),
-        userHandle: resp.userHandle ? bufferToBase64Url(resp.userHandle as ArrayBuffer) : null,
-      },
-    };
   } catch (error) {
-    if (error instanceof GhostIDError) {
-      throw error;
-    }
     throw new GhostIDError(
       `${ERROR_MESSAGES.PASSKEY_ASSERTION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
     );
   }
+
+  if (!assertion) {
+    throw new GhostIDError(ERROR_MESSAGES.PASSKEY_ASSERTION_CANCELLED, ErrorCodes.INVALID_INPUT);
+  }
+
+  const resp = assertion.response as AuthenticatorAssertionResponse;
+  const authenticatorAttachment =
+    (assertion as PublicKeyCredential & { authenticatorAttachment?: AuthenticatorAttachment })
+      .authenticatorAttachment ?? undefined;
+
+  return {
+    id: assertion.id,
+    rawId: bufferToBase64Url(assertion.rawId),
+    type: assertion.type as 'public-key',
+    authenticatorAttachment,
+    clientExtensionResults: assertion.getClientExtensionResults(),
+    response: {
+      clientDataJSON: bufferToBase64Url(resp.clientDataJSON),
+      authenticatorData: bufferToBase64Url(resp.authenticatorData),
+      signature: bufferToBase64Url(resp.signature),
+      userHandle: resp.userHandle ? bufferToBase64Url(resp.userHandle as ArrayBuffer) : null,
+    },
+  };
 }
 
 export function isWebAuthnSupported(): boolean {

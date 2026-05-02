@@ -105,16 +105,16 @@ GhostID is designed to be self-hosted. Your users' identity data lives in your P
 
 **Required environment variables:**
 
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | Postgres connection string | required |
-| `RP_ID` | WebAuthn relying party ID (your domain) | `localhost` |
-| `RP_NAME` | Display name shown in passkey dialogs | `GhostID` |
-| `RP_ORIGIN` | Allowed origin(s), comma-separated | `http://localhost:5173` |
-| `CHALLENGE_TTL_SECONDS` | How long challenges stay valid | `300` |
-| `SESSION_TTL_SECONDS` | How long sessions stay valid | `86400` |
-| `PORT` | Server port | `8787` |
-| `HOST` | Server host | `0.0.0.0` |
+| Variable                | Description                             | Default                 |
+|-------------------------|-----------------------------------------|-------------------------|
+| `DATABASE_URL`          | Postgres connection string              | required                |
+| `RP_ID`                 | WebAuthn relying party ID (your domain) | `localhost`             |
+| `RP_NAME`               | Display name shown in passkey dialogs   | `GhostID`               |
+| `RP_ORIGIN`             | Allowed origin(s), comma-separated      | `http://localhost:5173` |
+| `CHALLENGE_TTL_SECONDS` | How long challenges stay valid          | `300`                   |
+| `SESSION_TTL_SECONDS`   | How long sessions stay valid            | `86400`                 |
+| `PORT`                  | Server port                             | `8787`                  |
+| `HOST`                  | Server host                             | `0.0.0.0`               |
 
 **Database maintenance:**
 
