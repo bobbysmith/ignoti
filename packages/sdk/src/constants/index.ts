@@ -194,7 +194,8 @@ export const ERROR_MESSAGES = {
   // WebAuthn / passkeys
   WEB_AUTHN_NOT_SUPPORTED: 'WebAuthn not available in this environment',
   PASSKEY_CREATION_CANCELLED: 'Failed to create passkey: user may have cancelled',
-  PASSKEY_ASSERTION_CANCELLED: 'Failed to get passkey assertion: user may have cancelled or no credentials found',
+  PASSKEY_ASSERTION_CANCELLED:
+    'Failed to get passkey assertion: user may have cancelled or no credentials found',
   PASSKEY_CREATION_FAILED: 'Passkey creation failed',
   PASSKEY_ASSERTION_FAILED: 'Passkey authentication failed',
 

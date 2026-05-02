@@ -75,7 +75,10 @@ export class CoreApiClient {
         method as (typeof SECURITY.ALLOWED_HTTP_METHODS)[number]
       )
     ) {
-      throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HTTP_METHOD}: ${method}`, ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(
+        `${ERROR_MESSAGES.INVALID_HTTP_METHOD}: ${method}`,
+        ErrorCodes.INVALID_INPUT
+      );
     }
   }
 
@@ -108,14 +111,23 @@ export class CoreApiClient {
         name.length > SECURITY.MAX_HEADER_NAME_LENGTH ||
         !HEADER_NAME_RE.test(name)
       ) {
-        throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HEADER_NAME}: ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(
+          `${ERROR_MESSAGES.INVALID_HEADER_NAME}: ${name}`,
+          ErrorCodes.INVALID_INPUT
+        );
       }
       const lower = name.toLowerCase();
       if (FORBIDDEN_REQUEST_HEADERS.has(lower)) {
-        throw new GhostIDError(`${ERROR_MESSAGES.FORBIDDEN_HEADER}: ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(
+          `${ERROR_MESSAGES.FORBIDDEN_HEADER}: ${name}`,
+          ErrorCodes.INVALID_INPUT
+        );
       }
       if (value.length > SECURITY.MAX_HEADER_VALUE_LENGTH || !HEADER_VALUE_RE.test(value)) {
-        throw new GhostIDError(`${ERROR_MESSAGES.INVALID_HEADER_VALUE} ${name}`, ErrorCodes.INVALID_INPUT);
+        throw new GhostIDError(
+          `${ERROR_MESSAGES.INVALID_HEADER_VALUE} ${name}`,
+          ErrorCodes.INVALID_INPUT
+        );
       }
       out[lower] = value;
     }
@@ -132,7 +144,11 @@ export class CoreApiClient {
     try {
       stringified = JSON.stringify(data);
     } catch (error) {
-      throw new GhostIDError(ERROR_MESSAGES.FAILED_TO_SERIALIZE, ErrorCodes.INVALID_INPUT, error as Error);
+      throw new GhostIDError(
+        ERROR_MESSAGES.FAILED_TO_SERIALIZE,
+        ErrorCodes.INVALID_INPUT,
+        error as Error
+      );
     }
     if (stringified.length > SECURITY.MAX_REQUEST_BODY_SIZE) {
       throw new GhostIDError(ERROR_MESSAGES.REQUEST_BODY_TOO_LARGE, ErrorCodes.INVALID_INPUT);
@@ -182,63 +198,91 @@ export class CoreApiClient {
     // every GhostID mutation is guarded server-side by a single-use challenge
     // or a unique constraint, so a duplicate request is rejected, not applied.
 
-    let lastError: Error | null = null;
-    try {
-      for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
-        try {
-          const response = await fetch(url, requestOptions);
-          if (!response.ok) {
-            const errorData = await this.parseErrorResponse(response);
-            const message = this.capErrorMessage(
-              errorData.error ||
-                errorData.message ||
-                `HTTP ${response.status}: ${response.statusText}`
-            );
-            throw new GhostIDError(
-              message,
-              ErrorCodes.API_ERROR,
-              new Error(`HTTP ${response.status}`),
-              response.status
-            );
-          }
-          try {
-            return (await response.json()) as T;
-          } catch (parseError) {
-            throw new GhostIDError(ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE, ErrorCodes.API_ERROR, parseError as Error);
-          }
-        } catch (error) {
-          lastError = error as Error;
-          // Timeout - the AbortController has fired; retrying against the same
-          // already-aborted signal would fail instantly, so surface immediately.
-          if (error instanceof Error && error.name === 'AbortError') {
-            throw new GhostIDError(ERROR_MESSAGES.REQUEST_TIMED_OUT, ErrorCodes.API_ERROR, error);
-          }
-          // Network-level failure (DNS, TCP). Not transient in the way a 5xx is.
-          if (error instanceof TypeError) throw error;
-          if (error instanceof GhostIDError && error.httpStatus !== undefined) {
-            const { httpStatus: status } = error;
-            // 4xx: client errors - retrying won't change the outcome.
-            // 501: server does not implement the endpoint - not transient.
-            if (
-              (status >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
-                status <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
-              status === HTTP_STATUS.NOT_IMPLEMENTED
-            ) {
-              throw error;
-            }
-            // All other 5xx (500, 502, 503, 504 …) are treated as transient.
-          }
-          if (attempt === this.retryAttempts) break;
-          const delay = Math.min(
+    const retryDelay = (attempt: number) =>
+      new Promise<void>(resolve =>
+        setTimeout(
+          resolve,
+          Math.min(
             TIMEOUTS.DEFAULT_RETRY_DELAY * RETRY.EXPONENTIAL_BACKOFF_BASE ** (attempt - 1),
             TIMEOUTS.MAX_RETRY_DELAY
+          )
+        )
+      );
+
+    let lastError: Error | null = null;
+
+    try {
+      for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
+        let response: Response;
+
+        try {
+          response = await fetch(url, requestOptions);
+        } catch (fetchError) {
+          lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            throw new GhostIDError(
+              ERROR_MESSAGES.REQUEST_TIMED_OUT,
+              ErrorCodes.API_ERROR,
+              fetchError
+            );
+          }
+
+          if (fetchError instanceof TypeError) {
+            throw fetchError;
+          }
+          if (attempt < this.retryAttempts) {
+            await retryDelay(attempt);
+          }
+
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorData = await this.parseErrorResponse(response);
+          const message = this.capErrorMessage(
+            errorData.error ||
+              errorData.message ||
+              `HTTP ${response.status}: ${response.statusText}`
           );
-          await new Promise<void>(resolve => setTimeout(() => resolve(), delay));
+          const ghostError = new GhostIDError(
+            message,
+            ErrorCodes.API_ERROR,
+            new Error(`HTTP ${response.status}`),
+            response.status
+          );
+          lastError = ghostError;
+          const { httpStatus: status } = ghostError;
+          // 4xx: retrying won't change the outcome.
+          // 501: server does not implement the endpoint - not transient.
+          if (
+            (status &&
+              status >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
+              status <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
+            status === HTTP_STATUS.NOT_IMPLEMENTED
+          ) {
+            throw ghostError;
+          }
+
+          if (attempt < this.retryAttempts) {
+            await retryDelay(attempt);
+          }
+          continue;
+        }
+
+        try {
+          return await response.json();
+        } catch (parseError) {
+          throw new GhostIDError(
+            ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE,
+            ErrorCodes.API_ERROR,
+            parseError
+          );
         }
       }
     } finally {
       clearTimeout(timeoutId);
     }
+
     throw new GhostIDError(
       `${ERROR_MESSAGES.API_REQUEST_FAILED}: ${lastError?.message}`,
       ErrorCodes.API_ERROR,

@@ -27,7 +27,11 @@ export function signRequest(payload: Record<string, unknown>, privateKey: Uint8A
     const signature = sign(payloadBytes, privateKey);
     return toBase64(signature);
   } catch (error) {
-    throw new GhostIDError(ERROR_MESSAGES.SIGNING_FAILED, ErrorCodes.CRYPTOGRAPHY_ERROR, error as Error);
+    throw new GhostIDError(
+      ERROR_MESSAGES.SIGNING_FAILED,
+      ErrorCodes.CRYPTOGRAPHY_ERROR,
+      error as Error
+    );
   }
 }
 

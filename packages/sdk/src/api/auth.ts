@@ -77,7 +77,10 @@ export class AuthApiClient extends BaseApiClient {
     };
 
     if (!request.registrationResponse || typeof request.registrationResponse !== 'object') {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_REGISTRATION_RESPONSE, ErrorCodes.INVALID_INPUT);
+      throw new GhostIDError(
+        ERROR_MESSAGES.INVALID_REGISTRATION_RESPONSE,
+        ErrorCodes.INVALID_INPUT
+      );
     }
 
     return this.makeRequest<RegisterDeviceResponse>(
