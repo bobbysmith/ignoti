@@ -87,9 +87,15 @@ export async function updateDeviceSignCount(deviceId: string, newCounter: number
   `;
 }
 
-export async function revokeDevice(deviceId: string): Promise<void> {
-  await sql`
-    update devices set revoked_at = now()
-    where id = ${deviceId} and revoked_at is null
-  `;
+export async function revokeDeviceWithSessions(deviceId: string): Promise<void> {
+  await sql.begin(async tx => {
+    await tx`
+      update devices set revoked_at = now()
+      where id = ${deviceId} and revoked_at is null
+    `;
+    await tx`
+      update sessions set revoked_at = now()
+      where device_id = ${deviceId} and revoked_at is null
+    `;
+  });
 }

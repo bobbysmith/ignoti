@@ -3,8 +3,11 @@ import Fastify from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ERROR_CODES, VALIDATION } from '../../constants';
-import { getDeviceById, getDevicesForUser, revokeDevice } from '../../db/queries/devices.js';
-import { revokeSessionsByDevice } from '../../db/queries/sessions.js';
+import {
+  getDeviceById,
+  getDevicesForUser,
+  revokeDeviceWithSessions,
+} from '../../db/queries/devices.js';
 import { getUserById } from '../../db/queries/users.js';
 import { verifyDeviceBindingJWS } from '../../lib/root-jws.js';
 import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
@@ -21,7 +24,6 @@ vi.mock('../../config.js', () => ({
   },
 }));
 vi.mock('../../db/queries/devices.js');
-vi.mock('../../db/queries/sessions.js');
 vi.mock('../../db/queries/users.js');
 vi.mock('../../lib/root-jws.js');
 vi.mock('../../plugins/session-auth.js', () => ({
@@ -35,7 +37,7 @@ vi.mock('../../plugins/session-auth.js', () => ({
 
 const SESSION_ID = 'session-uuid-5678';
 const USER_ID = 'user-uuid-1234';
-const DEVICE_ID = 'device-uuid-abcd';
+const DEVICE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const CREDENTIAL_ID = 'cred-id-base64url';
 const ROOT_PUBLIC_KEY = 'root-pub-key-b64';
 const VALID_ROOT_SIGNATURE = 'x'.repeat(64);
@@ -170,8 +172,7 @@ describe('devices', () => {
       vi.mocked(getDeviceById).mockReset();
       vi.mocked(getUserById).mockReset();
       vi.mocked(verifyDeviceBindingJWS).mockReset();
-      vi.mocked(revokeDevice).mockReset();
-      vi.mocked(revokeSessionsByDevice).mockReset();
+      vi.mocked(revokeDeviceWithSessions).mockReset();
     });
 
     function deleteDevice(
@@ -241,8 +242,7 @@ describe('devices', () => {
         vi.mocked(getDeviceById).mockResolvedValue(makeDeviceWithUser());
         vi.mocked(getUserById).mockResolvedValue(makeUser());
         vi.mocked(verifyDeviceBindingJWS).mockResolvedValue(undefined as never);
-        vi.mocked(revokeDevice).mockResolvedValue(undefined);
-        vi.mocked(revokeSessionsByDevice).mockResolvedValue(undefined);
+        vi.mocked(revokeDeviceWithSessions).mockResolvedValue(undefined);
         await deleteDevice();
         expect(verifyDeviceBindingJWS).toHaveBeenCalledWith(
           VALID_ROOT_SIGNATURE,
@@ -255,8 +255,7 @@ describe('devices', () => {
         vi.mocked(getDeviceById).mockResolvedValue(makeDeviceWithUser());
         vi.mocked(getUserById).mockResolvedValue(makeUser());
         vi.mocked(verifyDeviceBindingJWS).mockResolvedValue(undefined as never);
-        vi.mocked(revokeDevice).mockResolvedValue(undefined);
-        vi.mocked(revokeSessionsByDevice).mockResolvedValue(undefined);
+        vi.mocked(revokeDeviceWithSessions).mockResolvedValue(undefined);
         await deleteDevice(DEVICE_ID);
         expect(verifyDeviceBindingJWS).toHaveBeenCalledWith(
           expect.anything(),
@@ -269,8 +268,7 @@ describe('devices', () => {
         vi.mocked(getDeviceById).mockResolvedValue(makeDeviceWithUser());
         vi.mocked(getUserById).mockResolvedValue(makeUser());
         vi.mocked(verifyDeviceBindingJWS).mockResolvedValue(undefined as never);
-        vi.mocked(revokeDevice).mockResolvedValue(undefined);
-        vi.mocked(revokeSessionsByDevice).mockResolvedValue(undefined);
+        vi.mocked(revokeDeviceWithSessions).mockResolvedValue(undefined);
         await deleteDevice();
         expect(verifyDeviceBindingJWS).toHaveBeenCalledWith(
           expect.anything(),
@@ -285,8 +283,7 @@ describe('devices', () => {
         vi.mocked(getDeviceById).mockResolvedValue(makeDeviceWithUser());
         vi.mocked(getUserById).mockResolvedValue(makeUser());
         vi.mocked(verifyDeviceBindingJWS).mockResolvedValue(undefined as never);
-        vi.mocked(revokeDevice).mockResolvedValue(undefined);
-        vi.mocked(revokeSessionsByDevice).mockResolvedValue(undefined);
+        vi.mocked(revokeDeviceWithSessions).mockResolvedValue(undefined);
       });
 
       it('returns 200 with { ok: true }', async () => {
@@ -295,26 +292,17 @@ describe('devices', () => {
         expect(res.json()).toEqual({ ok: true });
       });
 
-      it('calls revokeDevice with the correct deviceId', async () => {
+      it('calls revokeDeviceWithSessions with the correct deviceId', async () => {
         await deleteDevice();
-        expect(revokeDevice).toHaveBeenCalledWith(DEVICE_ID);
+        expect(revokeDeviceWithSessions).toHaveBeenCalledWith(DEVICE_ID);
       });
+    });
 
-      it('calls revokeSessionsByDevice with the correct deviceId', async () => {
-        await deleteDevice();
-        expect(revokeSessionsByDevice).toHaveBeenCalledWith(DEVICE_ID);
-      });
-
-      it('calls revokeDevice before revokeSessionsByDevice', async () => {
-        const callOrder: string[] = [];
-        vi.mocked(revokeDevice).mockImplementation(async () => {
-          callOrder.push('revokeDevice');
-        });
-        vi.mocked(revokeSessionsByDevice).mockImplementation(async () => {
-          callOrder.push('revokeSessionsByDevice');
-        });
-        await deleteDevice();
-        expect(callOrder).toEqual(['revokeDevice', 'revokeSessionsByDevice']);
+    describe('param validation', () => {
+      it('returns 400 INVALID_INPUT when deviceId is not a UUID', async () => {
+        const res = await deleteDevice('not-a-uuid');
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
       });
     });
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { sql } from '../../../db/client.js';
 import {
@@ -6,11 +6,15 @@ import {
   getDeviceById,
   getDevicesForUser,
   insertDevice,
-  revokeDevice,
+  revokeDeviceWithSessions,
   updateDeviceSignCount,
 } from '../../../db/queries/devices.js';
 
-vi.mock('../../../db/client.js', () => ({ sql: vi.fn() }));
+vi.mock('../../../db/client.js', () => {
+  const sqlFn = vi.fn();
+  Object.assign(sqlFn, { begin: vi.fn() });
+  return { sql: sqlFn };
+});
 
 const DEVICE_ID = 'device-uuid-abcd';
 const USER_ID = 'user-uuid-1234';
@@ -179,34 +183,47 @@ describe('devices db queries', () => {
     });
   });
 
-  describe('revokeDevice', () => {
-    it('executes UPDATE setting revoked_at and passes deviceId', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await revokeDevice(DEVICE_ID);
-      const args = vi.mocked(sql).mock.calls[0];
-      expect(args).toEqual(expect.arrayContaining([DEVICE_ID]));
+  describe('revokeDeviceWithSessions', () => {
+    const sqlWithBegin = sql as unknown as Mock & { begin: Mock };
+
+    beforeEach(() => {
+      sqlWithBegin.begin = vi.fn(async (fn: (tx: Mock) => Promise<void>) =>
+        fn(sql as unknown as Mock)
+      );
     });
 
-    it('query only revokes where revoked_at is null', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await revokeDevice(DEVICE_ID);
-      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('revoked_at is null');
+    it('wraps both updates in a transaction', async () => {
+      vi.mocked(sql).mockResolvedValue([] as never);
+      await revokeDeviceWithSessions(DEVICE_ID);
+      expect(sqlWithBegin.begin).toHaveBeenCalledOnce();
+    });
+
+    it('revokes the device row with revoked_at guard', async () => {
+      vi.mocked(sql).mockResolvedValue([] as never);
+      await revokeDeviceWithSessions(DEVICE_ID);
+      const firstQuery = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(firstQuery.join('')).toContain('update devices');
+      expect(firstQuery.join('')).toContain('revoked_at is null');
+    });
+
+    it('revokes associated sessions with revoked_at guard', async () => {
+      vi.mocked(sql).mockResolvedValue([] as never);
+      await revokeDeviceWithSessions(DEVICE_ID);
+      const secondQuery = vi.mocked(sql).mock.calls[1][0] as readonly string[];
+      expect(secondQuery.join('')).toContain('update sessions');
+      expect(secondQuery.join('')).toContain('revoked_at is null');
+    });
+
+    it('passes deviceId to both queries', async () => {
+      vi.mocked(sql).mockResolvedValue([] as never);
+      await revokeDeviceWithSessions(DEVICE_ID);
+      expect(vi.mocked(sql).mock.calls[0]).toContain(DEVICE_ID);
+      expect(vi.mocked(sql).mock.calls[1]).toContain(DEVICE_ID);
     });
 
     it('resolves to void on success', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeDevice(DEVICE_ID)).resolves.toBeUndefined();
-    });
-
-    it('resolves to void (no error) when device is already revoked (0 rows updated)', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeDevice(DEVICE_ID)).resolves.toBeUndefined();
-    });
-
-    it('resolves to void (no error) when deviceId is not found', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeDevice('nonexistent')).resolves.toBeUndefined();
+      vi.mocked(sql).mockResolvedValue([] as never);
+      await expect(revokeDeviceWithSessions(DEVICE_ID)).resolves.toBeUndefined();
     });
   });
 });
