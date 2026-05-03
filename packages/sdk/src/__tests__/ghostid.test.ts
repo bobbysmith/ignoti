@@ -44,6 +44,8 @@ const {
   mockRecoverAccount,
   mockGetDevices,
   mockRevokeDevice,
+  mockGetSessions,
+  mockRevokeSession,
 } = vi.hoisted(() => ({
   mockApiClientSignRequest: vi.fn(),
   mockRegisterUser: vi.fn(),
@@ -54,6 +56,8 @@ const {
   mockRecoverAccount: vi.fn(),
   mockGetDevices: vi.fn(),
   mockRevokeDevice: vi.fn(),
+  mockGetSessions: vi.fn(),
+  mockRevokeSession: vi.fn(),
 }));
 
 vi.mock('@/core/crypto.ts', () => ({
@@ -85,6 +89,10 @@ vi.mock('@/api/client.ts', () => {
     devices = {
       getDevices: mockGetDevices,
       revokeDevice: mockRevokeDevice,
+    };
+    sessions = {
+      getSessions: mockGetSessions,
+      revokeSession: mockRevokeSession,
     };
     static signRequest = mockApiClientSignRequest;
     static verifyRequest = vi.fn();
@@ -346,6 +354,79 @@ describe('GhostID', () => {
         'network'
       );
       expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
+    });
+  });
+
+  describe('getSessions', () => {
+    it('throws NO_KEYS when no session', async () => {
+      const g = initializedSdk();
+      await expect(g.getSessions()).rejects.toThrow(GhostIDError);
+    });
+
+    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      await expect(g.getSessions()).rejects.toThrow('expired');
+      expect(g.getSession()).toBeNull();
+    });
+
+    it('returns session list on success', async () => {
+      const { g } = await withSession();
+      mockGetSessions.mockResolvedValue({
+        sessions: [
+          {
+            id: 'sess-1',
+            deviceId: 'device-1',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            lastUsedAt: null,
+            expiresAt: '2024-01-08T00:00:00.000Z',
+            isCurrent: true,
+          },
+        ],
+      });
+      const sessions = await g.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].id).toBe('sess-1');
+    });
+
+    it('calls getSessions with correct session auth args', async () => {
+      const { g, sessionId } = await withSession();
+      mockGetSessions.mockResolvedValue({ sessions: [] });
+      await g.getSessions();
+      expect(mockGetSessions).toHaveBeenCalledWith(sessionId, expect.any(Number), 'sig-abc');
+    });
+  });
+
+  describe('revokeSession', () => {
+    it('throws NO_KEYS when no session', async () => {
+      const g = initializedSdk();
+      await expect(g.revokeSession('other-sess')).rejects.toThrow(GhostIDError);
+    });
+
+    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      await expect(g.revokeSession('other-sess')).rejects.toThrow('expired');
+      expect(g.getSession()).toBeNull();
+    });
+
+    it('revokes another session without clearing local session', async () => {
+      const { g, sessionId } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
+      await g.revokeSession('other-sess');
+      expect(mockRevokeSession).toHaveBeenCalledWith(
+        'other-sess',
+        sessionId,
+        expect.any(Number),
+        'sig-abc'
+      );
+      expect(g.getSession()).not.toBeNull();
+    });
+
+    it('wipes session key and clears session when revoking own session', async () => {
+      const { g, sessionId } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
+      await g.revokeSession(sessionId);
+      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
+      expect(g.getSession()).toBeNull();
     });
   });
 

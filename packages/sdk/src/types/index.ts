@@ -210,6 +210,19 @@ export interface RevokeDeviceRequest extends Record<string, unknown> {
   rootSignature: string;
 }
 
+export interface SessionListItem extends Record<string, unknown> {
+  id: string;
+  deviceId: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+export interface GetSessionsResponse extends Record<string, unknown> {
+  sessions: SessionListItem[];
+}
+
 export interface RecoverAccountRequest extends Record<string, unknown> {
   rootPublicKey: string;
 }

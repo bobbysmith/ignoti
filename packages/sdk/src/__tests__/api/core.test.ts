@@ -100,6 +100,20 @@ describe('code api', () => {
       await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(networkError);
     });
 
+    it('retries on non-TypeError fetch error and exhausts attempts', async () => {
+      vi.useFakeTimers();
+      const client = makeClient({ retryAttempts: 3 });
+      const fetchMock = vi.fn().mockRejectedValue(new Error('connection reset'));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const assertion = expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(
+        'connection reset'
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
     it('throws GhostIDError on timeout (AbortError)', async () => {
       const client = makeClient({ timeout: 100 });
       vi.stubGlobal(

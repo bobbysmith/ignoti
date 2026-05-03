@@ -9,6 +9,7 @@ import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { registerSessionRoutes } from './routes/sessions.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -34,6 +35,7 @@ export async function buildServer() {
   await app.register(registerHealthRoutes);
   await app.register(registerAuthRoutes, { prefix: '/api/auth' });
   await app.register(registerDeviceRoutes, { prefix: '/api/devices' });
+  await app.register(registerSessionRoutes, { prefix: '/api/sessions' });
 
   return app;
 }

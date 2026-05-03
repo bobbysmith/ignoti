@@ -13,10 +13,11 @@ describe('client', () => {
   });
 
   describe('ApiClient', () => {
-    it('exposes auth and devices sub-clients', () => {
+    it('exposes auth, devices, and sessions sub-clients', () => {
       const client = new ApiClient({ baseUrl: BASE_URL });
       expect(client.auth).toBeDefined();
       expect(client.devices).toBeDefined();
+      expect(client.sessions).toBeDefined();
     });
 
     describe('signRequest', () => {

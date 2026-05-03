@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { sql } from '../../../db/client.js';
 import {
+  getSessionsForUser,
   getSessionWithUser,
   insertSession,
+  revokeSessionForUser,
   revokeSessionsByDevice,
   touchSession,
 } from '../../../db/queries/sessions.js';
@@ -137,6 +138,72 @@ describe('sessions db queries', () => {
     it('resolves to void (no error) when deviceId is not found', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(revokeSessionsByDevice('nonexistent')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('getSessionsForUser', () => {
+    const row = {
+      id: SESSION_ID,
+      device_id: DEVICE_ID,
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      last_used_at: null,
+      expires_at: new Date('2024-01-08T00:00:00Z'),
+    };
+
+    it('returns active sessions for the user', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([row] as never);
+      await expect(getSessionsForUser(USER_ID)).resolves.toEqual([row]);
+    });
+
+    it('returns empty array when user has no active sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(getSessionsForUser(USER_ID)).resolves.toEqual([]);
+    });
+
+    it('query filters by revoked_at is null', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionsForUser(USER_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('revoked_at is null');
+    });
+
+    it('query filters by expires_at > now()', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionsForUser(USER_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('expires_at > now()');
+    });
+
+    it('passes userId to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionsForUser(USER_ID);
+      expect(vi.mocked(sql).mock.calls[0]).toContain(USER_ID);
+    });
+  });
+
+  describe('revokeSessionForUser', () => {
+    it('returns true when the session is revoked', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([{ id: SESSION_ID }] as never);
+      await expect(revokeSessionForUser(SESSION_ID, USER_ID)).resolves.toBe(true);
+    });
+
+    it('returns false when the session is not found or not owned', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(revokeSessionForUser(SESSION_ID, USER_ID)).resolves.toBe(false);
+    });
+
+    it('passes sessionId and userId to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([{ id: SESSION_ID }] as never);
+      await revokeSessionForUser(SESSION_ID, USER_ID);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args).toEqual(expect.arrayContaining([SESSION_ID, USER_ID]));
+    });
+
+    it('query includes revoked_at is null guard', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await revokeSessionForUser(SESSION_ID, USER_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('revoked_at is null');
     });
   });
 });

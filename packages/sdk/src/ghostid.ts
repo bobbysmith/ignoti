@@ -36,6 +36,7 @@ import type {
   LoginResult,
   RecoverIdentityResult,
   SessionInfo,
+  SessionListItem,
 } from './types';
 
 interface ActiveSession {
@@ -271,6 +272,33 @@ export class GhostID {
       await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
     } finally {
       secureWipe(rootKeySet.signing.privateKey);
+    }
+  }
+
+  async getSessions(): Promise<SessionListItem[]> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    const { sessionId } = this.session;
+    const iat = Math.floor(Date.now() / 1000);
+    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const response = await this.apiClient.sessions.getSessions(sessionId, iat, signature);
+    return response.sessions;
+  }
+
+  async revokeSession(targetSessionId: string): Promise<void> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    const { sessionId } = this.session;
+    const iat = Math.floor(Date.now() / 1000);
+    const signature = await this.signWithSessionKey({ sessionId, iat });
+    await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature);
+    if (targetSessionId === sessionId) {
+      secureWipe(this.session.sessionPrivateKey);
+      this.session = null;
     }
   }
 

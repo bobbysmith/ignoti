@@ -8,6 +8,7 @@ import type { ApiClientOptions } from '@/types';
 import { AuthApiClient } from './auth';
 import { CoreApiClient } from './core';
 import { DevicesApiClient } from './devices';
+import { SessionsApiClient } from './sessions';
 import { signRequest, verifyRequest } from './signing';
 
 /**
@@ -18,11 +19,13 @@ export class ApiClient {
   private readonly core: CoreApiClient;
   public readonly auth: AuthApiClient;
   public readonly devices: DevicesApiClient;
+  public readonly sessions: SessionsApiClient;
 
   constructor(options: ApiClientOptions) {
     this.core = new CoreApiClient(options);
     this.auth = new AuthApiClient(this.core.makeRequest.bind(this.core));
     this.devices = new DevicesApiClient(this.core.makeRequest.bind(this.core));
+    this.sessions = new SessionsApiClient(this.core.makeRequest.bind(this.core));
   }
 
   /**

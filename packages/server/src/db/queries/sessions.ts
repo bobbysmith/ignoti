@@ -6,17 +6,25 @@ interface InsertSessionParams {
   expiresAt: Date;
 }
 
-interface SessionRow {
-  id: string;
-  expires_at: Date;
-}
-
 export interface SessionAuthRow {
   session_public_key: string;
   expires_at: Date;
   revoked_at: Date | null;
   user_id: string;
   device_id: string;
+}
+
+interface SessionRow {
+  id: string;
+  expires_at: Date;
+}
+
+interface SessionListRow {
+  id: string;
+  device_id: string;
+  created_at: Date;
+  last_used_at: Date | null;
+  expires_at: Date;
 }
 
 export async function insertSession(params: InsertSessionParams): Promise<SessionRow> {
@@ -51,4 +59,29 @@ export async function revokeSessionsByDevice(deviceId: string): Promise<void> {
     update sessions set revoked_at = now()
     where device_id = ${deviceId} and revoked_at is null
   `;
+}
+
+export async function getSessionsForUser(userId: string): Promise<SessionListRow[]> {
+  return sql<SessionListRow[]>`
+    select s.id, s.device_id, s.created_at, s.last_used_at, s.expires_at
+    from sessions s
+    join devices d on d.id = s.device_id
+    where d.user_id = ${userId}
+      and s.revoked_at is null
+      and s.expires_at > now()
+    order by s.created_at desc
+  `;
+}
+
+export async function revokeSessionForUser(sessionId: string, userId: string): Promise<boolean> {
+  const [row] = await sql<{ id: string }[]>`
+    update sessions set revoked_at = now()
+    where id = ${sessionId}
+      and revoked_at is null
+      and device_id in (
+        select id from devices where user_id = ${userId} and revoked_at is null
+      )
+    returning id
+  `;
+  return row !== undefined;
 }

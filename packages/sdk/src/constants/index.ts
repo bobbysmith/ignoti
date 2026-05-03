@@ -104,6 +104,10 @@ export const API_ENDPOINTS = {
     LIST: '/api/devices',
     REVOKE: '/api/devices',
   },
+  SESSIONS: {
+    LIST: '/api/sessions',
+    REVOKE: '/api/sessions',
+  },
 } as const;
 
 // ============================================================================
