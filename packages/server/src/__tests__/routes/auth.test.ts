@@ -506,6 +506,20 @@ describe('auth', () => {
         await registerDevice();
         expect(insertDevice).toHaveBeenCalledWith(expect.objectContaining({ signCount: 0 }));
       });
+
+      it('returns 409 ATTESTATION_VERIFICATION_FAILED when credential_id is already registered', async () => {
+        const uniqueViolation = Object.assign(new Error('duplicate key'), { code: '23505' });
+        vi.mocked(insertDevice).mockRejectedValue(uniqueViolation);
+        const res = await registerDevice();
+        expect(res.statusCode).toBe(409);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.ATTESTATION_VERIFICATION_FAILED });
+      });
+
+      it('rethrows unexpected DB errors from insertDevice', async () => {
+        vi.mocked(insertDevice).mockRejectedValue(new Error('connection lost'));
+        const res = await registerDevice();
+        expect(res.statusCode).toBe(500);
+      });
     });
   });
 

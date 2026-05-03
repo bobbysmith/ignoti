@@ -161,14 +161,24 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       const credentialIdB64 = credential.id;
       const credentialPubKeyB64 = Buffer.from(credential.publicKey).toString('base64url');
 
-      const device = await insertDevice({
-        userId,
-        credentialId: credentialIdB64,
-        passkeyPublicKey: credentialPubKeyB64,
-        signCount: credential.counter ?? 0,
-        transports: (registrationResponse.response.transports ?? null) as string[] | null,
-        deviceName: deviceName ?? null,
-      });
+      let device: Awaited<ReturnType<typeof insertDevice>>;
+      try {
+        device = await insertDevice({
+          userId,
+          credentialId: credentialIdB64,
+          passkeyPublicKey: credentialPubKeyB64,
+          signCount: credential.counter ?? 0,
+          transports: (registrationResponse.response.transports ?? null) as string[] | null,
+          deviceName: deviceName ?? null,
+        });
+      } catch (err) {
+        if ((err as Record<string, unknown>).code === '23505') {
+          // unique violation
+          req.log.warn({ err }, 'credential already registered');
+          return sendError(reply, 409, ERROR_CODES.ATTESTATION_VERIFICATION_FAILED);
+        }
+        throw err;
+      }
 
       return reply.send({ deviceId: device.id, credentialId: credentialIdB64 });
     }
@@ -297,7 +307,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
-      const challenge = await consumeSessionChallenge(verified.payload.sessionChallenge as string);
+      const challenge = await consumeSessionChallenge(verified.payload.sessionChallenge);
       if (!challenge?.device_id) {
         return sendError(reply, 400, ERROR_CODES.INVALID_OR_EXPIRED_SESSION_CHALLENGE);
       }
