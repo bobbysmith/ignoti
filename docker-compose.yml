@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ghostid
+      POSTGRES_USER: ghostid
+      POSTGRES_PASSWORD: ghostid
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghostid -d ghostid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build: .
+    command: ["node", "dist/db/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://ghostid:ghostid@db:5432/ghostid
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      DATABASE_URL: postgres://ghostid:ghostid@db:5432/ghostid
+      RP_ID: ${RP_ID:-localhost}
+      RP_NAME: ${RP_NAME:-GhostID}
+      RP_ORIGIN: ${RP_ORIGIN:-http://localhost:5173}
+      CHALLENGE_TTL_SECONDS: ${CHALLENGE_TTL_SECONDS:-300}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db_data:

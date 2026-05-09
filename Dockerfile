@@ -26,6 +26,7 @@ WORKDIR /app
 RUN addgroup -S ghostid && adduser -S ghostid -G ghostid
 
 COPY --from=builder --chown=ghostid:ghostid /app ./
+COPY --from=builder --chown=ghostid:ghostid /build/packages/server/src/db/migrations ./dist/db/migrations
 
 USER ghostid
 
