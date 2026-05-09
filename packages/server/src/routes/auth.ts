@@ -99,7 +99,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       let expectedChallenge: string;
       try {
         expectedChallenge = extractChallenge(registrationResponse);
-      } catch {
+      } catch (err) {
+        req.log.warn({ err }, 'failed to extract challenge from registration response');
         return sendError(reply, 400, ERROR_CODES.INVALID_INPUT);
       }
 
@@ -235,7 +236,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     let expectedChallenge: string;
     try {
       expectedChallenge = extractChallenge(assertion);
-    } catch {
+    } catch (err) {
+      req.log.warn({ err }, 'failed to extract challenge from login assertion');
       return sendError(reply, 400, ERROR_CODES.INVALID_INPUT);
     }
 
