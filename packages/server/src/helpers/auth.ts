@@ -1,7 +1,7 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { WEBAUTHN_TIMEOUT_MS } from '../constants';
+import { WEBAUTHN_TIMEOUT_MS } from '../constants.js';
 
 interface WebAuthnResponse {
   response: { clientDataJSON: string };

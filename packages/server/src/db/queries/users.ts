@@ -1,4 +1,4 @@
-import { sql } from '../client';
+import { sql } from '../client.js';
 
 interface UserRow {
   id: string;

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ERROR_CODES, ROUTES } from '../constants';
+import { ERROR_CODES, ROUTES } from '../constants.js';
 import { getSessionsForUser, revokeSessionForUser } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
 import { requireSession } from '../plugins/session-auth.js';

@@ -12,7 +12,7 @@ import {
   ROUTES,
   SESSION_CHALLENGE_TTL_MS,
   WEBAUTHN_TIMEOUT_MS,
-} from '../constants';
+} from '../constants.js';
 import {
   consumeLoginChallenge,
   consumeRecoverChallenge,
@@ -23,15 +23,15 @@ import {
   insertRegisterChallenge,
   insertSessionChallenge,
   insertTimingRecoverChallenge,
-} from '../db/queries/challenges';
+} from '../db/queries/challenges.js';
 import {
   getDeviceByCredentialId,
   getDeviceById,
   insertDevice,
   updateDeviceSignCount,
-} from '../db/queries/devices';
-import { insertSession } from '../db/queries/sessions';
-import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users';
+} from '../db/queries/devices.js';
+import { insertSession } from '../db/queries/sessions.js';
+import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../helpers/auth.js';
 import { sendError } from '../helpers/response.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../lib/root-jws.js';

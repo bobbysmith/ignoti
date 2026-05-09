@@ -1,5 +1,5 @@
-import { CHALLENGE_PURPOSE } from '../../constants';
-import { sql } from '../client';
+import { CHALLENGE_PURPOSE } from '../../constants.js';
+import { sql } from '../client.js';
 
 interface ChallengeValue {
   value: string;

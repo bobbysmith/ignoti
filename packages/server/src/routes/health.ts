@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ROUTES } from '../constants';
+import { ROUTES } from '../constants.js';
 import { sql } from '../db/client.js';
 
 export async function registerHealthRoutes(app: FastifyInstance) {

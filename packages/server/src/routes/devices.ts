@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ERROR_CODES, RATE_LIMITS, ROUTES } from '../constants';
+import { ERROR_CODES, RATE_LIMITS, ROUTES } from '../constants.js';
 import {
   getDeviceById,
   getDevicesForUser,

@@ -5,7 +5,7 @@ import {
   ERROR_CODES,
   SESSION_AUTH_SCHEME,
   SESSION_SIG_TOLERANCE_SECONDS,
-} from '../constants';
+} from '../constants.js';
 import { getSessionWithUser, touchSession } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
 

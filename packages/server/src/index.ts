@@ -3,7 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
 import { config } from './config.js';
-import { RATE_LIMITS } from './constants';
+import { RATE_LIMITS } from './constants.js';
 import { sql } from './db/client.js';
 import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';

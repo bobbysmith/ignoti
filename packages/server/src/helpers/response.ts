@@ -1,6 +1,6 @@
 import type { ServerErrorResponse } from '@ghostid/shared';
 import type { FastifyReply } from 'fastify';
-import { ERROR_MESSAGES, type ServerErrorCode } from '../constants';
+import { ERROR_MESSAGES, type ServerErrorCode } from '../constants.js';
 
 /**
  * Sends a consistent error envelope: { error, message, details? }.

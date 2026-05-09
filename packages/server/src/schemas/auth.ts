@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { VALIDATION } from '../constants';
+import { VALIDATION } from '../constants.js';
 
 export const registerBody = z.object({
   rootPublicKey: z
