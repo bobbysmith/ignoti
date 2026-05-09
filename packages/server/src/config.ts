@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+const CHALLENGE_TTL_MIN_SECONDS = 30; // 30 seconds
+const CHALLENGE_TTL_MAX_SECONDS = 60 * 60; // 1 hour
+const CHALLENGE_TTL_DEFAULT_SECONDS = 5 * 60; // 5 minutes
+
+const SESSION_TTL_MIN_SECONDS = 60; // 1 minute
+const SESSION_TTL_MAX_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const SESSION_TTL_DEFAULT_SECONDS = 60 * 60 * 24; // 24 hours
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(8787),
   HOST: z.string().default('0.0.0.0'),
@@ -23,10 +31,23 @@ const envSchema = z.object({
         .filter(Boolean)
     )
     .pipe(z.array(z.string().url({ message: 'Each RP_ORIGIN entry must be a valid URL' }))),
-  CHALLENGE_TTL_SECONDS: z.coerce.number().default(300),
-  SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60 * 24),
+  CHALLENGE_TTL_SECONDS: z.coerce
+    .number()
+    .min(CHALLENGE_TTL_MIN_SECONDS)
+    .max(CHALLENGE_TTL_MAX_SECONDS)
+    .default(CHALLENGE_TTL_DEFAULT_SECONDS),
+  SESSION_TTL_SECONDS: z.coerce
+    .number()
+    .min(SESSION_TTL_MIN_SECONDS)
+    .max(SESSION_TTL_MAX_SECONDS)
+    .default(SESSION_TTL_DEFAULT_SECONDS),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
-export const config = envSchema.parse(process.env);
-export type Config = typeof config;
+const result = envSchema.safeParse(process.env);
+if (!result.success) {
+  const lines = result.error.issues.map(i => `  ${i.path.join('.')}: ${i.message}`);
+  throw new Error(`Invalid environment configuration:\n${lines.join('\n')}`);
+}
+
+export const config = result.data;
