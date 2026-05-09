@@ -7,7 +7,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
     try {
       await sql`SELECT 1`;
     } catch {
-      return reply.status(503).send({ status: 'error', detail: 'database unreachable' });
+      return reply.status(503).send({ status: 'error' });
     }
     return { status: 'ok' };
   });
