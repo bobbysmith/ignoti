@@ -22,6 +22,7 @@ import {
   insertRecoverChallenge,
   insertRegisterChallenge,
   insertSessionChallenge,
+  insertTimingRecoverChallenge,
 } from '../db/queries/challenges';
 import {
   getDeviceByCredentialId,
@@ -357,20 +358,24 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       // return faster than a found one. The placeholder UUID is used only to
       // make buildRegistrationOptions do equivalent work; its output is discarded
       // when the user is not found.
-      const [user, _timingOptions] = await Promise.all([
+      const [user, timingOptions] = await Promise.all([
         getUserByRootPublicKey(rootPublicKey),
         buildRegistrationOptions(randomUUID()),
       ]);
 
+      const expiresAt = new Date(Date.now() + config.CHALLENGE_TTL_SECONDS * 1000);
+
+      // Mirror the found user path's two serial operations so both branches
+      // take the same time and can't be distinguished by response latency.
+      // insertTimingRecoverChallenge uses user_id = NULL and expires_at = now(),
+      // so the row is never consumable and is swept by the next GC run.
       if (!user) {
-        // Return the same shape as the success path. The challenge is never
-        // stored, so the subsequent /register/device call will fail with
-        // INVALID_OR_EXPIRED_CHALLENGE — identical to a real expired challenge.
-        return reply.send({ userId: randomUUID(), options: _timingOptions });
+        const fakeOptions = await buildRegistrationOptions(randomUUID());
+        await insertTimingRecoverChallenge(fakeOptions.challenge);
+        return reply.send({ userId: randomUUID(), options: timingOptions });
       }
 
       const options = await buildRegistrationOptions(user.id);
-      const expiresAt = new Date(Date.now() + config.CHALLENGE_TTL_SECONDS * 1000);
       await insertRecoverChallenge(options.challenge, user.id, expiresAt);
 
       return reply.send({ userId: user.id, options });

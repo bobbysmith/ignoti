@@ -17,6 +17,7 @@ import {
   insertRecoverChallenge,
   insertRegisterChallenge,
   insertSessionChallenge,
+  insertTimingRecoverChallenge,
 } from '../../db/queries/challenges.js';
 import {
   getDeviceByCredentialId,
@@ -854,6 +855,7 @@ describe('auth', () => {
         vi.mocked(buildRegistrationOptions).mockResolvedValue({
           challenge: VALID_CHALLENGE,
         } as never);
+        vi.mocked(insertTimingRecoverChallenge).mockResolvedValue(undefined);
       });
 
       it('returns 200 with the same shape as a successful recover (no enumeration)', async () => {
@@ -868,13 +870,14 @@ describe('auth', () => {
         expect(typeof body.userId).toBe('string');
       });
 
-      it('does not store a challenge when the user does not exist', async () => {
+      it('stores a timing challenge but not a real recover challenge when user does not exist', async () => {
         await app.inject({
           method: 'POST',
           url: RECOVER_URL,
           body: { rootPublicKey: VALID_ROOT_PUBLIC_KEY },
         });
         expect(insertRecoverChallenge).not.toHaveBeenCalled();
+        expect(insertTimingRecoverChallenge).toHaveBeenCalledOnce();
       });
     });
 

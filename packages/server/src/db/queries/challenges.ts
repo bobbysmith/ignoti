@@ -27,6 +27,22 @@ export async function insertRecoverChallenge(
   `;
 }
 
+/**
+ * Timing equalization insert for the not found path in /recover. Uses
+ * user_id = NULL and expires immediately so it is never consumable and is
+ * swept by the next GC run. Keeps response latency indistinguishable from
+ * the found user path.
+ *
+ * @param value - the challenge string to insert, random base64url value
+ * @returns a promise that resolves when the insert completes
+ */
+export async function insertTimingRecoverChallenge(value: string): Promise<void> {
+  await sql`
+    insert into challenges (value, purpose, expires_at)
+    values (${value}, ${CHALLENGE_PURPOSE.RECOVER}, now())
+  `;
+}
+
 export async function insertRegisterChallenge(
   value: string,
   userId: string,
