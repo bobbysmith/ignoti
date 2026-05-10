@@ -328,7 +328,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         expiresAt,
       });
 
-      const secure = config.RP_ORIGIN.every(o => o.startsWith('https://'));
+      const secure = config.COOKIE_SECURE;
 
       reply.setCookie(SESSION_COOKIE_NAME, session.id, {
         httpOnly: true,

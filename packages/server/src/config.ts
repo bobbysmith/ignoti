@@ -41,6 +41,10 @@ const envSchema = z.object({
     .min(SESSION_TTL_MIN_SECONDS)
     .max(SESSION_TTL_MAX_SECONDS)
     .default(SESSION_TTL_DEFAULT_SECONDS),
+  COOKIE_SECURE: z
+    .string()
+    .default('true')
+    .transform(v => v.toLowerCase() !== 'false'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
