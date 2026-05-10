@@ -641,7 +641,7 @@ describe('auth', () => {
 
       it('passes device transports when non-null to verifyAuthenticationResponse', async () => {
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(true);
         const device = { ...makeDevice(), transports: ['internal', 'hybrid'] };
         vi.mocked(getDeviceByCredentialId).mockResolvedValue(device as never);
         await login();
@@ -654,7 +654,7 @@ describe('auth', () => {
 
       it('passes device sign_count as Number() to verifyAuthenticationResponse', async () => {
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(true);
         const device = { ...makeDevice(), sign_count: 42n };
         vi.mocked(getDeviceByCredentialId).mockResolvedValue(device as never);
         await login();
@@ -670,7 +670,14 @@ describe('auth', () => {
         vi.mocked(extractChallenge).mockReturnValue(VALID_CHALLENGE);
         vi.mocked(consumeLoginChallenge).mockResolvedValue(true);
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(true);
+      });
+
+      it('returns 401 ASSERTION_VERIFICATION_FAILED when sign count guard blocks update', async () => {
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(false);
+        const res = await login();
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.ASSERTION_VERIFICATION_FAILED });
       });
 
       it('advances sign count and inserts session challenge in a transaction', async () => {

@@ -271,12 +271,15 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
     const sessionChallenge = randomBytes(32).toString('base64url');
     const sessionChallengeExpiresAt = new Date(Date.now() + SESSION_CHALLENGE_TTL_MS);
-    await incrementSignCountWithChallenge(
+    const incremented = await incrementSignCountWithChallenge(
       device.id,
       verification.authenticationInfo.newCounter,
       sessionChallenge,
       sessionChallengeExpiresAt
     );
+    if (!incremented) {
+      return sendError(reply, 401, ERROR_CODES.ASSERTION_VERIFICATION_FAILED);
+    }
 
     return reply.send({ sessionChallenge, deviceId: device.id });
   });
