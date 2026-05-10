@@ -884,23 +884,13 @@ describe('auth', () => {
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_SESSION_BINDING });
       });
-
-      it('returns 401 INVALID_SESSION_BINDING when sessionChallenge does not match cookie sessionId', async () => {
-        vi.mocked(verifySessionBindingJWS).mockResolvedValue({
-          sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
-          payload: { sessionChallenge: 'wrong-session-id' },
-        } as never);
-        const res = await postRestore(undefined, VALID_SESSION_ID);
-        expect(res.statusCode).toBe(401);
-        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_SESSION_BINDING });
-      });
     });
 
     describe('rebind failure', () => {
       beforeEach(() => {
         vi.mocked(verifySessionBindingJWS).mockResolvedValue({
           sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
-          payload: { sessionChallenge: VALID_SESSION_ID },
+          payload: { sessionChallenge: 'random-nonce' },
         } as never);
       });
 
@@ -930,7 +920,7 @@ describe('auth', () => {
       beforeEach(() => {
         vi.mocked(verifySessionBindingJWS).mockResolvedValue({
           sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
-          payload: { sessionChallenge: VALID_SESSION_ID },
+          payload: { sessionChallenge: 'random-nonce' },
         } as never);
         vi.mocked(rebindSessionPublicKey).mockResolvedValue(REBIND_ROW);
       });

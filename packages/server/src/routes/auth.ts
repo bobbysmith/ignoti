@@ -355,9 +355,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    * After a page reload the SDK has lost its ephemeral session private key but
    * the browser still holds the httpOnly session cookie. This endpoint lets the
    * SDK generate a fresh ephemeral keypair and re-bind it to the existing live
-   * session. The sessionId from the cookie acts as the nonce (`sessionChallenge`
-   * claim) so no separate DB challenge roundtrip is needed; the JWS `exp` (60 s)
-   * provides freshness. The session's stored public key is atomically replaced.
+   * session. The JWS `exp` (60 s) provides freshness; the cookie identifies the
+   * session. The session's stored public key is atomically replaced.
    */
   app.post(
     ROUTES.AUTH.SESSION_RESTORE,
@@ -379,10 +378,6 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         verified = await verifySessionBindingJWS(sessionBinding);
       } catch (err) {
         req.log.warn({ err }, 'session restore: binding verification failed');
-        return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
-      }
-
-      if (verified.payload.sessionChallenge !== sessionId) {
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 

@@ -118,6 +118,33 @@ describe('AuthApiClient', () => {
     });
   });
 
+  describe('restoreSession', () => {
+    it('calls makeRequest with trimmed sessionBinding', async () => {
+      const { client, makeRequest } = makeClient();
+      makeRequest.mockResolvedValue({
+        sessionId: 's1',
+        userId: 'u1',
+        deviceId: 'd1',
+        expiresAt: 0,
+      });
+      await client.restoreSession('  binding123  ');
+      expect(makeRequest).toHaveBeenCalledWith('POST', '/api/auth/session/restore', {
+        sessionBinding: 'binding123',
+      });
+    });
+
+    it('throws when sessionBinding is empty', async () => {
+      const { client } = makeClient();
+      await expect(client.restoreSession('')).rejects.toThrow();
+    });
+
+    it('throws when sessionBinding exceeds MAX_SESSION_BINDING_LENGTH', async () => {
+      const { client } = makeClient();
+      const long = 'a'.repeat(VALIDATION.MAX_SESSION_BINDING_LENGTH + 1);
+      await expect(client.restoreSession(long)).rejects.toThrow('exceeds maximum length');
+    });
+  });
+
   describe('recoverAccount', () => {
     it('calls makeRequest with rootPublicKey', async () => {
       const { client, makeRequest } = makeClient();

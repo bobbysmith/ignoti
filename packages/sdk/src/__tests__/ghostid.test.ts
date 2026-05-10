@@ -41,6 +41,7 @@ const {
   mockRequestChallenge,
   mockLogin,
   mockCreateSession,
+  mockRestoreSession,
   mockRecoverAccount,
   mockGetDevices,
   mockRevokeDevice,
@@ -53,6 +54,7 @@ const {
   mockRequestChallenge: vi.fn(),
   mockLogin: vi.fn(),
   mockCreateSession: vi.fn(),
+  mockRestoreSession: vi.fn(),
   mockRecoverAccount: vi.fn(),
   mockGetDevices: vi.fn(),
   mockRevokeDevice: vi.fn(),
@@ -84,6 +86,7 @@ vi.mock('@/api/client.ts', () => {
       requestChallenge: mockRequestChallenge,
       login: mockLogin,
       createSession: mockCreateSession,
+      restoreSession: mockRestoreSession,
       recoverAccount: mockRecoverAccount,
     };
     devices = {
@@ -500,6 +503,77 @@ describe('GhostID', () => {
       const g = initializedSdk();
       expect(() => g.destroy()).not.toThrow();
       expect(mockSecureWipe).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restoreSession', () => {
+    it('throws NOT_INITIALIZED before init()', async () => {
+      const g = sdk();
+      await expect(g.restoreSession()).rejects.toThrow(GhostIDError);
+    });
+
+    function stubRestoreMocks(serverResult: 'success' | 'failure') {
+      mockGenerateSessionKeypair.mockReturnValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      if (serverResult === 'success') {
+        mockRestoreSession.mockResolvedValue({
+          sessionId: 'sess-old',
+          userId: 'user-1',
+          deviceId: 'device-1',
+          expiresAt: Date.now() + 3_600_000,
+        });
+      } else {
+        mockRestoreSession.mockRejectedValue(new Error('gone'));
+      }
+    }
+
+    it('always attempts restore regardless of local state', async () => {
+      stubRestoreMocks('success');
+      const g = initializedSdk();
+      await g.restoreSession();
+      expect(mockRestoreSession).toHaveBeenCalledWith('restore-binding');
+    });
+
+    it('sets session from server response on success', async () => {
+      stubRestoreMocks('success');
+      const g = initializedSdk();
+      await g.restoreSession();
+      expect(g.getSession()).toMatchObject({ sessionId: 'sess-old', userId: 'user-1' });
+    });
+
+    it('signs the JWS with a random nonce as sessionChallenge', async () => {
+      stubRestoreMocks('success');
+      const g = initializedSdk();
+      await g.restoreSession();
+      const [claims, ,] = mockSignSessionBindingJWS.mock.calls[0];
+      expect(typeof claims.sessionChallenge).toBe('string');
+      expect(claims.sessionChallenge.length).toBeGreaterThan(0);
+    });
+
+    it('throws GhostIDError and wipes ephemeral key when server call fails', async () => {
+      stubRestoreMocks('failure');
+      const g = initializedSdk();
+      await expect(g.restoreSession()).rejects.toThrow(GhostIDError);
+      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
+    });
+
+    it('leaves session null when restore fails', async () => {
+      stubRestoreMocks('failure');
+      const g = initializedSdk();
+      await expect(g.restoreSession()).rejects.toThrow();
+      expect(g.getSession()).toBeNull();
+    });
+  });
+
+  describe('init', () => {
+    it('enables guarded methods synchronously without awaiting', async () => {
+      const g = sdk();
+      await expect(g.logout()).rejects.toThrow(GhostIDError);
+      g.init();
+      await expect(g.logout()).resolves.toBeUndefined();
     });
   });
 

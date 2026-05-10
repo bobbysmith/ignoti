@@ -5,9 +5,9 @@
  *   2. Device identity (WebAuthn passkey) - daily auth.
  *   3. Session identity (ephemeral Ed25519) - silent request signing.
  *
- * The SDK persists session tokens via httpOnly cookie (handled by the server)
- * and non-sensitive identifiers (userId, deviceId) via localStorage. Session
- * private keys never leave memory; logging out or calling destroy() wipes them.
+ * The SDK persists nothing. Session identity lives in an httpOnly cookie set by
+ * the server; the session private key lives only in memory. On page reload,
+ * init() calls the server to rebind a fresh keypair to the existing session.
  */
 
 import { ApiClient, createApiClient } from './api/client';
@@ -63,6 +63,30 @@ export class GhostID {
 
   init(): void {
     this.initialized = true;
+  }
+
+  async restoreSession(): Promise<void> {
+    this.ensureInitialized();
+    const sessionKeyPair = generateSessionSigningKeypair();
+    try {
+      const nonce = crypto.randomUUID();
+      const sessionBinding = await signSessionBindingJWS(
+        { sessionChallenge: nonce },
+        sessionKeyPair.privateKey,
+        sessionKeyPair.publicKey
+      );
+      const response = await this.apiClient.auth.restoreSession(sessionBinding);
+      this.session = {
+        sessionId: response.sessionId,
+        userId: response.userId,
+        deviceId: response.deviceId,
+        expiresAt: response.expiresAt,
+        sessionPrivateKey: sessionKeyPair.privateKey,
+      };
+    } catch {
+      secureWipe(sessionKeyPair.privateKey);
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
   }
 
   private ensureInitialized(): void {

@@ -99,6 +99,7 @@ export const API_ENDPOINTS = {
     REGISTER_DEVICE: '/api/auth/register/device',
     RECOVER: '/api/auth/recover',
     SESSION: '/api/auth/session',
+    SESSION_RESTORE: '/api/auth/session/restore',
   },
   DEVICES: {
     LIST: '/api/devices',

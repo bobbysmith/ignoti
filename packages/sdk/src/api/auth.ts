@@ -16,6 +16,7 @@ import type {
   RegisterUserRequest,
   RegisterUserResponse,
   RequestChallengeResponse,
+  RestoreSessionResponse,
 } from '@/types';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
@@ -134,6 +135,19 @@ export class AuthApiClient extends BaseApiClient {
     return this.makeRequest<CreateSessionResponse>(HTTP_METHODS.POST, API_ENDPOINTS.AUTH.SESSION, {
       sessionBinding: validatedBinding,
     });
+  }
+
+  async restoreSession(sessionBinding: string): Promise<RestoreSessionResponse> {
+    const validatedBinding = validateString(
+      sessionBinding,
+      'sessionBinding',
+      VALIDATION.MAX_SESSION_BINDING_LENGTH
+    );
+    return this.makeRequest<RestoreSessionResponse>(
+      HTTP_METHODS.POST,
+      API_ENDPOINTS.AUTH.SESSION_RESTORE,
+      { sessionBinding: validatedBinding }
+    );
   }
 
   /**

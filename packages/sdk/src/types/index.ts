@@ -232,6 +232,13 @@ export interface RecoverAccountResponse extends Record<string, unknown> {
   options: Record<string, unknown>;
 }
 
+export interface RestoreSessionResponse extends Record<string, unknown> {
+  sessionId: string;
+  userId: string;
+  deviceId: string;
+  expiresAt: number;
+}
+
 // ============================================================================
 // GhostID SDK Types
 // ============================================================================
