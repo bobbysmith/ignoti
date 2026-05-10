@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GhostIDError } from '@/core/errors.ts';
+import { ErrorCodes, GhostIDError } from '@/core/errors.ts';
 import { GhostID } from '@/ghostid.ts';
 
 const {
@@ -566,15 +566,37 @@ describe('GhostID', () => {
       expect(claims.sessionChallenge.length).toBeGreaterThan(0);
     });
 
-    it('throws GhostIDError when server call fails', async () => {
+    it('converts a 401 API error to NO_ACTIVE_SESSION GhostIDError', async () => {
       mockGenerateSessionKeypair.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
       mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
-      mockRestoreSession.mockRejectedValue(new Error('gone'));
+      mockRestoreSession.mockRejectedValue(
+        new GhostIDError('unauthorized', ErrorCodes.API_ERROR, undefined, 401)
+      );
 
-      await expect(initializedSdk().restoreSession()).rejects.toThrow(GhostIDError);
+      const err = await initializedSdk()
+        .restoreSession()
+        .catch(e => e);
+      expect(err).toBeInstanceOf(GhostIDError);
+      expect((err as GhostIDError).message).toContain('No active session');
+    });
+
+    it('rethrows non-401 errors unchanged', async () => {
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockRejectedValue(new Error('network error'));
+
+      const err = await initializedSdk()
+        .restoreSession()
+        .catch(e => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err).not.toBeInstanceOf(GhostIDError);
+      expect(err.message).toBe('network error');
     });
 
     it('leaves session null when restore fails', async () => {

@@ -86,8 +86,11 @@ export class GhostID {
         expiresAt: response.expiresAt,
         sessionPrivateKey: sessionKeyPair.privateKey,
       };
-    } catch {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    } catch (error) {
+      if (error instanceof GhostIDError && error.httpStatus === 401) {
+        throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      }
+      throw error;
     }
   }
 
