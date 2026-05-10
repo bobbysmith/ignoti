@@ -23,7 +23,6 @@ export {
   generateNonce,
   generateSessionSigningKeypair,
   hash,
-  secureWipe,
   sign,
   stringToBytes,
   toBase64,

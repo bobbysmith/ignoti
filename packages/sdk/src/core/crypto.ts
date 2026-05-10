@@ -120,7 +120,7 @@ export async function deriveRootKeysFromMnemonic(
     });
     const publicKey = ed25519.getPublicKey(signingSeed);
 
-    secureWipe(seed);
+    seed.fill(0);
 
     return {
       signing: {
@@ -167,12 +167,4 @@ export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= (a[i] as number) ^ (b[i] as number);
   return diff === 0;
-}
-
-/**
- * Best-effort wipe. JS engines may have already copied buffers; this is
- * defense-in-depth, not a guarantee.
- */
-export function secureWipe(data: Uint8Array): void {
-  if (data) data.fill(0);
 }

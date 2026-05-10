@@ -9,7 +9,6 @@ import {
   generateNonce,
   generateSessionSigningKeypair,
   hash,
-  secureWipe,
   sign,
   stringToBytes,
   toBase64,
@@ -187,14 +186,6 @@ describe('crypto', () => {
 
     it('returns false for different lengths', () => {
       expect(constantTimeEqual(new Uint8Array([1, 2]), new Uint8Array([1, 2, 3]))).toBe(false);
-    });
-  });
-
-  describe('secureWipe', () => {
-    it('zeros the buffer', () => {
-      const data = new Uint8Array([1, 2, 3, 4]);
-      secureWipe(data);
-      expect(data).toEqual(new Uint8Array(4));
     });
   });
 });

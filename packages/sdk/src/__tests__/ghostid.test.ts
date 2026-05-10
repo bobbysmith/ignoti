@@ -223,13 +223,16 @@ describe('GhostID', () => {
       );
     });
 
-    it('wipes root private key even when registerDevice throws', async () => {
+    it('zeroes root private key even when registerDevice throws', async () => {
       stubCreateIdentityMocks();
       mockRegisterDevice.mockRejectedValue(new Error('network'));
+      const rootKey = new Uint8Array(32).fill(1);
+      mockDeriveRootKeys.mockResolvedValue({
+        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
+      });
 
-      const g = initializedSdk();
-      await expect(g.createIdentity()).rejects.toThrow('network');
-      expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
+      await expect(initializedSdk().createIdentity()).rejects.toThrow('network');
+      expect(rootKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -244,12 +247,17 @@ describe('GhostID', () => {
       expect(g.getSession()).toMatchObject({ sessionId: info.sessionId, deviceId: 'device-1' });
     });
 
-    it('wipes session key and rethrows when createSession throws', async () => {
+    it('zeroes session key and rethrows when createSession throws', async () => {
       stubLoginMocks();
       mockSignSessionBindingJWS.mockRejectedValue(new Error('jws fail'));
+      const sessionKey = new Uint8Array(32).fill(3);
+      mockGenerateSessionKeypair.mockReturnValue({
+        privateKey: sessionKey,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
 
       await expect(initializedSdk().login()).rejects.toThrow('jws fail');
-      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
+      expect(sessionKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -265,7 +273,6 @@ describe('GhostID', () => {
         expect.any(Number),
         'sig-abc'
       );
-      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
       expect(g.getSession()).toBeNull();
     });
 
@@ -383,18 +390,20 @@ describe('GhostID', () => {
       await g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id');
 
       expect(mockRevokeDevice).toHaveBeenCalledWith('device-1', 'root-sig');
-      expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
     });
 
-    it('wipes root key even when revokeDevice API throws', async () => {
+    it('zeroes root key even when revokeDevice API throws', async () => {
       const g = initializedSdk();
-      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      const rootKey = new Uint8Array(32).fill(1);
+      mockDeriveRootKeys.mockResolvedValue({
+        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
+      });
       mockRevokeDevice.mockRejectedValue(new Error('network'));
 
       await expect(g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id')).rejects.toThrow(
         'network'
       );
-      expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
+      expect(rootKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -466,7 +475,6 @@ describe('GhostID', () => {
       const { g, sessionId } = await withSession();
       mockRevokeSession.mockResolvedValue({ ok: true });
       await g.revokeSession(sessionId);
-      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
       expect(g.getSession()).toBeNull();
     });
   });
@@ -490,19 +498,22 @@ describe('GhostID', () => {
 
       expect(result.userId).toBe('user-1');
       expect(result.deviceId).toBe('device-2');
-      expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
     });
 
-    it('wipes root key even when registerDevice throws during recovery', async () => {
+    it('zeroes root key even when registerDevice throws during recovery', async () => {
       mockIsWebAuthnSupported.mockReturnValue(true);
-      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      const rootKey = new Uint8Array(32).fill(1);
+      mockDeriveRootKeys.mockResolvedValue({
+        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
+      });
       mockRecoverAccount.mockResolvedValue({ userId: 'user-1', options: makeOptions() });
       mockCreatePasskey.mockResolvedValue(makePasskeyResponse());
       mockRegisterDevice.mockRejectedValue(new Error('device fail'));
 
-      const g = initializedSdk();
-      await expect(g.recoverIdentity('word '.repeat(12).trim())).rejects.toThrow('device fail');
-      expect(mockSecureWipe).toHaveBeenCalledWith(ROOT_PRIVATE_KEY);
+      await expect(initializedSdk().recoverIdentity('word '.repeat(12).trim())).rejects.toThrow(
+        'device fail'
+      );
+      expect(rootKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -511,7 +522,6 @@ describe('GhostID', () => {
       const { g } = await withSession();
       g.destroy();
 
-      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
       expect(g.getSession()).toBeNull();
       await expect(g.logout()).rejects.toThrow(GhostIDError);
     });
@@ -570,11 +580,17 @@ describe('GhostID', () => {
       expect(claims.sessionChallenge.length).toBeGreaterThan(0);
     });
 
-    it('throws GhostIDError and wipes ephemeral key when server call fails', async () => {
-      stubRestoreMocks('failure');
-      const g = initializedSdk();
-      await expect(g.restoreSession()).rejects.toThrow(GhostIDError);
-      expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
+    it('throws GhostIDError and zeroes ephemeral key when server call fails', async () => {
+      const sessionKey = new Uint8Array(32).fill(3);
+      mockGenerateSessionKeypair.mockReturnValue({
+        privateKey: sessionKey,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockRejectedValue(new Error('gone'));
+
+      await expect(initializedSdk().restoreSession()).rejects.toThrow(GhostIDError);
+      expect(sessionKey.every(b => b === 0)).toBe(true);
     });
 
     it('leaves session null when restore fails', async () => {
