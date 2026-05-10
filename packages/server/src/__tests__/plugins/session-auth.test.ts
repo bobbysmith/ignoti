@@ -20,7 +20,7 @@ interface Keypair {
   publicKeyB64: string;
 }
 
-const SESSION_ID = 'session-uuid-1234';
+const SESSION_ID = '550e8400-e29b-41d4-a716-446655440000';
 const USER_ID = 'user-uuid-5678';
 const DEVICE_ID = 'device-uuid-abcd';
 
@@ -247,6 +247,22 @@ describe('session auth', () => {
           makeReq({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
             [AUTH_HEADERS.SESSION_TIMESTAMP]: '',
+            [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
+          }),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.MALFORMED_SESSION_HEADERS })
+        );
+      });
+
+      it('returns 401 MALFORMED_SESSION_HEADERS when sessionId is not a valid UUID', async () => {
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          makeReq({
+            [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} not-a-uuid`,
+            [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
           reply as never

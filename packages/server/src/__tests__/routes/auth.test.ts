@@ -74,7 +74,7 @@ const CHALLENGE_URL = '/api/auth/challenge';
 const SESSION_URL = '/api/auth/session';
 const SESSION_RESTORE_URL = '/api/auth/session/restore';
 const RECOVER_URL = '/api/auth/recover';
-const VALID_SESSION_ID = 'session-id-1234';
+const VALID_SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
 
 const VALID_REGISTRATION_RESPONSE = {
   id: VALID_CREDENTIAL_ID,
@@ -854,6 +854,12 @@ describe('auth', () => {
     describe('request validation', () => {
       it('returns 401 SESSION_NOT_FOUND when session cookie is absent', async () => {
         const res = await postRestore();
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('returns 401 SESSION_NOT_FOUND when session cookie is not a valid UUID', async () => {
+        const res = await postRestore(undefined, 'not-a-uuid');
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });

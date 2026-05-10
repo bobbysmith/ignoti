@@ -1,5 +1,6 @@
 import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import {
   AUTH_HEADERS,
   ERROR_CODES,
@@ -53,7 +54,7 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
   const sessionId = authHeader.slice(SESSION_AUTH_SCHEME.length + 1).trim();
   const iat = parseInt(timestampHeader, 10);
 
-  if (!sessionId || Number.isNaN(iat)) {
+  if (!sessionId || !z.string().uuid().safeParse(sessionId).success || Number.isNaN(iat)) {
     return sendError(reply, 401, ERROR_CODES.MALFORMED_SESSION_HEADERS);
   }
 

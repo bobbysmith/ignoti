@@ -5,6 +5,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { config } from '../config.js';
 import {
   ERROR_CODES,
@@ -363,7 +364,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     { config: { rateLimit: RATE_LIMITS.LOGIN } },
     async (req, reply) => {
       const sessionId = req.cookies[SESSION_COOKIE_NAME];
-      if (!sessionId) {
+      if (!sessionId || !z.string().uuid().safeParse(sessionId).success) {
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
 
