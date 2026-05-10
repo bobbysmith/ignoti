@@ -7,7 +7,7 @@
  *
  * The SDK persists nothing. Session identity lives in an httpOnly cookie set by
  * the server; the session private key lives only in memory. On page reload,
- * init() calls the server to rebind a fresh keypair to the existing session.
+ * call restoreSession() to rebind a fresh keypair to the existing session.
  */
 
 import { ApiClient, createApiClient } from './api/client';
@@ -247,7 +247,8 @@ export class GhostID {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     if (Date.now() > this.session.expiresAt) {
-      await this.logout();
+      secureWipe(this.session.sessionPrivateKey);
+      this.session = null;
       throw new GhostIDError(ERROR_MESSAGES.SESSION_EXPIRED, ErrorCodes.EXPIRED_CHALLENGE);
     }
     return ApiClient.signRequest(payload, this.session.sessionPrivateKey);
@@ -276,10 +277,15 @@ export class GhostID {
 
   async logout(): Promise<void> {
     this.ensureInitialized();
-    if (this.session) {
-      secureWipe(this.session.sessionPrivateKey);
-      this.session = null;
+    if (!this.session) {
+      return;
     }
+    const { sessionId, sessionPrivateKey } = this.session;
+    const iat = Math.floor(Date.now() / 1000);
+    const signature = ApiClient.signRequest({ sessionId, iat }, sessionPrivateKey);
+    await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature);
+    secureWipe(sessionPrivateKey);
+    this.session = null;
   }
 
   async getDevices(): Promise<DeviceInfo[]> {

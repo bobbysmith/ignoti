@@ -65,9 +65,7 @@ export const ghost = new GhostID({
 ghost.init();
 ```
 
-`GhostID` handles session persistence automatically. The session private key stays in memory and is never written to disk
-or localStorage. When the user reloads the page, `init()` restores the previous session from a secure cookie if one 
-exists. Non-sensitive identifiers (`userId`, `deviceId`) are persisted in localStorage by the SDK.
+`init()` is synchronous. The session private key stays in memory only — nothing is written to disk or localStorage.
 
 ---
 
@@ -99,25 +97,29 @@ establishes an in-memory session.
 const { sessionId, expiresAt } = await ghost.login();
 ```
 
-The session private key exists only in memory. The session automatically restores when the user returns to the page 
-- no passkey prompt on reload. If the session has expired or the user has logged out, `getSession()` returns `null` 
-  and they will need to authenticate again.
+The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from the httpOnly cookie — no passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
 
 ---
 
 ## 6. Handle returning users
 
-When the user reopens your app, call `getSession()` before rendering any authenticated UI. If `init()` found a valid
-session cookie, it will have already restored the session - no passkey prompt needed.
+On page load, call `restoreSession()` before rendering any authenticated UI. It sends a fresh keypair binding to the
+server, which validates the session cookie and re-establishes the in-memory session — no passkey prompt needed.
 
 ```ts
+ghost.init();
+
+try {
+  await ghost.restoreSession();
+} catch {
+  // no active session cookie, or session expired/revoked
+}
+
 const session = ghost.getSession();
 
 if (session) {
-  // user is already logged in - session was restored automatically
   renderApp(session.userId);
 } else {
-  // no session - show login screen
   renderLoginScreen();
 }
 ```
@@ -206,7 +208,7 @@ Revoking the current session is equivalent to logging out - the in-memory sessio
 await ghost.logout();
 ```
 
-The in-memory session key is securely wiped and the session cookie is cleared. The user will need to authenticate again.
+The session is revoked server-side (clearing the httpOnly cookie) and the in-memory key is wiped. If the server call fails, the local key is still wiped but the error is rethrown — the server session remains active. The user will need to authenticate again on success.
 
 When your app is shutting down (e.g. a single-page app unmounting its root component), call `destroy()` to wipe all 
 in-memory keys:

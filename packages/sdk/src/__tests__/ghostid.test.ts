@@ -175,7 +175,7 @@ async function withSession(opts?: Parameters<typeof stubLoginMocks>[0]) {
 
 describe('GhostID', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockBase64UrlToBuffer.mockReturnValue(new Uint8Array(32).buffer);
     mockBufferToBase64Url.mockReturnValue('challenge-b64url');
     mockToBase64.mockReturnValue('root-pub-b64');
@@ -254,17 +254,34 @@ describe('GhostID', () => {
   });
 
   describe('logout', () => {
-    it('wipes session key and clears session', async () => {
-      const { g } = await withSession();
+    it('revokes session server-side, wipes key, and clears session', async () => {
+      const { g, sessionId } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
       await g.logout();
 
+      expect(mockRevokeSession).toHaveBeenCalledWith(
+        sessionId,
+        sessionId,
+        expect.any(Number),
+        'sig-abc'
+      );
       expect(mockSecureWipe).toHaveBeenCalledWith(SESSION_PRIVATE_KEY);
       expect(g.getSession()).toBeNull();
+    });
+
+    it('throws and leaves session intact when server revocation fails', async () => {
+      const { g } = await withSession();
+      mockRevokeSession.mockRejectedValue(new Error('network'));
+      await expect(g.logout()).rejects.toThrow('network');
+
+      expect(mockSecureWipe).not.toHaveBeenCalled();
+      expect(g.getSession()).not.toBeNull();
     });
 
     it('is a no-op when no session is active', async () => {
       const g = initializedSdk();
       await expect(g.logout()).resolves.toBeUndefined();
+      expect(mockRevokeSession).not.toHaveBeenCalled();
       expect(mockSecureWipe).not.toHaveBeenCalled();
     });
   });
