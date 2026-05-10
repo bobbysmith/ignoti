@@ -6,7 +6,6 @@ import {
   insertSession,
   rebindSessionPublicKey,
   revokeSessionForUser,
-  revokeSessionsByDevice,
   touchSession,
 } from '../../../db/queries/sessions.js';
 
@@ -106,37 +105,6 @@ describe('sessions db queries', () => {
     it('resolves to void on success', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(touchSession(SESSION_ID)).resolves.toBeUndefined();
-    });
-  });
-
-  describe('revokeSessionsByDevice', () => {
-    it('executes UPDATE passing deviceId', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await revokeSessionsByDevice(DEVICE_ID);
-      const args = vi.mocked(sql).mock.calls[0];
-      expect(args).toEqual(expect.arrayContaining([DEVICE_ID]));
-    });
-
-    it('query only revokes where revoked_at is null', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await revokeSessionsByDevice(DEVICE_ID);
-      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('revoked_at is null');
-    });
-
-    it('resolves to void on success', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeSessionsByDevice(DEVICE_ID)).resolves.toBeUndefined();
-    });
-
-    it('resolves to void (no error) when device has no active sessions', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeSessionsByDevice(DEVICE_ID)).resolves.toBeUndefined();
-    });
-
-    it('resolves to void (no error) when deviceId is not found', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeSessionsByDevice('nonexistent')).resolves.toBeUndefined();
     });
   });
 

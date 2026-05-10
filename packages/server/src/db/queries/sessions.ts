@@ -60,13 +60,6 @@ export async function touchSession(sessionId: string): Promise<void> {
   `;
 }
 
-export async function revokeSessionsByDevice(deviceId: string): Promise<void> {
-  await sql`
-    update sessions set revoked_at = now()
-    where device_id = ${deviceId} and revoked_at is null
-  `;
-}
-
 export async function getSessionsForUser(userId: string): Promise<SessionListRow[]> {
   return sql<SessionListRow[]>`
     select s.id, s.device_id, s.created_at, s.last_used_at, s.expires_at
