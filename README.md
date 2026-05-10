@@ -44,24 +44,28 @@ Builders whose users care about privacy. If you're building for people who use S
 
 **1. Deploy the server**
 
-```bash
-# Coming soon: one-click deploy to Railway, Render, and Fly.io
-# Docker image and docker-compose.yml in progress
-```
-
-**2. Run migrations**
+GhostID ships as a Docker image. The included `docker-compose.yml` starts the server and a Postgres database together and runs migrations automatically on first boot.
 
 ```bash
-DATABASE_URL=postgres://... pnpm db:migrate
+curl -O https://raw.githubusercontent.com/dipsettheory/ghostid/main/docker-compose.yml
+
+# Set RP_ID and RP_ORIGIN for your domain - see Environment variables below
+cp .env.example .env
+
+docker compose up -d
 ```
 
-**3. Install the client SDK**
+The server listens on port `8787` by default.
+
+One-click deploy buttons for Railway, Render, and Fly.io.
+
+**2. Install the client SDK**
 
 ```bash
 npm install ghostid
 ```
 
-**4. Initialize in your app**
+**3. Initialize in your app**
 
 ```ts
 import { GhostID } from 'ghostid';
@@ -76,7 +80,7 @@ const { userId, deviceId, mnemonic } = await ghost.createIdentity();
 // Log in
 const { sessionId, expiresAt } = await ghost.login();
 
-// Make authenticated requests (session key signs automatically)
+// Sign authenticated requests
 const headers = await ghost.getSessionHeaders();
 ```
 
@@ -99,27 +103,36 @@ The SDK handles all cryptography client-side. The server handles verification, c
 
 ## Self-hosting
 
-GhostID is designed to be self-hosted. Your users' identity data lives in your Postgres database, under your control, in your infrastructure. GhostID (the project) never sees it.
+GhostID is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in your infrastructure. GhostID never has access to it.
 
-**Required environment variables:**
+**Environment variables:**
 
-| Variable                | Description                             | Default                 |
-|-------------------------|-----------------------------------------|-------------------------|
-| `DATABASE_URL`          | Postgres connection string              | required                |
-| `RP_ID`                 | WebAuthn relying party ID (your domain) | `localhost`             |
-| `RP_NAME`               | Display name shown in passkey dialogs   | `GhostID`               |
-| `RP_ORIGIN`             | Allowed origin(s), comma-separated      | `http://localhost:5173` |
-| `CHALLENGE_TTL_SECONDS` | How long challenges stay valid          | `300`                   |
-| `SESSION_TTL_SECONDS`   | How long sessions stay valid            | `86400`                 |
-| `PORT`                  | Server port                             | `8787`                  |
-| `HOST`                  | Server host                             | `0.0.0.0`               |
+| Variable                | Required | Default                 | Description                                                                                                           |
+|-------------------------|----------|-------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                           |
+| `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                         |
+| `RP_NAME`               | No       | `GhostID`               | Display name shown to users in passkey dialogs.                                                                       |
+| `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins. |
+| `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                        |
+| `SESSION_TTL_SECONDS`   | No       | `86400` (24 hr)         | How long a session token stays valid. Min: 60, max: 2592000 (30 days).                                                |
+| `DB_PREPARE`            | No       | `true`                  | Set to `false` when using a transaction pooler that does not support prepared statements.                             |
+| `PORT`                  | No       | `8787`                  | Port the server listens on.                                                                                           |
+| `HOST`                  | No       | `0.0.0.0`               | Network interface to bind to.                                                                                         |
+| `LOG_LEVEL`             | No       | `info`                  | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`.                                            |
+
+**Database:**
+
+GhostID requires Postgres 14 or later. When using Docker Compose, a Postgres container is included and migrations run automatically on startup. To run migrations manually against an external database:
+
+```bash
+docker run --rm -e DATABASE_URL=postgres://... ghostid/server node dist/db/migrate.js
+```
 
 **Database maintenance:**
 
-GhostID includes a cleanup function `ghostid_gc()` that prunes expired challenges and old sessions. Schedule it to run daily (or hourly at scale) via pg_cron or Supabase Cron Jobs:
+GhostID includes a `ghostid_gc()` function that deletes expired challenges and old sessions. Schedule it to run at least daily using your database's job scheduler.
 
 ```sql
--- pg_cron
 select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
 ```
 
@@ -129,11 +142,11 @@ select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
 
 GhostID's cryptographic design is documented in [THREAT_MODEL.md](./THREAT_MODEL.md). Key properties:
 
-- No passwords - nothing to steal from the server
-- No PII stored - a breached database reveals no real-world identities
-- Phishing-resistant - WebAuthn origin binding means passkeys only work on the registered domain
-- Replay-resistant - all challenges are single-use, scoped, and short-lived
-- Signed requests - session keys sign every API call; a stolen session ID alone cannot be replayed
+- **No passwords** - nothing to steal from the server
+- **No PII stored** - a breached database reveals no real world identities
+- **Phishing-resistant** - WebAuthn origin binding means passkeys only work on the registered domain
+- **Replay-resistant** - all challenges are single-use, scoped, and short-lived
+- **Signed requests** - session keys sign every API call; a stolen session ID alone cannot be replayed
 
 ---
 
