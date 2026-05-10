@@ -11,7 +11,7 @@ export {
 export const WEBAUTHN_TIMEOUT_MS = 60_000;
 
 export const RATE_LIMITS = {
-  // Applied globally — authenticated / low-risk routes.
+  // Applied globally authenticated / low-risk routes.
   DEFAULT: { max: 100, timeWindow: '1 minute' },
   // Account creation. An attacker can fill the DB or pre-register credentials
   // they don't control. Legitimate users need this at most a handful of times.
@@ -79,13 +79,12 @@ export const ROUTES = {
   HEALTH: '/health',
 } as const;
 
-// Lowercase versions for Fastify header lookup — Fastify normalizes incoming
-// header names to lowercase, so these must be lowercase to match.
 export const AUTH_HEADERS = {
   AUTHORIZATION: 'authorization',
   SESSION_SIGNATURE: 'x-ghostid-signature',
   SESSION_TIMESTAMP: 'x-ghostid-timestamp',
 } as const;
 
-// Acceptable clock skew for per-request session signatures.
 export const SESSION_SIG_TOLERANCE_SECONDS = 60;
+
+export const SESSION_COOKIE_NAME = 'ghostid_session';

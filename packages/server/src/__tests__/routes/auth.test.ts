@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
@@ -134,6 +135,7 @@ let app: FastifyInstance;
 describe('auth', () => {
   beforeAll(async () => {
     app = Fastify({ logger: false });
+    await app.register(cookie);
     await app.register(registerAuthRoutes, { prefix: '/api/auth' });
     await app.ready();
   });
@@ -816,6 +818,20 @@ describe('auth', () => {
           expiresAt: session.expires_at.getTime(),
           userId: VALID_USER_ID,
         });
+      });
+
+      it('sets httpOnly SameSite=Strict session cookie with sessionId', async () => {
+        const session = makeSession();
+        vi.mocked(insertSession).mockResolvedValue(session);
+        const res = await postSession();
+        const raw = res.headers['set-cookie'];
+        const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+        expect(cookieStr).toContain(`ghostid_session=${session.id}`);
+        expect(cookieStr).toContain('HttpOnly');
+        expect(cookieStr).toContain('SameSite=Strict');
+        expect(cookieStr).toContain('Path=/');
+        expect(cookieStr).toContain('Max-Age=86400');
+        expect(cookieStr).not.toContain('Secure');
       });
     });
   });

@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
@@ -20,9 +21,11 @@ export async function buildServer() {
     trustProxy: 1,
   });
 
+  await app.register(cookie);
+
   await app.register(cors, {
     origin: config.RP_ORIGIN,
-    credentials: false,
+    credentials: true,
   });
 
   await app.register(rateLimit, {

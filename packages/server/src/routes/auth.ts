@@ -11,6 +11,7 @@ import {
   RATE_LIMITS,
   ROUTES,
   SESSION_CHALLENGE_TTL_MS,
+  SESSION_COOKIE_NAME,
   WEBAUTHN_TIMEOUT_MS,
 } from '../constants.js';
 import {
@@ -325,6 +326,16 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         deviceId: challenge.device_id,
         sessionPublicKey: verified.sessionPublicKey,
         expiresAt,
+      });
+
+      const secure = config.RP_ORIGIN.every(o => o.startsWith('https://'));
+
+      reply.setCookie(SESSION_COOKIE_NAME, session.id, {
+        httpOnly: true,
+        secure,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: config.SESSION_TTL_SECONDS,
       });
 
       return reply.send({
