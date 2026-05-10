@@ -7,7 +7,6 @@ import {
   getDevicesForUser,
   insertDevice,
   revokeDeviceWithSessions,
-  updateDeviceSignCount,
 } from '../../../db/queries/devices.js';
 
 vi.mock('../../../db/client.js', () => {
@@ -161,25 +160,6 @@ describe('devices db queries', () => {
     it('throws "insertDevice returned no row" when INSERT returns empty array', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(insertDevice(params)).rejects.toThrow('insertDevice returned no row');
-    });
-  });
-
-  describe('updateDeviceSignCount', () => {
-    it('executes UPDATE with new sign_count and passes deviceId', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await updateDeviceSignCount(DEVICE_ID, 42);
-      const args = vi.mocked(sql).mock.calls[0];
-      expect(args).toEqual(expect.arrayContaining([42, DEVICE_ID]));
-    });
-
-    it('resolves to void when deviceId is found', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(updateDeviceSignCount(DEVICE_ID, 1)).resolves.toBeUndefined();
-    });
-
-    it('resolves to void (no error) when deviceId is not found (0 rows updated)', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(updateDeviceSignCount('nonexistent', 0)).resolves.toBeUndefined();
     });
   });
 

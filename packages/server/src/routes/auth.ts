@@ -23,15 +23,10 @@ import {
   insertLoginChallenge,
   insertRecoverChallenge,
   insertRegisterChallenge,
-  insertSessionChallenge,
   insertTimingRecoverChallenge,
 } from '../db/queries/challenges.js';
-import {
-  getDeviceByCredentialId,
-  getDeviceById,
-  insertDevice,
-  updateDeviceSignCount,
-} from '../db/queries/devices.js';
+import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../db/queries/devices.js';
+import { incrementSignCountWithChallenge } from '../db/queries/login.js';
 import { insertSession, rebindSessionPublicKey } from '../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../helpers/auth.js';
@@ -274,11 +269,14 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return sendError(reply, 401, ERROR_CODES.ASSERTION_VERIFICATION_FAILED);
     }
 
-    await updateDeviceSignCount(device.id, verification.authenticationInfo.newCounter);
-
     const sessionChallenge = randomBytes(32).toString('base64url');
     const sessionChallengeExpiresAt = new Date(Date.now() + SESSION_CHALLENGE_TTL_MS);
-    await insertSessionChallenge(sessionChallenge, device.id, sessionChallengeExpiresAt);
+    await incrementSignCountWithChallenge(
+      device.id,
+      verification.authenticationInfo.newCounter,
+      sessionChallenge,
+      sessionChallengeExpiresAt
+    );
 
     return reply.send({ sessionChallenge, deviceId: device.id });
   });

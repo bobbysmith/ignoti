@@ -17,15 +17,10 @@ import {
   insertLoginChallenge,
   insertRecoverChallenge,
   insertRegisterChallenge,
-  insertSessionChallenge,
   insertTimingRecoverChallenge,
 } from '../../db/queries/challenges.js';
-import {
-  getDeviceByCredentialId,
-  getDeviceById,
-  insertDevice,
-  updateDeviceSignCount,
-} from '../../db/queries/devices.js';
+import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../../db/queries/devices.js';
+import { incrementSignCountWithChallenge } from '../../db/queries/login.js';
 import { insertSession, rebindSessionPublicKey } from '../../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../../helpers/auth.js';
@@ -46,6 +41,7 @@ vi.mock('../../config.js', () => ({
 vi.mock('../../db/queries/users.js');
 vi.mock('../../db/queries/devices.js');
 vi.mock('../../db/queries/challenges.js');
+vi.mock('../../db/queries/login.js');
 vi.mock('../../db/queries/sessions.js');
 vi.mock('@simplewebauthn/server');
 vi.mock('../../lib/root-jws.js');
@@ -645,8 +641,7 @@ describe('auth', () => {
 
       it('passes device transports when non-null to verifyAuthenticationResponse', async () => {
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(updateDeviceSignCount).mockResolvedValue(undefined);
-        vi.mocked(insertSessionChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
         const device = { ...makeDevice(), transports: ['internal', 'hybrid'] };
         vi.mocked(getDeviceByCredentialId).mockResolvedValue(device as never);
         await login();
@@ -659,8 +654,7 @@ describe('auth', () => {
 
       it('passes device sign_count as Number() to verifyAuthenticationResponse', async () => {
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(updateDeviceSignCount).mockResolvedValue(undefined);
-        vi.mocked(insertSessionChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
         const device = { ...makeDevice(), sign_count: 42n };
         vi.mocked(getDeviceByCredentialId).mockResolvedValue(device as never);
         await login();
@@ -676,20 +670,15 @@ describe('auth', () => {
         vi.mocked(extractChallenge).mockReturnValue(VALID_CHALLENGE);
         vi.mocked(consumeLoginChallenge).mockResolvedValue(true);
         vi.mocked(verifyAuthenticationResponse).mockResolvedValue(makeAuthVerification() as never);
-        vi.mocked(updateDeviceSignCount).mockResolvedValue(undefined);
-        vi.mocked(insertSessionChallenge).mockResolvedValue(undefined);
+        vi.mocked(incrementSignCountWithChallenge).mockResolvedValue(undefined);
       });
 
-      it('updates device sign count after successful verification', async () => {
+      it('advances sign count and inserts session challenge in a transaction', async () => {
         await login();
-        expect(updateDeviceSignCount).toHaveBeenCalledWith(VALID_DEVICE_ID, 1);
-      });
-
-      it('inserts a session challenge for the device', async () => {
-        await login();
-        expect(insertSessionChallenge).toHaveBeenCalledWith(
-          expect.any(String),
+        expect(incrementSignCountWithChallenge).toHaveBeenCalledWith(
           VALID_DEVICE_ID,
+          1,
+          expect.any(String),
           expect.any(Date)
         );
       });

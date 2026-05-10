@@ -79,14 +79,6 @@ export async function insertDevice(params: InsertDeviceParams): Promise<DeviceId
   return device;
 }
 
-export async function updateDeviceSignCount(deviceId: string, newCounter: number): Promise<void> {
-  await sql`
-    update devices
-    set sign_count = ${newCounter}, last_used_at = now()
-    where id = ${deviceId}
-  `;
-}
-
 export async function revokeDeviceWithSessions(deviceId: string): Promise<void> {
   await sql.begin(async tx => {
     await tx`
