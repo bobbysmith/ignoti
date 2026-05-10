@@ -227,6 +227,7 @@ export const ERROR_MESSAGES = {
   REQUEST_TIMED_OUT: 'Request timed out',
 
   // Auth
+  INVALID_WEBAUTHN_OPTIONS: 'Invalid WebAuthn options received from server',
   INVALID_REGISTRATION_RESPONSE: 'Invalid registrationResponse provided',
   INVALID_ASSERTION_RESPONSE: 'Invalid assertion provided',
 

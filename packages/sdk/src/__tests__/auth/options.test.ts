@@ -4,6 +4,7 @@ import {
   extractChallenge,
   requestOptionsFromServer,
 } from '@/auth/options.ts';
+import { GhostIDError } from '@/core/errors.ts';
 
 // 'challenge' → base64url
 const CHALLENGE_B64URL = 'Y2hhbGxlbmdl';
@@ -62,6 +63,18 @@ describe('creationOptionsFromServer', () => {
     const opts = creationOptionsFromServer(baseCreationJson());
     expect(opts.excludeCredentials).toBeUndefined();
   });
+
+  it('throws GhostIDError when challenge is missing', () => {
+    expect(() => creationOptionsFromServer(baseCreationJson({ challenge: undefined }))).toThrow(
+      GhostIDError
+    );
+  });
+
+  it('throws GhostIDError when user is missing', () => {
+    expect(() => creationOptionsFromServer(baseCreationJson({ user: undefined }))).toThrow(
+      GhostIDError
+    );
+  });
 });
 
 describe('extractChallenge', () => {
@@ -97,5 +110,9 @@ describe('requestOptionsFromServer', () => {
   it('leaves allowCredentials undefined when absent', () => {
     const opts = requestOptionsFromServer({ challenge: CHALLENGE_B64URL });
     expect(opts.allowCredentials).toBeUndefined();
+  });
+
+  it('throws GhostIDError when challenge is missing', () => {
+    expect(() => requestOptionsFromServer({})).toThrow(GhostIDError);
   });
 });
