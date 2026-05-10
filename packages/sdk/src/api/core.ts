@@ -27,13 +27,7 @@ const HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 /** RFC 7230 field-value: visible ASCII and tab/space, no CR/LF. */
 const HEADER_VALUE_RE = /^[\t\x20-\x7E]*$/;
 
-const FORBIDDEN_REQUEST_HEADERS = new Set([
-  'host',
-  'connection',
-  'content-length',
-  'transfer-encoding',
-  'upgrade',
-]);
+const FORBIDDEN_REQUEST_HEADERS = new Set<string>(SECURITY.FORBIDDEN_HEADERS);
 
 export class CoreApiClient {
   private readonly baseUrl: string;

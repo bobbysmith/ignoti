@@ -266,14 +266,19 @@ export const SECURITY = {
   MAX_HEADER_NAME_LENGTH: 256, // Max header name length
   MAX_PATH_LENGTH: 2048, // Max URL path length
   MAX_REQUEST_BODY_SIZE: 1024 * 1024, // 1MB max request body
-  // Headers the client must never set manually — browser/runtime controls these.
+  // Headers the client must never set manually — browser/runtime controls these,
+  // or they are HTTP/1.1 connection-level fields that must not be overridden.
   // Note: 'authorization' is intentionally NOT listed here; the SDK sends it for session auth.
   FORBIDDEN_HEADERS: [
+    'connection',
+    'content-length',
     'cookie',
     'host',
     'origin',
     'referer',
     'set-cookie',
+    'transfer-encoding',
+    'upgrade',
     'x-forwarded-for',
     'x-real-ip',
   ] as const,
