@@ -67,6 +67,7 @@ export const ROUTES = {
     REGISTER: '/register',
     REGISTER_DEVICE: '/register/device',
     SESSION: '/session',
+    SESSION_RESTORE: '/session/restore',
   },
   DEVICES: {
     LIST: '/',

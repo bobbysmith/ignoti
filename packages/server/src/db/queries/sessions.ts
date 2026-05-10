@@ -6,7 +6,13 @@ interface InsertSessionParams {
   expiresAt: Date;
 }
 
-export interface SessionAuthRow {
+interface RebindRow {
+  user_id: string;
+  device_id: string;
+  expires_at: Date;
+}
+
+interface SessionAuthRow {
   session_public_key: string;
   expires_at: Date;
   revoked_at: Date | null;
@@ -14,16 +20,16 @@ export interface SessionAuthRow {
   device_id: string;
 }
 
-interface SessionRow {
-  id: string;
-  expires_at: Date;
-}
-
 interface SessionListRow {
   id: string;
   device_id: string;
   created_at: Date;
   last_used_at: Date | null;
+  expires_at: Date;
+}
+
+interface SessionRow {
+  id: string;
   expires_at: Date;
 }
 
@@ -71,6 +77,23 @@ export async function getSessionsForUser(userId: string): Promise<SessionListRow
       and s.expires_at > now()
     order by s.created_at desc
   `;
+}
+
+export async function rebindSessionPublicKey(
+  sessionId: string,
+  newPublicKey: string
+): Promise<RebindRow | undefined> {
+  const [row] = await sql<RebindRow[]>`
+    update sessions s
+    set session_public_key = ${newPublicKey}
+    from devices d
+    where s.id = ${sessionId}
+      and s.device_id = d.id
+      and s.revoked_at is null
+      and s.expires_at > now()
+    returning d.user_id, s.device_id, s.expires_at
+  `;
+  return row;
 }
 
 export async function revokeSessionForUser(sessionId: string, userId: string): Promise<boolean> {

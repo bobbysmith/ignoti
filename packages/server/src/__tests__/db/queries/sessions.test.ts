@@ -4,6 +4,7 @@ import {
   getSessionsForUser,
   getSessionWithUser,
   insertSession,
+  rebindSessionPublicKey,
   revokeSessionForUser,
   revokeSessionsByDevice,
   touchSession,
@@ -178,6 +179,43 @@ describe('sessions db queries', () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await getSessionsForUser(USER_ID);
       expect(vi.mocked(sql).mock.calls[0]).toContain(USER_ID);
+    });
+  });
+
+  describe('rebindSessionPublicKey', () => {
+    const NEW_PUBLIC_KEY = 'new-session-pub-key-b64';
+    const expiresAt = new Date('2026-12-01T00:00:00Z');
+    const rebindRow = { user_id: USER_ID, device_id: DEVICE_ID, expires_at: expiresAt };
+
+    it('returns the rebind row when session is active and not revoked', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rebindRow] as never);
+      await expect(rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY)).resolves.toEqual(rebindRow);
+    });
+
+    it('returns undefined when session is not found, revoked, or expired', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY)).resolves.toBeUndefined();
+    });
+
+    it('passes sessionId and newPublicKey to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rebindRow] as never);
+      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args).toEqual(expect.arrayContaining([SESSION_ID, NEW_PUBLIC_KEY]));
+    });
+
+    it('query guards against revoked sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('revoked_at is null');
+    });
+
+    it('query guards against expired sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('expires_at > now()');
     });
   });
 

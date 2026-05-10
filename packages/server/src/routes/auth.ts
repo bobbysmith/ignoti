@@ -31,7 +31,7 @@ import {
   insertDevice,
   updateDeviceSignCount,
 } from '../db/queries/devices.js';
-import { insertSession } from '../db/queries/sessions.js';
+import { insertSession, rebindSessionPublicKey } from '../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../helpers/auth.js';
 import { sendError } from '../helpers/response.js';
@@ -342,6 +342,61 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         sessionId: session.id,
         expiresAt: session.expires_at.getTime(),
         userId: device.user_id,
+      });
+    }
+  );
+
+  /**
+   * POST /api/auth/session/restore
+   * Cookie: ghostid_session=<sessionId>
+   * Body: { sessionBinding }  (compact JWS, EdDSA — same shape as /session)
+   * Returns: { sessionId, userId, deviceId, expiresAt }
+   *
+   * After a page reload the SDK has lost its ephemeral session private key but
+   * the browser still holds the httpOnly session cookie. This endpoint lets the
+   * SDK generate a fresh ephemeral keypair and re-bind it to the existing live
+   * session. The sessionId from the cookie acts as the nonce (`sessionChallenge`
+   * claim) so no separate DB challenge roundtrip is needed; the JWS `exp` (60 s)
+   * provides freshness. The session's stored public key is atomically replaced.
+   */
+  app.post(
+    ROUTES.AUTH.SESSION_RESTORE,
+    { config: { rateLimit: RATE_LIMITS.LOGIN } },
+    async (req, reply) => {
+      const sessionId = req.cookies[SESSION_COOKIE_NAME];
+      if (!sessionId) {
+        return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
+      }
+
+      const parsed = sessionBody.safeParse(req.body);
+      if (!parsed.success) {
+        return sendError(reply, 400, ERROR_CODES.INVALID_INPUT, parsed.error.flatten());
+      }
+      const { sessionBinding } = parsed.data;
+
+      let verified: Awaited<ReturnType<typeof verifySessionBindingJWS>>;
+      try {
+        verified = await verifySessionBindingJWS(sessionBinding);
+      } catch (err) {
+        req.log.warn({ err }, 'session restore: binding verification failed');
+        return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
+      }
+
+      if (verified.payload.sessionChallenge !== sessionId) {
+        return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
+      }
+
+      const session = await rebindSessionPublicKey(sessionId, verified.sessionPublicKey);
+      if (!session) {
+        reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+        return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
+      }
+
+      return reply.send({
+        sessionId,
+        userId: session.user_id,
+        deviceId: session.device_id,
+        expiresAt: session.expires_at.getTime(),
       });
     }
   );

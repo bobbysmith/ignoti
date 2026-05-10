@@ -26,7 +26,7 @@ import {
   insertDevice,
   updateDeviceSignCount,
 } from '../../db/queries/devices.js';
-import { insertSession } from '../../db/queries/sessions.js';
+import { insertSession, rebindSessionPublicKey } from '../../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../../helpers/auth.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../../lib/root-jws.js';
@@ -72,7 +72,9 @@ const DEVICES_URL = '/api/auth/register/device';
 const LOGIN_URL = '/api/auth/login';
 const CHALLENGE_URL = '/api/auth/challenge';
 const SESSION_URL = '/api/auth/session';
+const SESSION_RESTORE_URL = '/api/auth/session/restore';
 const RECOVER_URL = '/api/auth/recover';
+const VALID_SESSION_ID = 'session-id-1234';
 
 const VALID_REGISTRATION_RESPONSE = {
   id: VALID_CREDENTIAL_ID,
@@ -832,6 +834,124 @@ describe('auth', () => {
         expect(cookieStr).toContain('Path=/');
         expect(cookieStr).toContain('Max-Age=86400');
         expect(cookieStr).not.toContain('Secure');
+      });
+    });
+  });
+
+  describe('POST /api/auth/session/restore', () => {
+    function postRestore(
+      body: Record<string, unknown> = { sessionBinding: VALID_SESSION_BINDING },
+      sessionCookie?: string
+    ) {
+      return app.inject({
+        method: 'POST',
+        url: SESSION_RESTORE_URL,
+        body,
+        cookies: sessionCookie !== undefined ? { ghostid_session: sessionCookie } : undefined,
+      });
+    }
+
+    describe('request validation', () => {
+      it('returns 401 SESSION_NOT_FOUND when session cookie is absent', async () => {
+        const res = await postRestore();
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('returns 400 INVALID_INPUT when sessionBinding is missing', async () => {
+        const res = await postRestore({}, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+
+      it('returns 400 INVALID_INPUT when sessionBinding is shorter than MIN_SESSION_BINDING_LENGTH', async () => {
+        const res = await postRestore({ sessionBinding: SHORT_SESSION_BINDING }, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+
+      it('returns 400 INVALID_INPUT when sessionBinding exceeds MAX_SESSION_BINDING_LENGTH', async () => {
+        const res = await postRestore({ sessionBinding: LONG_SESSION_BINDING }, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+    });
+
+    describe('JWS verification', () => {
+      it('returns 401 INVALID_SESSION_BINDING when verifySessionBindingJWS throws', async () => {
+        vi.mocked(verifySessionBindingJWS).mockRejectedValue(new Error('bad jws'));
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_SESSION_BINDING });
+      });
+
+      it('returns 401 INVALID_SESSION_BINDING when sessionChallenge does not match cookie sessionId', async () => {
+        vi.mocked(verifySessionBindingJWS).mockResolvedValue({
+          sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
+          payload: { sessionChallenge: 'wrong-session-id' },
+        } as never);
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_SESSION_BINDING });
+      });
+    });
+
+    describe('rebind failure', () => {
+      beforeEach(() => {
+        vi.mocked(verifySessionBindingJWS).mockResolvedValue({
+          sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
+          payload: { sessionChallenge: VALID_SESSION_ID },
+        } as never);
+      });
+
+      it('returns 401 SESSION_NOT_FOUND when rebindSessionPublicKey returns undefined', async () => {
+        vi.mocked(rebindSessionPublicKey).mockResolvedValue(undefined);
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('clears the session cookie when rebind fails', async () => {
+        vi.mocked(rebindSessionPublicKey).mockResolvedValue(undefined);
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        const raw = res.headers['set-cookie'];
+        const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+        expect(cookieStr).toMatch(/ghostid_session=;|ghostid_session=(?:;| |$)/);
+      });
+    });
+
+    describe('success', () => {
+      const REBIND_ROW = {
+        user_id: VALID_USER_ID,
+        device_id: VALID_DEVICE_ID,
+        expires_at: new Date(Date.now() + 86_400_000),
+      };
+
+      beforeEach(() => {
+        vi.mocked(verifySessionBindingJWS).mockResolvedValue({
+          sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
+          payload: { sessionChallenge: VALID_SESSION_ID },
+        } as never);
+        vi.mocked(rebindSessionPublicKey).mockResolvedValue(REBIND_ROW);
+      });
+
+      it('calls rebindSessionPublicKey with sessionId from cookie and new public key', async () => {
+        await postRestore(undefined, VALID_SESSION_ID);
+        expect(rebindSessionPublicKey).toHaveBeenCalledWith(
+          VALID_SESSION_ID,
+          VALID_SESSION_PUBLIC_KEY
+        );
+      });
+
+      it('returns 200 with sessionId, userId, deviceId, and expiresAt', async () => {
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+          sessionId: VALID_SESSION_ID,
+          userId: VALID_USER_ID,
+          deviceId: VALID_DEVICE_ID,
+          expiresAt: REBIND_ROW.expires_at.getTime(),
+        });
       });
     });
   });
