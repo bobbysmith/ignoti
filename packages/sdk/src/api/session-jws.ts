@@ -1,4 +1,5 @@
 /**
+ * @file session-jws.ts
  * Session-binding JWS (RFC 7515) signed with a freshly-generated session
  * Ed25519 keypair. The public key travels in the JWS protected header as a
  * `jwk` (RFC 7517) so the server can extract it and store it as the session's
@@ -14,9 +15,7 @@
  */
 
 import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
-import { importJWK, SignJWT } from 'jose';
-
-import { toBase64 } from '../core/crypto';
+import { SignJWT } from 'jose';
 
 export interface SessionBindingClaims {
   /** Server-issued nonce returned from POST /login. Single-use, short-lived. */
@@ -24,33 +23,22 @@ export interface SessionBindingClaims {
 }
 
 /**
- * `sessionPrivateKey` and `sessionPublicKey` are both 32-byte Ed25519 (the
- * seed for the private key, `@noble`'s convention, also what JWK EdDSA
- * expects as `d`).
+ * `sessionPrivateKey` is a non-extractable WebCrypto Ed25519 private key —
+ * its bytes never enter the JS heap. `sessionPublicKey` is always extractable.
  */
 export async function signSessionBindingJWS(
   claims: SessionBindingClaims,
-  sessionPrivateKey: Uint8Array,
-  sessionPublicKey: Uint8Array
+  sessionPrivateKey: CryptoKey,
+  sessionPublicKey: CryptoKey
 ): Promise<string> {
-  if (sessionPrivateKey.length !== 32 || sessionPublicKey.length !== 32) {
-    throw new Error('Ed25519 keys must be 32 bytes (seed and public key)');
-  }
-  const xB64 = toBase64(sessionPublicKey);
-  const jwk = {
-    kty: 'OKP',
-    crv: 'Ed25519',
-    d: toBase64(sessionPrivateKey),
-    x: xB64,
-  };
-  const key = await importJWK(jwk, 'EdDSA');
+  const jwk = (await crypto.subtle.exportKey('jwk', sessionPublicKey)) as JsonWebKey;
   return new SignJWT({ ...claims })
     .setProtectedHeader({
       alg: 'EdDSA',
       typ: SESSION_BINDING_TYP,
-      jwk: { kty: 'OKP', crv: 'Ed25519', x: xB64 },
+      jwk: { kty: 'OKP', crv: 'Ed25519', x: jwk.x },
     })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_JWS_MAX_AGE_SECONDS}s`)
-    .sign(key);
+    .sign(sessionPrivateKey);
 }

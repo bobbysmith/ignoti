@@ -4,28 +4,20 @@
  */
 
 import { ERROR_MESSAGES } from '@/constants';
-import { fromBase64, sign, stringToBytes, toBase64, verify } from '../core/crypto';
+import { base64UrlToBuffer, bufferToBase64Url, stringToBytes } from '../core/crypto';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
-/**
- * Signs a request payload with the provided private key
- * @param payload - Request payload to sign
- * @param privateKey - Private key for signing
- * @returns Base64-encoded signature
- */
-export function signRequest(payload: Record<string, unknown>, privateKey: Uint8Array): string {
+export async function signRequest(
+  payload: Record<string, unknown>,
+  privateKey: CryptoKey
+): Promise<string> {
   if (!payload || typeof payload !== 'object') {
     throw new GhostIDError(ERROR_MESSAGES.INVALID_SIGNING_PAYLOAD, ErrorCodes.INVALID_INPUT);
   }
-  if (privateKey.length === 0) {
-    throw new GhostIDError(ERROR_MESSAGES.INVALID_SIGNING_KEY, ErrorCodes.INVALID_INPUT);
-  }
-
   try {
-    const payloadString = JSON.stringify(payload);
-    const payloadBytes = stringToBytes(payloadString);
-    const signature = sign(payloadBytes, privateKey);
-    return toBase64(signature);
+    const payloadBytes = new Uint8Array(stringToBytes(JSON.stringify(payload)));
+    const signatureBuffer = await crypto.subtle.sign('Ed25519', privateKey, payloadBytes);
+    return bufferToBase64Url(signatureBuffer);
   } catch (error) {
     throw new GhostIDError(
       ERROR_MESSAGES.SIGNING_FAILED,
@@ -35,33 +27,17 @@ export function signRequest(payload: Record<string, unknown>, privateKey: Uint8A
   }
 }
 
-/**
- * Verifies a request signature
- * @param payload - Request payload that was signed
- * @param signature - Base64-encoded signature
- * @param publicKey - Public key for verification
- * @returns True if signature is valid
- */
-export function verifyRequest(
+export async function verifyRequest(
   payload: Record<string, unknown>,
   signature: string,
-  publicKey: Uint8Array
-): boolean {
+  publicKey: CryptoKey
+): Promise<boolean> {
   try {
-    if (!payload || typeof payload !== 'object') {
-      return false;
-    }
-    if (!signature || signature.trim().length === 0) {
-      return false;
-    }
-    if (publicKey.length === 0) {
-      return false;
-    }
-
-    const payloadString = JSON.stringify(payload);
-    const payloadBytes = stringToBytes(payloadString);
-    const signatureBytes = fromBase64(signature.trim());
-    return verify(signatureBytes, payloadBytes, publicKey);
+    if (!payload || typeof payload !== 'object') return false;
+    if (!signature || signature.trim().length === 0) return false;
+    const payloadBytes = new Uint8Array(stringToBytes(JSON.stringify(payload)));
+    const signatureBuffer = base64UrlToBuffer(signature.trim());
+    return await crypto.subtle.verify('Ed25519', publicKey, signatureBuffer, payloadBytes);
   } catch {
     return false;
   }

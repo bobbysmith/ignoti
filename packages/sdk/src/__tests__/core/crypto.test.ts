@@ -105,9 +105,9 @@ describe('crypto', () => {
       expect(verify(sig, stringToBytes('msg'), ks2.signing.publicKey)).toBe(false);
     });
 
-    it('verify returns false on zeroed signature without throwing', () => {
-      const { publicKey } = generateSessionSigningKeypair();
-      expect(verify(new Uint8Array(64), stringToBytes('msg'), publicKey)).toBe(false);
+    it('verify returns false on zeroed signature without throwing', async () => {
+      const { signing } = await deriveRootKeysFromMnemonic(generateMnemonic());
+      expect(verify(new Uint8Array(64), stringToBytes('msg'), signing.publicKey)).toBe(false);
     });
 
     it('verify returns false when ed25519.verify throws (wrong-length public key)', () => {
@@ -116,17 +116,29 @@ describe('crypto', () => {
   });
 
   describe('generateSessionSigningKeypair', () => {
-    it('returns two distinct 32-byte keys', () => {
-      const { publicKey, privateKey } = generateSessionSigningKeypair();
-      expect(publicKey).toHaveLength(32);
-      expect(privateKey).toHaveLength(32);
-      expect(publicKey).not.toEqual(privateKey);
+    it('returns a CryptoKeyPair with non-extractable private key', async () => {
+      const kp = await generateSessionSigningKeypair();
+      expect(kp.privateKey).toBeInstanceOf(CryptoKey);
+      expect(kp.publicKey).toBeInstanceOf(CryptoKey);
+      expect(kp.privateKey.type).toBe('private');
+      expect(kp.publicKey.type).toBe('public');
+      expect(kp.privateKey.extractable).toBe(false);
+      expect(kp.publicKey.extractable).toBe(true);
     });
 
-    it('generates fresh keys on each call', () => {
-      const a = generateSessionSigningKeypair();
-      const b = generateSessionSigningKeypair();
-      expect(a.publicKey).not.toEqual(b.publicKey);
+    it('private key supports sign, public key supports verify', async () => {
+      const kp = await generateSessionSigningKeypair();
+      expect(kp.privateKey.usages).toContain('sign');
+      expect(kp.publicKey.usages).toContain('verify');
+    });
+
+    it('generates fresh keys on each call', async () => {
+      const a = await generateSessionSigningKeypair();
+      const b = await generateSessionSigningKeypair();
+      const msg = new TextEncoder().encode('test');
+      const sigA = await crypto.subtle.sign('Ed25519', a.privateKey, msg);
+      const sigB = await crypto.subtle.sign('Ed25519', b.privateKey, msg);
+      expect(new Uint8Array(sigA)).not.toEqual(new Uint8Array(sigB));
     });
   });
 

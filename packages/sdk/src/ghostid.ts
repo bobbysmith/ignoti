@@ -9,10 +9,10 @@
  * the server; the session private key lives only in memory. On page reload,
  * call restoreSession() to rebind a fresh keypair to the existing session.
  *
- * JavaScript cannot guarantee secure memory erasure — GC'd runtimes may copy
- * buffers before they are zeroed. Protection comes from ephemeral key lifetimes
- * and no persistence to disk or localStorage, not from active memory wiping.
- * Key bytes are zeroed where possible as a best-effort measure only.
+ * Session identity: ephemeral Ed25519 keypair generated via WebCrypto. The
+ * private key is non-extractable — its bytes never enter the JS heap. Root key
+ * bytes are zeroed after use as a best-effort measure; JavaScript cannot
+ * guarantee secure erasure (GC may copy buffers before they are zeroed).
  */
 
 import { ApiClient, createApiClient } from './api/client';
@@ -34,7 +34,6 @@ import {
 import { ErrorCodes, GhostIDError } from './core/errors';
 import type {
   CreateIdentityResult,
-  CreateSessionResponse,
   DeviceInfo,
   GhostIDOptions,
   LoginResult,
@@ -48,7 +47,7 @@ interface ActiveSession {
   userId: string;
   deviceId: string;
   expiresAt: number;
-  sessionPrivateKey: Uint8Array;
+  sessionPrivateKey: CryptoKey;
 }
 
 export class GhostID {
@@ -71,7 +70,7 @@ export class GhostID {
 
   async restoreSession(): Promise<void> {
     this.ensureInitialized();
-    const sessionKeyPair = generateSessionSigningKeypair();
+    const sessionKeyPair = await generateSessionSigningKeypair();
     try {
       const nonce = crypto.randomUUID();
       const sessionBinding = await signSessionBindingJWS(
@@ -88,7 +87,6 @@ export class GhostID {
         sessionPrivateKey: sessionKeyPair.privateKey,
       };
     } catch {
-      sessionKeyPair.privateKey.fill(0);
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
   }
@@ -174,19 +172,13 @@ export class GhostID {
 
     const loginResponse = await this.apiClient.auth.login({ assertion });
 
-    const sessionKeyPair = generateSessionSigningKeypair();
-    let sessionResponse: CreateSessionResponse;
-    try {
-      const sessionBinding = await signSessionBindingJWS(
-        { sessionChallenge: loginResponse.sessionChallenge },
-        sessionKeyPair.privateKey,
-        sessionKeyPair.publicKey
-      );
-      sessionResponse = await this.apiClient.auth.createSession({ sessionBinding });
-    } catch (err) {
-      sessionKeyPair.privateKey.fill(0);
-      throw err;
-    }
+    const sessionKeyPair = await generateSessionSigningKeypair();
+    const sessionBinding = await signSessionBindingJWS(
+      { sessionChallenge: loginResponse.sessionChallenge },
+      sessionKeyPair.privateKey,
+      sessionKeyPair.publicKey
+    );
+    const sessionResponse = await this.apiClient.auth.createSession({ sessionBinding });
 
     this.session = {
       sessionId: sessionResponse.sessionId,
@@ -251,7 +243,6 @@ export class GhostID {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     if (Date.now() > this.session.expiresAt) {
-      this.session.sessionPrivateKey.fill(0);
       this.session = null;
       throw new GhostIDError(ERROR_MESSAGES.SESSION_EXPIRED, ErrorCodes.EXPIRED_CHALLENGE);
     }
@@ -286,9 +277,8 @@ export class GhostID {
     }
     const { sessionId, sessionPrivateKey } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = ApiClient.signRequest({ sessionId, iat }, sessionPrivateKey);
+    const signature = await ApiClient.signRequest({ sessionId, iat }, sessionPrivateKey);
     await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature);
-    sessionPrivateKey.fill(0);
     this.session = null;
   }
 
@@ -352,7 +342,6 @@ export class GhostID {
     const signature = await this.signWithSessionKey({ sessionId, iat });
     await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature);
     if (targetSessionId === sessionId) {
-      this.session.sessionPrivateKey.fill(0);
       this.session = null;
     }
   }
@@ -372,10 +361,7 @@ export class GhostID {
   }
 
   destroy(): void {
-    if (this.session) {
-      this.session.sessionPrivateKey.fill(0);
-      this.session = null;
-    }
+    this.session = null;
     this.initialized = false;
   }
 

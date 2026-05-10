@@ -65,10 +65,13 @@ export function sign(message: Uint8Array, privateKey: Uint8Array): Uint8Array {
   return ed25519.sign(message, privateKey);
 }
 
-/** Returns 32-byte Ed25519 seed as `privateKey` and 32-byte public key. */
-export function generateSessionSigningKeypair(): { publicKey: Uint8Array; privateKey: Uint8Array } {
-  const { secretKey, publicKey } = ed25519.keygen();
-  return { publicKey, privateKey: secretKey };
+/**
+ * Generates a session signing keypair using WebCrypto.
+ * The private key is non-extractable — its bytes never enter the JS heap.
+ * The public key is exportable (public keys carry no secret).
+ */
+export async function generateSessionSigningKeypair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']);
 }
 
 export function stringToBytes(str: string): Uint8Array {

@@ -6,7 +6,6 @@ const {
   mockGenerateMnemonic,
   mockDeriveRootKeys,
   mockGenerateSessionKeypair,
-  mockSecureWipe,
   mockToBase64,
   mockBufferToBase64Url,
   mockBase64UrlToBuffer,
@@ -14,7 +13,6 @@ const {
   mockGenerateMnemonic: vi.fn(),
   mockDeriveRootKeys: vi.fn(),
   mockGenerateSessionKeypair: vi.fn(),
-  mockSecureWipe: vi.fn(),
   mockToBase64: vi.fn(),
   mockBufferToBase64Url: vi.fn(),
   mockBase64UrlToBuffer: vi.fn(),
@@ -66,7 +64,6 @@ vi.mock('@/core/crypto.ts', () => ({
   generateMnemonic: mockGenerateMnemonic,
   deriveRootKeysFromMnemonic: mockDeriveRootKeys,
   generateSessionSigningKeypair: mockGenerateSessionKeypair,
-  secureWipe: mockSecureWipe,
   toBase64: mockToBase64,
   bufferToBase64Url: mockBufferToBase64Url,
   base64UrlToBuffer: mockBase64UrlToBuffer,
@@ -158,7 +155,7 @@ function stubLoginMocks(
   mockRequestChallenge.mockResolvedValue({ options: opts.challengeOptions ?? makeOptions() });
   mockGetPasskeyAssertion.mockResolvedValue({ id: 'cred', type: 'public-key' });
   mockLogin.mockResolvedValue({ sessionChallenge: 'ch', deviceId: 'device-1' });
-  mockGenerateSessionKeypair.mockReturnValue({
+  mockGenerateSessionKeypair.mockResolvedValue({
     privateKey: SESSION_PRIVATE_KEY,
     publicKey: SESSION_PUBLIC_KEY,
   });
@@ -181,7 +178,7 @@ describe('GhostID', () => {
     mockToBase64.mockReturnValue('root-pub-b64');
     mockSignDeviceBindingJWS.mockResolvedValue('root-sig');
     mockSignSessionBindingJWS.mockResolvedValue('session-binding');
-    mockApiClientSignRequest.mockReturnValue('sig-abc');
+    mockApiClientSignRequest.mockResolvedValue('sig-abc');
   });
 
   afterEach(() => vi.useRealTimers());
@@ -247,17 +244,10 @@ describe('GhostID', () => {
       expect(g.getSession()).toMatchObject({ sessionId: info.sessionId, deviceId: 'device-1' });
     });
 
-    it('zeroes session key and rethrows when createSession throws', async () => {
+    it('rethrows when signSessionBindingJWS throws', async () => {
       stubLoginMocks();
       mockSignSessionBindingJWS.mockRejectedValue(new Error('jws fail'));
-      const sessionKey = new Uint8Array(32).fill(3);
-      mockGenerateSessionKeypair.mockReturnValue({
-        privateKey: sessionKey,
-        publicKey: SESSION_PUBLIC_KEY,
-      });
-
       await expect(initializedSdk().login()).rejects.toThrow('jws fail');
-      expect(sessionKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -280,8 +270,6 @@ describe('GhostID', () => {
       const { g } = await withSession();
       mockRevokeSession.mockRejectedValue(new Error('network'));
       await expect(g.logout()).rejects.toThrow('network');
-
-      expect(mockSecureWipe).not.toHaveBeenCalled();
       expect(g.getSession()).not.toBeNull();
     });
 
@@ -289,7 +277,6 @@ describe('GhostID', () => {
       const g = initializedSdk();
       await expect(g.logout()).resolves.toBeUndefined();
       expect(mockRevokeSession).not.toHaveBeenCalled();
-      expect(mockSecureWipe).not.toHaveBeenCalled();
     });
   });
 
@@ -340,7 +327,7 @@ describe('GhostID', () => {
     });
 
     it('returns signature from ApiClient.signRequest when session is valid', async () => {
-      mockApiClientSignRequest.mockReturnValue('signed-payload');
+      mockApiClientSignRequest.mockResolvedValue('signed-payload');
       const { g } = await withSession();
       expect(await g.signWithSessionKey({ foo: 'bar' })).toBe('signed-payload');
     });
@@ -529,7 +516,6 @@ describe('GhostID', () => {
     it('is safe to call when no session is active', () => {
       const g = initializedSdk();
       expect(() => g.destroy()).not.toThrow();
-      expect(mockSecureWipe).not.toHaveBeenCalled();
     });
   });
 
@@ -540,7 +526,7 @@ describe('GhostID', () => {
     });
 
     function stubRestoreMocks(serverResult: 'success' | 'failure') {
-      mockGenerateSessionKeypair.mockReturnValue({
+      mockGenerateSessionKeypair.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -580,17 +566,15 @@ describe('GhostID', () => {
       expect(claims.sessionChallenge.length).toBeGreaterThan(0);
     });
 
-    it('throws GhostIDError and zeroes ephemeral key when server call fails', async () => {
-      const sessionKey = new Uint8Array(32).fill(3);
-      mockGenerateSessionKeypair.mockReturnValue({
-        privateKey: sessionKey,
+    it('throws GhostIDError when server call fails', async () => {
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
       mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
       mockRestoreSession.mockRejectedValue(new Error('gone'));
 
       await expect(initializedSdk().restoreSession()).rejects.toThrow(GhostIDError);
-      expect(sessionKey.every(b => b === 0)).toBe(true);
     });
 
     it('leaves session null when restore fails', async () => {

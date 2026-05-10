@@ -2,10 +2,11 @@ import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
 import { decodeJwt, decodeProtectedHeader, importJWK, jwtVerify } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { signDeviceBindingJWS } from '@/api/root-jws.ts';
-import { generateSessionSigningKeypair, toBase64 } from '@/core/crypto.ts';
+import { deriveRootKeysFromMnemonic, generateMnemonic, toBase64 } from '@/core/crypto.ts';
 
-function makeKeypair() {
-  return generateSessionSigningKeypair();
+async function makeKeypair() {
+  const ks = await deriveRootKeysFromMnemonic(generateMnemonic());
+  return { privateKey: ks.signing.privateKey, publicKey: ks.signing.publicKey };
 }
 
 const VALID_CLAIMS = {
@@ -17,7 +18,7 @@ const VALID_CLAIMS = {
 
 describe('signDeviceBindingJWS', () => {
   it('produces a compact JWS with correct typ and claims', async () => {
-    const { publicKey, privateKey } = makeKeypair();
+    const { publicKey, privateKey } = await makeKeypair();
     const jws = await signDeviceBindingJWS(VALID_CLAIMS, privateKey, publicKey);
 
     expect(typeof jws).toBe('string');
@@ -38,7 +39,7 @@ describe('signDeviceBindingJWS', () => {
   });
 
   it('signature verifies against the public key', async () => {
-    const { publicKey, privateKey } = makeKeypair();
+    const { publicKey, privateKey } = await makeKeypair();
     const jws = await signDeviceBindingJWS(VALID_CLAIMS, privateKey, publicKey);
 
     const jwk = { kty: 'OKP', crv: 'Ed25519', x: toBase64(publicKey) };
@@ -47,7 +48,7 @@ describe('signDeviceBindingJWS', () => {
   });
 
   it('each call produces a unique JWS when iat differs', async () => {
-    const { publicKey, privateKey } = makeKeypair();
+    const { publicKey, privateKey } = await makeKeypair();
     vi.useFakeTimers();
     const jws1 = await signDeviceBindingJWS(VALID_CLAIMS, privateKey, publicKey);
     vi.advanceTimersByTime(1000);
@@ -57,21 +58,21 @@ describe('signDeviceBindingJWS', () => {
   });
 
   it('throws when private key is not 32 bytes', async () => {
-    const { publicKey } = makeKeypair();
+    const { publicKey } = await makeKeypair();
     await expect(signDeviceBindingJWS(VALID_CLAIMS, new Uint8Array(16), publicKey)).rejects.toThrow(
       '32 bytes'
     );
   });
 
   it('throws when public key is not 32 bytes', async () => {
-    const { privateKey } = makeKeypair();
+    const { privateKey } = await makeKeypair();
     await expect(
       signDeviceBindingJWS(VALID_CLAIMS, privateKey, new Uint8Array(16))
     ).rejects.toThrow('32 bytes');
   });
 
   it('signs all three RootPurpose values', async () => {
-    const { publicKey, privateKey } = makeKeypair();
+    const { publicKey, privateKey } = await makeKeypair();
     for (const purpose of ['register-device', 'recover-device', 'revoke-device'] as const) {
       const jws = await signDeviceBindingJWS({ ...VALID_CLAIMS, purpose }, privateKey, publicKey);
       expect(decodeJwt(jws).purpose).toBe(purpose);

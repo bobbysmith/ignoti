@@ -21,26 +21,28 @@ describe('client', () => {
     });
 
     describe('signRequest', () => {
-      it('returns a base64url signature', () => {
-        const { privateKey } = generateSessionSigningKeypair();
-        const sig = ApiClient.signRequest({ sessionId: SESSION_ID, iat: 1 }, privateKey);
+      it('returns a base64url signature', async () => {
+        const { privateKey } = await generateSessionSigningKeypair();
+        const sig = await ApiClient.signRequest({ sessionId: SESSION_ID, iat: 1 }, privateKey);
         expect(typeof sig).toBe('string');
         expect(sig).not.toMatch(/[+/=]/);
       });
     });
 
     describe('verifyRequest', () => {
-      it('verifies a signature produced by signRequest', () => {
-        const { publicKey, privateKey } = generateSessionSigningKeypair();
+      it('verifies a signature produced by signRequest', async () => {
+        const { publicKey, privateKey } = await generateSessionSigningKeypair();
         const payload = { sessionId: SESSION_ID, iat: 1 };
-        const sig = ApiClient.signRequest(payload, privateKey);
-        expect(ApiClient.verifyRequest(payload, sig, publicKey)).toBe(true);
+        const sig = await ApiClient.signRequest(payload, privateKey);
+        expect(await ApiClient.verifyRequest(payload, sig, publicKey)).toBe(true);
       });
 
-      it('returns false for a tampered payload', () => {
-        const { publicKey, privateKey } = generateSessionSigningKeypair();
-        const sig = ApiClient.signRequest({ sessionId: SESSION_ID, iat: 1 }, privateKey);
-        expect(ApiClient.verifyRequest({ sessionId: 'xyz', iat: 1 }, sig, publicKey)).toBe(false);
+      it('returns false for a tampered payload', async () => {
+        const { publicKey, privateKey } = await generateSessionSigningKeypair();
+        const sig = await ApiClient.signRequest({ sessionId: SESSION_ID, iat: 1 }, privateKey);
+        expect(await ApiClient.verifyRequest({ sessionId: 'xyz', iat: 1 }, sig, publicKey)).toBe(
+          false
+        );
       });
     });
   });

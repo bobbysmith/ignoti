@@ -28,37 +28,19 @@ export class ApiClient {
     this.sessions = new SessionsApiClient(this.core.makeRequest.bind(this.core));
   }
 
-  /**
-   * Signs a request payload with the provided private key
-   * @param payload - Request payload to sign
-   * @param privateKey - Private key for signing
-   * @returns Base64-encoded signature
-   */
-  static signRequest(payload: Record<string, unknown>, privateKey: Uint8Array): string {
+  static signRequest(payload: Record<string, unknown>, privateKey: CryptoKey): Promise<string> {
     return signRequest(payload, privateKey);
   }
 
-  /**
-   * Verifies a request signature
-   * @param payload - Request payload that was signed
-   * @param signature - Base64-encoded signature
-   * @param publicKey - Public key for verification
-   * @returns True if signature is valid
-   */
   static verifyRequest(
     payload: Record<string, unknown>,
     signature: string,
-    publicKey: Uint8Array
-  ): boolean {
+    publicKey: CryptoKey
+  ): Promise<boolean> {
     return verifyRequest(payload, signature, publicKey);
   }
 }
 
-/**
- * Creates a new API client instance
- * @param options - Client configuration options
- * @returns New API client instance
- */
 export function createApiClient(options: ApiClientOptions): ApiClient {
   return new ApiClient(options);
 }
