@@ -6,7 +6,7 @@ This document defines what GhostID protects against, what it explicitly does **n
 
 ## 1. System overview
 
-GhostID is a free, open-source, self-hosted authentication platform — a privacy-first alternative to Sign in with Google/Apple. Builders deploy a pre-built backend server they own and control, and integrate the client SDK into their app. Their users get passkey-based auth without surrendering their identity to any third party.
+GhostID is a free, open-source, self-hosted authentication platform - a privacy-first alternative to Sign in with Google/Apple. Builders deploy a pre-built backend server they own and control, and integrate the client SDK into their app. Their users get passkey-based auth without surrendering their identity to any third party.
 
 GhostID uses a self-sovereign identity protocol with three layers:
 
@@ -19,11 +19,11 @@ GhostID uses a self-sovereign identity protocol with three layers:
 
 The backend stores only opaque public keys, opaque IDs (UUIDs), single-use challenges, and session metadata. It 
 never sees the mnemonic, root private key, passkey private key, session private key, IP-to-identity mapping, 
-or device fingerprint — and collects no PII (no email, phone number, or real-world identifier) by design.
+or device fingerprint - and collects no PII (no email, phone number, or real-world identifier) by design.
 
 ## 2. Assets we are protecting
 
-`userId` is a random UUID generated server-side at registration — it is not the public key. Using the public
+`userId` is a random UUID generated server-side at registration - it is not the public key. Using the public
 key as the identifier would allow any observer with the `userId` to trivially confirm which public key it
 corresponds to, collapsing the pseudonymity layer. The UUID breaks that link: the root public key is stored
 in the DB but is never echoed back to clients or included in tokens.
@@ -33,8 +33,9 @@ in the DB but is never echoed back to clients or included in tokens.
 | Mnemonic phrase           | User's head / paper / password manager  | Critical                  | Critical  | High (loss = account loss)  |
 | Root private key          | Derived in memory only, wiped after use | Critical                  | Critical  | N/A (re-derivable)          |
 | Passkey private key       | Authenticator's secure enclave          | Critical (hardware-bound) | Critical  | Medium (per-device)         |
-| Session private key       | Browser memory only                     | High                      | High      | Low (re-creatable on login) |
-| User pseudonym (`userId`) | Backend DB and client memory            | Medium                    | High      | High                        |
+| Session private key       | Browser memory only, wiped on logout    | High                      | High      | Low (re-creatable on login) |
+| Session token (cookie)    | httpOnly browser cookie                 | High                      | N/A       | Low (re-creatable on login) |
+| User pseudonym (`userId`) | Backend DB and SDK localStorage         | Medium                    | High      | High                        |
 | Device list               | Backend DB                              | Medium                    | High      | High                        |
 
 ## 3. Attacker model
@@ -69,7 +70,14 @@ pseudonymous UUIDs; nothing that can be replayed against another service or used
 ### Session hijacking (A1, A2)
 Sessions are bound to an ephemeral public key registered at login. Every authorized request is signed with the 
 corresponding private key, which never leaves the client. A stolen session ID alone cannot be replayed - the 
-attacker would also need the in-memory private key. **Mitigation: signed-request sessions, not bearer tokens.**
+attacker would also need the in-memory private key.
+
+Session persistence across page reloads is handled by an httpOnly, Secure, SameSite=Strict cookie containing the 
+session token. JavaScript on the page cannot read this cookie - a successful XSS cannot exfiltrate it. On reload, 
+the SDK calls the restore endpoint with the cookie and generates a fresh ephemeral keypair; the private key is 
+never written to disk or localStorage. A stolen cookie cannot be used to forge signed API requests, and CSRF is 
+blocked by SameSite=Strict. The only viable attack surface for the cookie is a network-level attacker, which TLS 
+prevents. **Mitigation: signed-request sessions with ephemeral keys; httpOnly cookie for session restore.**
 
 ### Replay attacks (A1)
 Every challenge is single-use, scoped to a purpose (`register`, `login`, `recover`, `session`), and expires within 
@@ -148,12 +156,16 @@ We do not roll our own crypto. Any change to this table requires explicit securi
 
 These are not optional. A deployment that violates them is not implementing the threat model above.
 
-1. **TLS everywhere.** WebAuthn refuses non-HTTPS origins outside `localhost`.
+1. **TLS everywhere.** WebAuthn refuses non-HTTPS origins outside `localhost`. The session cookie's `Secure` 
+   flag means browsers will not send it over plain HTTP - but the server must enforce HTTPS at the infrastructure 
+   level too.
 2. **No PII in logs.** Never log signatures, public keys, IPs joined to user IDs, or request bodies near auth code.
 3. **Tight CORS.** `RP_ORIGIN` is the only allowed origin.
 4. **Constant-time comparisons** for any signature/public-key check.
 5. **Challenge GC.** Expired challenges must be deleted, not just marked consumed.
 6. **No silent migrations.** Schema changes that could leak data require a documented migration path.
+7. **Cookie security.** The session cookie must remain httpOnly, Secure, and SameSite=Strict. Do not expose 
+   the session token via any other channel (response body, URL parameter, log line).
 
 ## 9. Open questions / future work
 

@@ -275,7 +275,28 @@ describe('GhostID', () => {
       const { g } = await withSession();
       const info = g.getSession();
       expect(info).not.toHaveProperty('sessionPrivateKey');
-      expect(info).toMatchObject({ sessionId: 'sess-1', deviceId: 'device-1' });
+      expect(info).toMatchObject({ sessionId: 'sess-1', userId: 'user-1', deviceId: 'device-1' });
+    });
+  });
+
+  describe('getSessionHeaders', () => {
+    it('throws NO_KEYS when no session', async () => {
+      const g = initializedSdk();
+      await expect(g.getSessionHeaders()).rejects.toThrow(GhostIDError);
+    });
+
+    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      await expect(g.getSessionHeaders()).rejects.toThrow('expired');
+      expect(g.getSession()).toBeNull();
+    });
+
+    it('returns Authorization, Timestamp, and Signature headers', async () => {
+      const { g, sessionId } = await withSession();
+      const headers = await g.getSessionHeaders();
+      expect(headers.Authorization).toBe(`GhostID-Session ${sessionId}`);
+      expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
+      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
     });
   });
 

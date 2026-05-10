@@ -5,9 +5,9 @@
  *   2. Device identity (WebAuthn passkey) - daily auth.
  *   3. Session identity (ephemeral Ed25519) - silent request signing.
  *
- * The SDK persists nothing. Callers receive identifiers (userId, deviceId,
- * mnemonic) from operations and are responsible for storing them. Sessions
- * exist only in memory; logging out or refreshing the page ends them.
+ * The SDK persists session tokens via httpOnly cookie (handled by the server)
+ * and non-sensitive identifiers (userId, deviceId) via localStorage. Session
+ * private keys never leave memory; logging out or calling destroy() wipes them.
  */
 
 import { ApiClient, createApiClient } from './api/client';
@@ -19,7 +19,7 @@ import {
   requestOptionsFromServer,
 } from './auth/options';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
-import { ERROR_MESSAGES, UA_HINTS } from './constants';
+import { ERROR_MESSAGES, HTTP_HEADERS, SESSION_AUTH_SCHEME, UA_HINTS } from './constants';
 import {
   deriveRootKeysFromMnemonic,
   generateMnemonic,
@@ -79,8 +79,8 @@ export class GhostID {
    *   4. SDK signs `register-device|userId|credentialId|challenge` with root key.
    *   5. POST /register/device with the registration response and root signature.
    *
-   * Caller must persist the returned mnemonic offline (it is the only recovery path)
-   * and should persist userId and deviceId to skip recovery on return visits.
+   * Caller must persist the returned mnemonic offline (it is the only recovery path).
+   * userId and deviceId are persisted automatically by the SDK.
    */
   async createIdentity(): Promise<CreateIdentityResult> {
     this.ensureInitialized();
@@ -229,6 +229,27 @@ export class GhostID {
     return ApiClient.signRequest(payload, this.session.sessionPrivateKey);
   }
 
+  /**
+   * Returns headers that authenticate requests to the integrator's own backend.
+   * The GhostID server's `requireSession` middleware validates these headers.
+   *
+   * Every call generates a fresh timestamp and signature - do not cache the result.
+   */
+  async getSessionHeaders(): Promise<Record<string, string>> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    const { sessionId } = this.session;
+    const iat = Math.floor(Date.now() / 1000);
+    const signature = await this.signWithSessionKey({ sessionId, iat });
+    return {
+      [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
+      [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
+      [HTTP_HEADERS.SESSION_SIGNATURE]: signature,
+    };
+  }
+
   async logout(): Promise<void> {
     this.ensureInitialized();
     if (this.session) {
@@ -310,6 +331,7 @@ export class GhostID {
     if (!this.session) return null;
     return {
       sessionId: this.session.sessionId,
+      userId: this.session.userId,
       deviceId: this.session.deviceId,
       expiresAt: this.session.expiresAt,
     };

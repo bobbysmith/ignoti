@@ -247,6 +247,7 @@ export interface GhostIDOptions {
 
 export interface SessionInfo {
   sessionId: string;
+  userId: string;
   deviceId: string;
   expiresAt: number;
 }

@@ -65,4 +65,5 @@ export type {
   RevokeDeviceRequest,
   RootKeySet,
   SessionInfo,
+  SessionListItem,
 } from './types';

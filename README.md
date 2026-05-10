@@ -28,7 +28,7 @@ A 12-word phrase derived into an Ed25519 keypair. Never stored anywhere - not on
 A WebAuthn passkey bound to the user's authenticator - Touch ID, Face ID, Windows Hello, a hardware key. Hardware-backed, phishing-resistant. This is how users log in day to day.
 
 **Session identity (ephemeral)**
-An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key. A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key.
+An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key. A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session survives page reloads via an httpOnly cookie — the private key is never persisted, only a session token that JavaScript cannot read.
 
 The server stores only opaque public keys and UUIDs. No email, no phone, no OAuth token, no PII of any kind.
 
@@ -41,6 +41,8 @@ Builders whose users care about privacy. If you're building for people who use S
 ---
 
 ## Getting started
+
+For a full walkthrough see [docs/getting-started.md](./docs/getting-started.md).
 
 **1. Deploy the server**
 
@@ -147,6 +149,7 @@ GhostID's cryptographic design is documented in [THREAT_MODEL.md](./THREAT_MODEL
 - **Phishing-resistant** - WebAuthn origin binding means passkeys only work on the registered domain
 - **Replay-resistant** - all challenges are single-use, scoped, and short-lived
 - **Signed requests** - session keys sign every API call; a stolen session ID alone cannot be replayed
+- **Private keys never stored** - sessions survive page reloads via an httpOnly cookie; the private key stays ephemeral
 
 ---
 

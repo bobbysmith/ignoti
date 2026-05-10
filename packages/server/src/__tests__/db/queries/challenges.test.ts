@@ -11,6 +11,7 @@ import {
   insertRecoverChallenge,
   insertRegisterChallenge,
   insertSessionChallenge,
+  insertTimingRecoverChallenge,
 } from '../../../db/queries/challenges.js';
 
 vi.mock('../../../db/client.js', () => ({ sql: vi.fn() }));
@@ -41,6 +42,35 @@ describe('challenges db queries', () => {
       await expect(
         insertRegisterChallenge(CHALLENGE_VALUE, USER_ID, new Date())
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('insertTimingRecoverChallenge', () => {
+    it('executes INSERT with correct value and purpose=recover', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await insertTimingRecoverChallenge(CHALLENGE_VALUE);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args[1]).toBe(CHALLENGE_VALUE);
+      expect(args[2]).toBe(CHALLENGE_PURPOSE.RECOVER);
+    });
+
+    it('does not pass a userId arg - user_id stays NULL so the row is never consumable', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await insertTimingRecoverChallenge(CHALLENGE_VALUE);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args[3]).toBeUndefined();
+    });
+
+    it('does not pass a JS Date for expires_at - uses SQL now() so the row expires immediately', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await insertTimingRecoverChallenge(CHALLENGE_VALUE);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args.every(a => !(a instanceof Date))).toBe(true);
+    });
+
+    it('resolves to void on success', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(insertTimingRecoverChallenge(CHALLENGE_VALUE)).resolves.toBeUndefined();
     });
   });
 
