@@ -40,15 +40,12 @@ function makeSessionHeaders(sessionId: string, iat: number, privateKey: KeyObjec
   };
 }
 
-function makeSession(publicKeyB64: string, overrides: Record<string, unknown> = {}) {
+function makeSession(publicKeyB64: string) {
   return {
     session_id: SESSION_ID,
     user_id: USER_ID,
     device_id: DEVICE_ID,
     session_public_key: publicKeyB64,
-    revoked_at: null,
-    expires_at: new Date(Date.now() + 3_600_000),
-    ...overrides,
   };
 }
 
@@ -330,44 +327,14 @@ describe('session auth', () => {
     });
 
     describe('session state', () => {
-      it('returns 401 SESSION_REVOKED when session.revoked_at is non-null', async () => {
-        vi.mocked(getSessionWithUser).mockResolvedValue(
-          makeSession(keypair.publicKeyB64, { revoked_at: new Date() }) as never
-        );
+      it('returns 401 SESSION_NOT_FOUND when session is revoked or expired (filtered by SQL)', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(undefined as never);
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
         await requireSession(makeReq(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.SESSION_REVOKED })
-        );
-      });
-
-      it('returns 401 SESSION_EXPIRED when session.expires_at is in the past', async () => {
-        vi.mocked(getSessionWithUser).mockResolvedValue(
-          makeSession(keypair.publicKeyB64, { expires_at: new Date(Date.now() - 1) }) as never
-        );
-        const iat = Math.floor(Date.now() / 1000);
-        const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
-        const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
-        expect(reply.send).toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.SESSION_EXPIRED })
-        );
-      });
-
-      it('passes session state checks when revoked_at is null and expires_at is in the future', async () => {
-        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
-        const iat = Math.floor(Date.now() / 1000);
-        const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
-        const reply = makeMockReply();
-        const req = makeReq(headers);
-        await requireSession(req, reply as never);
-        expect(reply.send).not.toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.SESSION_REVOKED })
-        );
-        expect(reply.send).not.toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.SESSION_EXPIRED })
+          expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
         );
       });
     });

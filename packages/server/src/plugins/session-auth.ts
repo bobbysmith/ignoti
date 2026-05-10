@@ -67,12 +67,6 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
   if (!session) {
     return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
   }
-  if (session.revoked_at !== null) {
-    return sendError(reply, 401, ERROR_CODES.SESSION_REVOKED);
-  }
-  if (session.expires_at < new Date()) {
-    return sendError(reply, 401, ERROR_CODES.SESSION_EXPIRED);
-  }
 
   const payload = JSON.stringify({ sessionId, iat });
   const data = Buffer.from(payload, 'utf-8');

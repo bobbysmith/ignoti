@@ -55,13 +55,11 @@ describe('sessions db queries', () => {
   describe('getSessionWithUser', () => {
     const activeRow = {
       session_public_key: SESSION_PUBLIC_KEY,
-      expires_at: new Date('2026-12-01T00:00:00Z'),
-      revoked_at: null,
       device_id: DEVICE_ID,
       user_id: USER_ID,
     };
 
-    it('returns the full SessionAuthRow when session exists and device is joined', async () => {
+    it('returns the SessionAuthRow when session exists and device is joined', async () => {
       vi.mocked(sql).mockResolvedValueOnce([activeRow] as never);
       await expect(getSessionWithUser(SESSION_ID)).resolves.toEqual(activeRow);
     });
@@ -76,24 +74,24 @@ describe('sessions db queries', () => {
       await expect(getSessionWithUser(SESSION_ID)).resolves.toBeUndefined();
     });
 
-    it('returns session with revoked_at = null when session is active', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([{ ...activeRow, revoked_at: null }] as never);
-      const result = await getSessionWithUser(SESSION_ID);
-      expect(result?.revoked_at).toBeNull();
+    it('query filters out revoked sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionWithUser(SESSION_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('revoked_at is null');
     });
 
-    it('returns session with revoked_at set when session is revoked (no filtering in this query)', async () => {
-      const revokedAt = new Date('2026-06-01T00:00:00Z');
-      vi.mocked(sql).mockResolvedValueOnce([{ ...activeRow, revoked_at: revokedAt }] as never);
-      const result = await getSessionWithUser(SESSION_ID);
-      expect(result?.revoked_at).toEqual(revokedAt);
+    it('query filters out expired sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionWithUser(SESSION_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      expect(query.join('')).toContain('expires_at > now()');
     });
 
-    it('returns session with expires_at in past (no filtering; caller checks expiry)', async () => {
-      const pastExpiry = new Date('2020-01-01T00:00:00Z');
-      vi.mocked(sql).mockResolvedValueOnce([{ ...activeRow, expires_at: pastExpiry }] as never);
-      const result = await getSessionWithUser(SESSION_ID);
-      expect(result?.expires_at).toEqual(pastExpiry);
+    it('passes sessionId to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionWithUser(SESSION_ID);
+      expect(vi.mocked(sql).mock.calls[0]).toContain(SESSION_ID);
     });
   });
 
