@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +49,7 @@ let app: FastifyInstance;
 describe('sessions', () => {
   beforeAll(async () => {
     app = Fastify({ logger: false });
+    await app.register(cookie);
     registerSessionAuthPlugin(app);
     await app.register(registerSessionRoutes, { prefix: '/api/sessions' });
     await app.ready();
@@ -171,6 +173,20 @@ describe('sessions', () => {
         const res = await deleteSession(SESSION_ID);
         expect(res.statusCode).toBe(200);
         expect(revokeSessionForUser).toHaveBeenCalledWith(SESSION_ID, USER_ID);
+      });
+
+      it('clears the session cookie when revoking the current session', async () => {
+        vi.mocked(revokeSessionForUser).mockResolvedValue(true);
+        const res = await deleteSession(SESSION_ID);
+        const raw = res.headers['set-cookie'];
+        const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+        expect(cookieStr).toMatch(/ghostid_session=(?:;|$| )/);
+      });
+
+      it('does not clear the session cookie when revoking a different session', async () => {
+        vi.mocked(revokeSessionForUser).mockResolvedValue(true);
+        const res = await deleteSession(OTHER_SESSION_ID);
+        expect(res.headers['set-cookie']).toBeUndefined();
       });
     });
   });

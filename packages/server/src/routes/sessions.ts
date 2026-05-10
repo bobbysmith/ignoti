@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ERROR_CODES, ROUTES } from '../constants.js';
+import { ERROR_CODES, ROUTES, SESSION_COOKIE_NAME } from '../constants.js';
 import { getSessionsForUser, revokeSessionForUser } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
 import { requireSession } from '../plugins/session-auth.js';
@@ -53,6 +53,10 @@ export async function registerSessionRoutes(app: FastifyInstance) {
     const revoked = await revokeSessionForUser(targetSessionId, userId);
     if (!revoked) {
       return sendError(reply, 404, ERROR_CODES.SESSION_NOT_FOUND);
+    }
+
+    if (targetSessionId === currentSessionId) {
+      reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
     }
 
     req.log.info({ targetSessionId, currentSessionId, userId }, 'session revoked');
