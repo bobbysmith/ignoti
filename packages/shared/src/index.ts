@@ -1,3 +1,21 @@
+export function canonicalJson(payload: unknown): string {
+  if (payload === null || typeof payload !== 'object') {
+    return JSON.stringify(payload);
+  }
+
+  if (Array.isArray(payload)) {
+    return `[${payload.map(canonicalJson).join(',')}]`;
+  }
+
+  const pairs = Object.keys(payload as Record<string, unknown>)
+    .sort()
+    .map(
+      key => `${JSON.stringify(key)}:${canonicalJson((payload as Record<string, unknown>)[key])}`
+    );
+
+  return `{${pairs.join(',')}}`;
+}
+
 // JWS type identifiers — provide cross-protocol isolation (RFC 8725 §3.11)
 // so a token minted for one purpose cannot be misread as another.
 export const ROOT_BINDING_TYP = 'ghostid-root-binding+jwt';

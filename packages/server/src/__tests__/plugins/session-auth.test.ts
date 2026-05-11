@@ -30,8 +30,10 @@ function generateEd25519Keypair(): Keypair {
   return { privateKey, publicKeyB64: pubJwk.x };
 }
 
-function makeSessionHeaders(sessionId: string, iat: number, privateKey: KeyObject) {
-  const payload = JSON.stringify({ sessionId, iat });
+const DEFAULT_PATH = '/api/devices';
+
+function makeSessionHeaders(sessionId: string, iat: number, privateKey: KeyObject, path = DEFAULT_PATH) {
+  const payload = JSON.stringify({ iat, path, sessionId });
   const sig = cryptoSign(null, Buffer.from(payload, 'utf-8'), privateKey).toString('base64url');
   return {
     [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
@@ -56,9 +58,10 @@ function makeMockReply() {
   return reply;
 }
 
-function makeReq(headers: Record<string, string | string[] | undefined> = {}) {
+function makeReq(headers: Record<string, string | string[] | undefined> = {}, url = DEFAULT_PATH) {
   return {
     headers,
+    url,
     sessionContext: null,
     log: { error: vi.fn() },
   } as unknown as Parameters<typeof requireSession>[0];

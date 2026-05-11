@@ -1,6 +1,7 @@
 import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { canonicalJson } from '@ghostid/shared';
 import {
   AUTH_HEADERS,
   ERROR_CODES,
@@ -30,9 +31,8 @@ export function registerSessionAuthPlugin(app: FastifyInstance): void {
  * Verifies a per-request Ed25519 session signature and populates
  * `req.sessionContext`. Use as a `preHandler` on protected routes.
  *
- * The client signs `JSON.stringify({ sessionId, iat })` with the session
- * private key. Key insertion order must match `sessionId` before `iat`,
- * which is guaranteed when both sides construct the literal in that order.
+ * The client signs a canonically serialized payload (keys sorted alphabetically:
+ * `iat`, `path`, `sessionId`) with the session private key.
  */
 export async function requireSession(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const authHeader = req.headers[AUTH_HEADERS.AUTHORIZATION];
@@ -69,7 +69,8 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
     return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
   }
 
-  const payload = JSON.stringify({ sessionId, iat });
+  const path = req.url.split('?')[0];
+  const payload = canonicalJson({ iat, path, sessionId });
   const data = Buffer.from(payload, 'utf-8');
   const sig = Buffer.from(signatureHeader, 'base64url');
 

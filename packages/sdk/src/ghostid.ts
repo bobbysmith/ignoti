@@ -24,7 +24,7 @@ import {
   requestOptionsFromServer,
 } from './auth/options';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
-import { ERROR_MESSAGES, HTTP_HEADERS, SESSION_AUTH_SCHEME, UA_HINTS } from './constants';
+import { API_ENDPOINTS, ERROR_MESSAGES, HTTP_HEADERS, SESSION_AUTH_SCHEME, UA_HINTS } from './constants';
 import {
   deriveRootKeysFromMnemonic,
   generateMnemonic,
@@ -257,6 +257,11 @@ export class GhostID {
    * The GhostID server's `requireSession` middleware validates these headers.
    *
    * Every call generates a fresh timestamp and signature - do not cache the result.
+   *
+   * Note: this signature covers { sessionId, iat } only — no path binding. If you
+   * are running requireSession directly on your own server and want path-bound
+   * signatures, pass the destination path to signWithSessionKey and include it in
+   * your verification payload.
    */
   async getSessionHeaders(): Promise<Record<string, string>> {
     this.ensureInitialized();
@@ -280,7 +285,8 @@ export class GhostID {
     }
     const { sessionId, sessionPrivateKey } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = await ApiClient.signRequest({ sessionId, iat }, sessionPrivateKey);
+    const path = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
+    const signature = await ApiClient.signRequest({ sessionId, iat, path }, sessionPrivateKey);
     await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature);
     this.session = null;
   }
@@ -292,7 +298,8 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const path = API_ENDPOINTS.DEVICES.LIST;
+    const signature = await this.signWithSessionKey({ sessionId, iat, path });
     const response = await this.apiClient.devices.getDevices(sessionId, iat, signature);
     return response.devices;
   }
@@ -330,7 +337,8 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const path = API_ENDPOINTS.SESSIONS.LIST;
+    const signature = await this.signWithSessionKey({ sessionId, iat, path });
     const response = await this.apiClient.sessions.getSessions(sessionId, iat, signature);
     return response.sessions;
   }
@@ -342,7 +350,8 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const path = `${API_ENDPOINTS.SESSIONS.REVOKE}/${targetSessionId}`;
+    const signature = await this.signWithSessionKey({ sessionId, iat, path });
     await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature);
     if (targetSessionId === sessionId) {
       this.session = null;
