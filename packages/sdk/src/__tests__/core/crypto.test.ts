@@ -1,3 +1,4 @@
+import { ed25519 } from '@noble/curves/ed25519.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   base64UrlToBuffer,
@@ -40,14 +41,23 @@ describe('crypto', () => {
   });
 
   describe('deriveRootKeysFromMnemonic', () => {
-    it('derives deterministic 32-byte Ed25519 keypair', async () => {
-      const mnemonic = generateMnemonic();
-      const ks1 = await deriveRootKeysFromMnemonic(mnemonic);
-      const ks2 = await deriveRootKeysFromMnemonic(mnemonic);
+    it('derives deterministic Ed25519 keypair', async () => {
+      const ks1 = await deriveRootKeysFromMnemonic(generateMnemonic());
+      const ks2 = await deriveRootKeysFromMnemonic(generateMnemonic());
+
       expect(ks1.signing.publicKey).toHaveLength(32);
-      expect(ks1.signing.privateKey).toHaveLength(32);
+      expect(ks1.signing.privateKey).toBeInstanceOf(CryptoKey);
+      expect(ks1.signing.privateKey.type).toBe('private');
+      expect(ks1.signing.privateKey.extractable).toBe(false);
+      expect(ks1.signing.privateKey.algorithm).toMatchObject({ name: 'Ed25519' });
+      expect(ks1.signing.privateKey.usages).toContain('sign');
       expect(ks1.signing.publicKey).toEqual(ks2.signing.publicKey);
-      expect(ks1.signing.privateKey).toEqual(ks2.signing.privateKey);
+
+      const msg = new Uint8Array([1, 2, 3]);
+      const sig1 = await crypto.subtle.sign('Ed25519', ks1.signing.privateKey, msg);
+      const sig2 = await crypto.subtle.sign('Ed25519', ks2.signing.privateKey, msg);
+
+      expect(new Uint8Array(sig1)).toEqual(new Uint8Array(sig2));
       expect(ks1.version).toBe(1);
     });
 
@@ -84,30 +94,37 @@ describe('crypto', () => {
   });
 
   describe('sign / verify', () => {
-    it('produces a 64-byte signature that verifies', async () => {
-      const { signing } = await deriveRootKeysFromMnemonic(generateMnemonic());
+    function randomSeed(): Uint8Array {
+      return crypto.getRandomValues(new Uint8Array(32));
+    }
+
+    it('produces a 64-byte signature that verifies', () => {
+      const seed = randomSeed();
+      const publicKey = ed25519.getPublicKey(seed);
       const message = stringToBytes('hello world');
-      const sig = sign(message, signing.privateKey);
+      const sig = sign(message, seed);
       expect(sig).toHaveLength(64);
-      expect(verify(sig, message, signing.publicKey)).toBe(true);
+      expect(verify(sig, message, publicKey)).toBe(true);
     });
 
-    it('rejects a tampered message', async () => {
-      const { signing } = await deriveRootKeysFromMnemonic(generateMnemonic());
-      const sig = sign(stringToBytes('original'), signing.privateKey);
-      expect(verify(sig, stringToBytes('tampered'), signing.publicKey)).toBe(false);
+    it('rejects a tampered message', () => {
+      const seed = randomSeed();
+      const publicKey = ed25519.getPublicKey(seed);
+      const sig = sign(stringToBytes('original'), seed);
+      expect(verify(sig, stringToBytes('tampered'), publicKey)).toBe(false);
     });
 
-    it('rejects a wrong public key', async () => {
-      const ks1 = await deriveRootKeysFromMnemonic(generateMnemonic());
-      const ks2 = await deriveRootKeysFromMnemonic(generateMnemonic());
-      const sig = sign(stringToBytes('msg'), ks1.signing.privateKey);
-      expect(verify(sig, stringToBytes('msg'), ks2.signing.publicKey)).toBe(false);
+    it('rejects a wrong public key', () => {
+      const seed1 = randomSeed();
+      const seed2 = randomSeed();
+      const sig = sign(stringToBytes('msg'), seed1);
+      expect(verify(sig, stringToBytes('msg'), ed25519.getPublicKey(seed2))).toBe(false);
     });
 
-    it('verify returns false on zeroed signature without throwing', async () => {
-      const { signing } = await deriveRootKeysFromMnemonic(generateMnemonic());
-      expect(verify(new Uint8Array(64), stringToBytes('msg'), signing.publicKey)).toBe(false);
+    it('verify returns false on zeroed signature without throwing', () => {
+      const seed = randomSeed();
+      const publicKey = ed25519.getPublicKey(seed);
+      expect(verify(new Uint8Array(64), stringToBytes('msg'), publicKey)).toBe(false);
     });
 
     it('verify returns false when ed25519.verify throws (wrong-length public key)', () => {

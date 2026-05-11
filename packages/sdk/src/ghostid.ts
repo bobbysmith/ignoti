@@ -111,11 +111,10 @@ export class GhostID {
    *   1. Generate mnemonic and root keys.
    *   2. POST /register with rootPublicKey -> server returns userId and WebAuthn options.
    *   3. Browser produces a passkey credential.
-   *   4. SDK signs `register-device|userId|credentialId|challenge` with root key.
+   *   4. SDK signs a device-binding JWS with the root key.
    *   5. POST /register/device with the registration response and root signature.
    *
    * Caller must persist the returned mnemonic offline (it is the only recovery path).
-   * userId and deviceId are persisted automatically by the SDK.
    */
   async createIdentity(): Promise<CreateIdentityResult> {
     this.ensureInitialized();
@@ -127,36 +126,31 @@ export class GhostID {
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
     const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
-    try {
-      const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });
-      const { userId, options } = registerResponse;
+    const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });
+    const { userId, options } = registerResponse;
 
-      const passkeyOptions = creationOptionsFromServer(options);
-      const passkeyResponse = await createPasskey(passkeyOptions);
+    const passkeyOptions = creationOptionsFromServer(options);
+    const passkeyResponse = await createPasskey(passkeyOptions);
 
-      const challengeB64Url = extractChallenge(passkeyOptions);
-      const rootSignature = await signDeviceBindingJWS(
-        {
-          purpose: 'register-device',
-          userId,
-          credentialId: passkeyResponse.id,
-          challenge: challengeB64Url,
-        },
-        rootKeySet.signing.privateKey,
-        rootKeySet.signing.publicKey
-      );
-
-      const deviceResponse = await this.apiClient.auth.registerDevice({
+    const challengeB64Url = extractChallenge(passkeyOptions);
+    const rootSignature = await signDeviceBindingJWS(
+      {
+        purpose: 'register-device',
         userId,
-        registrationResponse: passkeyResponse,
-        rootSignature,
-        deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
-      });
+        credentialId: passkeyResponse.id,
+        challenge: challengeB64Url,
+      },
+      rootKeySet.signing.privateKey
+    );
 
-      return { mnemonic, userId, deviceId: deviceResponse.deviceId };
-    } finally {
-      rootKeySet.signing.privateKey.fill(0);
-    }
+    const deviceResponse = await this.apiClient.auth.registerDevice({
+      userId,
+      registrationResponse: passkeyResponse,
+      rootSignature,
+      deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
+    });
+
+    return { mnemonic, userId, deviceId: deviceResponse.deviceId };
   }
 
   /**
@@ -214,35 +208,30 @@ export class GhostID {
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
     const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
-    try {
-      const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
-      const { userId, options } = recoverResponse;
+    const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
+    const { userId, options } = recoverResponse;
 
-      const passkeyOptions = creationOptionsFromServer(options);
-      const passkeyResponse = await createPasskey(passkeyOptions);
-      const challengeB64Url = extractChallenge(passkeyOptions);
-      const rootSignature = await signDeviceBindingJWS(
-        {
-          purpose: 'recover-device',
-          userId,
-          credentialId: passkeyResponse.id,
-          challenge: challengeB64Url,
-        },
-        rootKeySet.signing.privateKey,
-        rootKeySet.signing.publicKey
-      );
-
-      const deviceResponse = await this.apiClient.auth.registerDevice({
+    const passkeyOptions = creationOptionsFromServer(options);
+    const passkeyResponse = await createPasskey(passkeyOptions);
+    const challengeB64Url = extractChallenge(passkeyOptions);
+    const rootSignature = await signDeviceBindingJWS(
+      {
+        purpose: 'recover-device',
         userId,
-        registrationResponse: passkeyResponse,
-        rootSignature,
-        deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
-      });
+        credentialId: passkeyResponse.id,
+        challenge: challengeB64Url,
+      },
+      rootKeySet.signing.privateKey
+    );
 
-      return { userId, deviceId: deviceResponse.deviceId };
-    } finally {
-      rootKeySet.signing.privateKey.fill(0);
-    }
+    const deviceResponse = await this.apiClient.auth.registerDevice({
+      userId,
+      registrationResponse: passkeyResponse,
+      rootSignature,
+      deviceName: this.defaultDeviceName ?? this.guessDeviceName(),
+    });
+
+    return { userId, deviceId: deviceResponse.deviceId };
   }
 
   /** Signs a payload with the in-memory session key. Throws if no session. */
@@ -333,16 +322,11 @@ export class GhostID {
     this.ensureInitialized();
 
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
-    try {
-      const rootSignature = await signDeviceBindingJWS(
-        { purpose: 'revoke-device', userId, credentialId, challenge: deviceId },
-        rootKeySet.signing.privateKey,
-        rootKeySet.signing.publicKey
-      );
-      await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
-    } finally {
-      rootKeySet.signing.privateKey.fill(0);
-    }
+    const rootSignature = await signDeviceBindingJWS(
+      { purpose: 'revoke-device', userId, credentialId, challenge: deviceId },
+      rootKeySet.signing.privateKey
+    );
+    await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
   }
 
   async getSessions(): Promise<SessionListItem[]> {

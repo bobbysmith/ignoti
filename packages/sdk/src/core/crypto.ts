@@ -27,6 +27,19 @@ import { ErrorCodes, GhostIDError } from './errors';
 
 const textEncoder = new TextEncoder();
 
+// Fixed DER header that wraps a 32-byte Ed25519 seed as PKCS8 for importKey.
+// Structure: SEQUENCE { version=0, AlgorithmIdentifier { OID 1.3.101.112 }, OCTET STRING { seed } }
+const ED25519_PKCS8_HEADER = new Uint8Array([
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+]);
+
+function seedToCryptoKey(seed: Uint8Array): Promise<CryptoKey> {
+  const pkcs8 = new Uint8Array(ED25519_PKCS8_HEADER.length + seed.length);
+  pkcs8.set(ED25519_PKCS8_HEADER);
+  pkcs8.set(seed, ED25519_PKCS8_HEADER.length);
+  return crypto.subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, false, ['sign']);
+}
+
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -122,14 +135,12 @@ export async function deriveRootKeysFromMnemonic(
       personalization: personal,
     });
     const publicKey = ed25519.getPublicKey(signingSeed);
-
+    const privateKey = await seedToCryptoKey(signingSeed);
+    signingSeed.fill(0);
     seed.fill(0);
 
     return {
-      signing: {
-        publicKey,
-        privateKey: signingSeed,
-      },
+      signing: { publicKey, privateKey },
       version,
       createdAt: Date.now(),
     };

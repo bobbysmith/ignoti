@@ -100,7 +100,7 @@ vi.mock('@/api/client.ts', () => {
   return { ApiClient, createApiClient: () => new ApiClient() };
 });
 
-const ROOT_PRIVATE_KEY = new Uint8Array(32).fill(1);
+const ROOT_PRIVATE_KEY = {} as unknown as CryptoKey;
 const ROOT_PUBLIC_KEY = new Uint8Array(32).fill(2);
 const SESSION_PRIVATE_KEY = new Uint8Array(32).fill(3);
 const SESSION_PUBLIC_KEY = new Uint8Array(32).fill(4);
@@ -218,18 +218,6 @@ describe('GhostID', () => {
       expect(mockRegisterDevice).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1', rootSignature: 'root-sig' })
       );
-    });
-
-    it('zeroes root private key even when registerDevice throws', async () => {
-      stubCreateIdentityMocks();
-      mockRegisterDevice.mockRejectedValue(new Error('network'));
-      const rootKey = new Uint8Array(32).fill(1);
-      mockDeriveRootKeys.mockResolvedValue({
-        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
-      });
-
-      await expect(initializedSdk().createIdentity()).rejects.toThrow('network');
-      expect(rootKey.every(b => b === 0)).toBe(true);
     });
   });
 
@@ -382,20 +370,6 @@ describe('GhostID', () => {
 
       expect(mockRevokeDevice).toHaveBeenCalledWith('device-1', 'root-sig');
     });
-
-    it('zeroes root key even when revokeDevice API throws', async () => {
-      const g = initializedSdk();
-      const rootKey = new Uint8Array(32).fill(1);
-      mockDeriveRootKeys.mockResolvedValue({
-        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
-      });
-      mockRevokeDevice.mockRejectedValue(new Error('network'));
-
-      await expect(g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id')).rejects.toThrow(
-        'network'
-      );
-      expect(rootKey.every(b => b === 0)).toBe(true);
-    });
   });
 
   describe('getSessions', () => {
@@ -495,22 +469,6 @@ describe('GhostID', () => {
 
       expect(result.userId).toBe('user-1');
       expect(result.deviceId).toBe('device-2');
-    });
-
-    it('zeroes root key even when registerDevice throws during recovery', async () => {
-      mockIsWebAuthnSupported.mockReturnValue(true);
-      const rootKey = new Uint8Array(32).fill(1);
-      mockDeriveRootKeys.mockResolvedValue({
-        signing: { privateKey: rootKey, publicKey: ROOT_PUBLIC_KEY },
-      });
-      mockRecoverAccount.mockResolvedValue({ userId: 'user-1', options: makeOptions() });
-      mockCreatePasskey.mockResolvedValue(makePasskeyResponse());
-      mockRegisterDevice.mockRejectedValue(new Error('device fail'));
-
-      await expect(initializedSdk().recoverIdentity('word '.repeat(12).trim())).rejects.toThrow(
-        'device fail'
-      );
-      expect(rootKey.every(b => b === 0)).toBe(true);
     });
   });
 

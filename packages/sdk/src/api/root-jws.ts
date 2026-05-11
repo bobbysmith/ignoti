@@ -10,41 +10,22 @@
  */
 
 import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS, type RootPurpose } from '@ghostid/shared';
-import { importJWK, SignJWT } from 'jose';
-
-import { toBase64 } from '../core/crypto';
+import { SignJWT } from 'jose';
 
 export interface DeviceBindingClaims {
   purpose: RootPurpose;
   userId: string;
   credentialId: string;
-  /** WebAuthn challenge (base64url) binds the JWS to the same ceremony. */
   challenge: string;
 }
 
-/**
- * `rootPrivateKey` and `rootPublicKey` are both 32-byte Ed25519 (the seed
- * for the private key, `@noble`'s convention, also what JWK EdDSA expects
- * as `d`).
- */
 export async function signDeviceBindingJWS(
   claims: DeviceBindingClaims,
-  rootPrivateKey: Uint8Array,
-  rootPublicKey: Uint8Array
+  rootPrivateKey: CryptoKey
 ): Promise<string> {
-  if (rootPrivateKey.length !== 32 || rootPublicKey.length !== 32) {
-    throw new Error('Ed25519 keys must be 32 bytes (seed and public key)');
-  }
-  const jwk = {
-    kty: 'OKP',
-    crv: 'Ed25519',
-    d: toBase64(rootPrivateKey),
-    x: toBase64(rootPublicKey),
-  };
-  const key = await importJWK(jwk, 'EdDSA');
   return new SignJWT({ ...claims })
     .setProtectedHeader({ alg: 'EdDSA', typ: ROOT_BINDING_TYP })
     .setIssuedAt()
     .setExpirationTime(`${ROOT_JWS_MAX_AGE_SECONDS}s`)
-    .sign(key);
+    .sign(rootPrivateKey);
 }
