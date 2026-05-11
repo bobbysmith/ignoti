@@ -30,7 +30,8 @@ export class SessionsApiClient extends BaseApiClient {
   async getSessions(
     sessionId: string,
     iat: number,
-    signature: string
+    signature: string,
+    jti: string
   ): Promise<GetSessionsResponse> {
     const validatedSessionId = validateString(
       sessionId,
@@ -49,6 +50,7 @@ export class SessionsApiClient extends BaseApiClient {
       undefined,
       {
         [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${validatedSessionId}`,
+        [HTTP_HEADERS.SESSION_NONCE]: jti,
         [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
         [HTTP_HEADERS.SESSION_SIGNATURE]: validatedSignature,
       }
@@ -59,7 +61,8 @@ export class SessionsApiClient extends BaseApiClient {
     targetSessionId: string,
     currentSessionId: string,
     iat: number,
-    signature: string
+    signature: string,
+    jti: string
   ): Promise<{ ok: boolean }> {
     const validatedTargetId = validateString(
       targetSessionId,
@@ -83,6 +86,7 @@ export class SessionsApiClient extends BaseApiClient {
       undefined,
       {
         [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${validatedCurrentId}`,
+        [HTTP_HEADERS.SESSION_NONCE]: jti,
         [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
         [HTTP_HEADERS.SESSION_SIGNATURE]: validatedSignature,
       }

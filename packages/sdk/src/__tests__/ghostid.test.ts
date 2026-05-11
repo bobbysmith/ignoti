@@ -261,7 +261,8 @@ describe('GhostID', () => {
         sessionId,
         sessionId,
         expect.any(Number),
-        'sig-abc'
+        'sig-abc',
+        expect.any(String)
       );
       expect(g.getSession()).toBeNull();
     });
@@ -296,19 +297,22 @@ describe('GhostID', () => {
   describe('getSessionHeaders', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.getSessionHeaders()).rejects.toThrow(GhostIDError);
+      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow(GhostIDError);
     });
 
     it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.getSessionHeaders()).rejects.toThrow('expired');
+      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('expired');
       expect(g.getSession()).toBeNull();
     });
 
-    it('returns Authorization, Timestamp, and Signature headers', async () => {
+    it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
       const { g, sessionId } = await withSession();
-      const headers = await g.getSessionHeaders();
+      const headers = await g.getSessionHeaders('GET', '/api/data');
       expect(headers.Authorization).toBe(`GhostID-Session ${sessionId}`);
+      expect(headers['X-GhostID-Nonce']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
       expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
       expect(headers['X-GhostID-Signature']).toBe('sig-abc');
     });
@@ -429,7 +433,12 @@ describe('GhostID', () => {
       const { g, sessionId } = await withSession();
       mockGetSessions.mockResolvedValue({ sessions: [] });
       await g.getSessions();
-      expect(mockGetSessions).toHaveBeenCalledWith(sessionId, expect.any(Number), 'sig-abc');
+      expect(mockGetSessions).toHaveBeenCalledWith(
+        sessionId,
+        expect.any(Number),
+        'sig-abc',
+        expect.any(String)
+      );
     });
   });
 
@@ -453,7 +462,8 @@ describe('GhostID', () => {
         'other-sess',
         sessionId,
         expect.any(Number),
-        'sig-abc'
+        'sig-abc',
+        expect.any(String)
       );
       expect(g.getSession()).not.toBeNull();
     });

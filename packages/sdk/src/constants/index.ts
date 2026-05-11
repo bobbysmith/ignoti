@@ -23,6 +23,7 @@ export const HTTP_HEADERS = {
   APPLICATION_JSON: 'application/json',
   AUTHORIZATION: 'Authorization',
   CONTENT_TYPE: 'Content-Type',
+  SESSION_NONCE: 'X-GhostID-Nonce',
   SESSION_SIGNATURE: 'X-GhostID-Signature',
   SESSION_TIMESTAMP: 'X-GhostID-Timestamp',
 } as const;

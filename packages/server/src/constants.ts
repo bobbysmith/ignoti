@@ -43,6 +43,7 @@ export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
   [SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE]:
     'Request timestamp is outside the acceptable range',
   [SERVER_ERROR_CODES.SESSION_NOT_FOUND]: 'Session not found',
+  [SERVER_ERROR_CODES.SESSION_NONCE_USED]: 'Request nonce has already been used',
   [SERVER_ERROR_CODES.SESSION_REVOKED]: 'Session has been revoked',
   [SERVER_ERROR_CODES.SESSION_EXPIRED]: 'Session has expired',
   [SERVER_ERROR_CODES.INVALID_SESSION_SIGNATURE]: 'Session signature verification failed',
@@ -82,6 +83,7 @@ export const ROUTES = {
 
 export const AUTH_HEADERS = {
   AUTHORIZATION: 'authorization',
+  SESSION_NONCE: 'x-ghostid-nonce',
   SESSION_SIGNATURE: 'x-ghostid-signature',
   SESSION_TIMESTAMP: 'x-ghostid-timestamp',
 } as const;

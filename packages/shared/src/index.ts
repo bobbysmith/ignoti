@@ -39,6 +39,7 @@ export const SESSION_AUTH_SCHEME = 'GhostID-Session';
 // HTTP headers are case-insensitive; servers should compare lowercased.
 export const GHOSTID_HEADERS = {
   AUTHORIZATION: 'Authorization',
+  SESSION_NONCE: 'X-GhostID-Nonce',
   SESSION_SIGNATURE: 'X-GhostID-Signature',
   SESSION_TIMESTAMP: 'X-GhostID-Timestamp',
 } as const;
@@ -72,6 +73,7 @@ export const SERVER_ERROR_CODES = {
   MISSING_SESSION_HEADERS: 'missing_session_headers',
   SESSION_EXPIRED: 'session_expired',
   SESSION_NOT_FOUND: 'session_not_found',
+  SESSION_NONCE_USED: 'session_nonce_used',
   SESSION_REVOKED: 'session_revoked',
   SESSION_TIMESTAMP_OUT_OF_RANGE: 'session_timestamp_out_of_range',
   USER_NOT_FOUND: 'user_not_found',

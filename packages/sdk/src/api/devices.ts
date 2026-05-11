@@ -27,7 +27,12 @@ export class DevicesApiClient extends BaseApiClient {
     super();
   }
 
-  async getDevices(sessionId: string, iat: number, signature: string): Promise<GetDevicesResponse> {
+  async getDevices(
+    sessionId: string,
+    iat: number,
+    signature: string,
+    jti: string
+  ): Promise<GetDevicesResponse> {
     const validatedSessionId = validateString(
       sessionId,
       'sessionId',
@@ -45,6 +50,7 @@ export class DevicesApiClient extends BaseApiClient {
       undefined,
       {
         [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${validatedSessionId}`,
+        [HTTP_HEADERS.SESSION_NONCE]: jti,
         [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
         [HTTP_HEADERS.SESSION_SIGNATURE]: validatedSignature,
       }

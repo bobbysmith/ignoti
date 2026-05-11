@@ -1,4 +1,5 @@
 import { sign as cryptoSign, generateKeyPairSync, type KeyObject } from 'node:crypto';
+import { canonicalJson } from '@ghostid/shared';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -31,12 +32,21 @@ function generateEd25519Keypair(): Keypair {
 }
 
 const DEFAULT_PATH = '/api/devices';
+const DEFAULT_METHOD = 'GET';
 
-function makeSessionHeaders(sessionId: string, iat: number, privateKey: KeyObject, path = DEFAULT_PATH) {
-  const payload = JSON.stringify({ iat, path, sessionId });
+function makeSessionHeaders(
+  sessionId: string,
+  iat: number,
+  privateKey: KeyObject,
+  htu = DEFAULT_PATH,
+  htm = DEFAULT_METHOD
+) {
+  const jti = crypto.randomUUID();
+  const payload = canonicalJson({ htm, htu, iat, jti, sessionId });
   const sig = cryptoSign(null, Buffer.from(payload, 'utf-8'), privateKey).toString('base64url');
   return {
     [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
+    [AUTH_HEADERS.SESSION_NONCE]: jti,
     [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
     [AUTH_HEADERS.SESSION_SIGNATURE]: sig,
   };
@@ -58,10 +68,15 @@ function makeMockReply() {
   return reply;
 }
 
-function makeReq(headers: Record<string, string | string[] | undefined> = {}, url = DEFAULT_PATH) {
+function mockSessionRequest(
+  headers: Record<string, string | string[] | undefined> = {},
+  url = DEFAULT_PATH,
+  method = DEFAULT_METHOD
+) {
   return {
     headers,
     url,
+    method,
     sessionContext: null,
     log: { error: vi.fn() },
   } as unknown as Parameters<typeof requireSession>[0];
@@ -92,9 +107,9 @@ describe('session auth', () => {
     });
 
     describe('header presence', () => {
-      it('returns 401 MISSING_SESSION_HEADERS when all three headers are absent', async () => {
+      it('returns 401 MISSING_SESSION_HEADERS when all headers are absent', async () => {
         const reply = makeMockReply();
-        await requireSession(makeReq({}), reply as never);
+        await requireSession(mockSessionRequest({}), reply as never);
         expect(reply.code).toHaveBeenCalledWith(401);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.MISSING_SESSION_HEADERS })
@@ -105,7 +120,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -119,7 +134,7 @@ describe('session auth', () => {
       it('returns 401 MISSING_SESSION_HEADERS when x-ghostid-timestamp is missing', async () => {
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -134,9 +149,25 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
+          }),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.MISSING_SESSION_HEADERS })
+        );
+      });
+
+      it('returns 401 MISSING_SESSION_HEADERS when x-ghostid-nonce is missing', async () => {
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          mockSessionRequest({
+            [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
+            [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
           reply as never
         );
@@ -149,7 +180,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: [`${SESSION_AUTH_SCHEME} ${SESSION_ID}`, 'extra'],
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
@@ -167,8 +198,9 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `Bearer ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -183,8 +215,9 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: SESSION_ID,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -199,8 +232,9 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `ghostid-session ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -217,8 +251,9 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} `,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -232,8 +267,9 @@ describe('session auth', () => {
       it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-timestamp is not a valid integer', async () => {
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: 'notanumber',
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -247,9 +283,27 @@ describe('session auth', () => {
       it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-timestamp is empty string', async () => {
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: '',
+            [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
+          }),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.MALFORMED_SESSION_HEADERS })
+        );
+      });
+
+      it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-nonce is not a valid UUID', async () => {
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          mockSessionRequest({
+            [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: 'not-a-uuid',
+            [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
           reply as never
@@ -263,8 +317,9 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} not-a-uuid`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
           }),
@@ -281,7 +336,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000) - SESSION_SIG_TOLERANCE_SECONDS - 1;
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE })
         );
@@ -291,7 +346,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000) + SESSION_SIG_TOLERANCE_SECONDS + 1;
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE })
         );
@@ -302,7 +357,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000) - SESSION_SIG_TOLERANCE_SECONDS;
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
         );
@@ -313,7 +368,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000) + SESSION_SIG_TOLERANCE_SECONDS;
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
         );
@@ -324,7 +379,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
         );
@@ -337,7 +392,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(getSessionWithUser).toHaveBeenCalledWith(SESSION_ID);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
@@ -351,7 +406,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NOT_FOUND })
         );
@@ -365,8 +420,9 @@ describe('session auth', () => {
         const wrongSig = Buffer.alloc(64).toString('base64url');
         const reply = makeMockReply();
         await requireSession(
-          makeReq({
+          mockSessionRequest({
             [AUTH_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${SESSION_ID}`,
+            [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: wrongSig,
           }),
@@ -384,7 +440,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
         );
@@ -395,7 +451,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, otherKeypair.privateKey);
         const reply = makeMockReply();
-        await requireSession(makeReq(headers), reply as never);
+        await requireSession(mockSessionRequest(headers), reply as never);
         expect(reply.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
         );
@@ -405,7 +461,7 @@ describe('session auth', () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
         const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
-        const req = makeReq(headers);
+        const req = mockSessionRequest(headers);
         const reply = makeMockReply();
         await requireSession(req, reply as never);
         expect(reply.send).not.toHaveBeenCalled();
@@ -413,11 +469,29 @@ describe('session auth', () => {
       });
     });
 
+    describe('nonce replay', () => {
+      it('returns 401 SESSION_NONCE_USED when the same jti is presented twice', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const iat = Math.floor(Date.now() / 1000);
+        const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
+
+        const req1 = mockSessionRequest(headers);
+        await requireSession(req1, makeMockReply() as never);
+        expect(req1.sessionContext).not.toBeNull();
+
+        const reply2 = makeMockReply();
+        await requireSession(mockSessionRequest(headers), reply2 as never);
+        expect(reply2.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.SESSION_NONCE_USED })
+        );
+      });
+    });
+
     describe('success', () => {
       it('sets req.sessionContext.sessionId to the extracted session ID', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
-        const req = makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
         await requireSession(req, makeMockReply() as never);
         expect(req.sessionContext?.sessionId).toBe(SESSION_ID);
       });
@@ -425,7 +499,7 @@ describe('session auth', () => {
       it('sets req.sessionContext.userId from the session row', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
-        const req = makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
         await requireSession(req, makeMockReply() as never);
         expect(req.sessionContext?.userId).toBe(USER_ID);
       });
@@ -433,7 +507,7 @@ describe('session auth', () => {
       it('sets req.sessionContext.deviceId from the session row', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
-        const req = makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
         await requireSession(req, makeMockReply() as never);
         expect(req.sessionContext?.deviceId).toBe(DEVICE_ID);
       });
@@ -443,7 +517,7 @@ describe('session auth', () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
-          makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
           reply as never
         );
         expect(reply.send).not.toHaveBeenCalled();
@@ -453,7 +527,7 @@ describe('session auth', () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         vi.mocked(touchSession).mockRejectedValue(new Error('db down'));
         const iat = Math.floor(Date.now() / 1000);
-        const req = makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
         await requireSession(req, makeMockReply() as never);
         // fire-and-forget: flush the microtask queue so the .catch runs
         await Promise.resolve();
@@ -467,7 +541,7 @@ describe('session auth', () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
         await requireSession(
-          makeReq(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
           makeMockReply() as never
         );
         expect(touchSession).toHaveBeenCalledWith(SESSION_ID);
@@ -477,7 +551,7 @@ describe('session auth', () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
         await requireSession(
-          makeReq(makeSessionHeaders(SESSION_ID, iat, otherKeypair.privateKey)),
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, otherKeypair.privateKey)),
           makeMockReply() as never
         );
         expect(touchSession).not.toHaveBeenCalled();

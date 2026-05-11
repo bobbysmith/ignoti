@@ -24,7 +24,13 @@ import {
   requestOptionsFromServer,
 } from './auth/options';
 import { createPasskey, getPasskeyAssertion, isWebAuthnSupported } from './auth/passkey';
-import { API_ENDPOINTS, ERROR_MESSAGES, HTTP_HEADERS, SESSION_AUTH_SCHEME, UA_HINTS } from './constants';
+import {
+  API_ENDPOINTS,
+  ERROR_MESSAGES,
+  HTTP_HEADERS,
+  SESSION_AUTH_SCHEME,
+  UA_HINTS,
+} from './constants';
 import {
   deriveRootKeysFromMnemonic,
   generateMnemonic,
@@ -253,26 +259,25 @@ export class GhostID {
   }
 
   /**
-   * Returns headers that authenticate requests to the integrator's own backend.
+   * Returns headers that authenticate a specific request to the integrator's own backend.
    * The GhostID server's `requireSession` middleware validates these headers.
    *
-   * Every call generates a fresh timestamp and signature - do not cache the result.
-   *
-   * Note: this signature covers { sessionId, iat } only — no path binding. If you
-   * are running requireSession directly on your own server and want path-bound
-   * signatures, pass the destination path to signWithSessionKey and include it in
-   * your verification payload.
+   * Every call generates a fresh nonce and signature, do not cache or reuse the result.
+   * Pass the exact HTTP method and path of the request you are about to make.
    */
-  async getSessionHeaders(): Promise<Record<string, string>> {
+  async getSessionHeaders(method: string, path: string): Promise<Record<string, string>> {
     this.ensureInitialized();
     if (!this.session) {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const signature = await this.signWithSessionKey({ sessionId, iat });
+    const jti = crypto.randomUUID();
+    const htm = method.toUpperCase();
+    const signature = await this.signWithSessionKey({ htm, htu: path, iat, jti, sessionId });
     return {
       [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
+      [HTTP_HEADERS.SESSION_NONCE]: jti,
       [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
       [HTTP_HEADERS.SESSION_SIGNATURE]: signature,
     };
@@ -285,9 +290,13 @@ export class GhostID {
     }
     const { sessionId, sessionPrivateKey } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const path = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
-    const signature = await ApiClient.signRequest({ sessionId, iat, path }, sessionPrivateKey);
-    await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature);
+    const jti = crypto.randomUUID();
+    const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
+    const signature = await ApiClient.signRequest(
+      { htm: 'DELETE', htu, iat, jti, sessionId },
+      sessionPrivateKey
+    );
+    await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature, jti);
     this.session = null;
   }
 
@@ -298,9 +307,15 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const path = API_ENDPOINTS.DEVICES.LIST;
-    const signature = await this.signWithSessionKey({ sessionId, iat, path });
-    const response = await this.apiClient.devices.getDevices(sessionId, iat, signature);
+    const jti = crypto.randomUUID();
+    const signature = await this.signWithSessionKey({
+      htm: 'GET',
+      htu: API_ENDPOINTS.DEVICES.LIST,
+      iat,
+      jti,
+      sessionId,
+    });
+    const response = await this.apiClient.devices.getDevices(sessionId, iat, signature, jti);
     return response.devices;
   }
 
@@ -337,9 +352,15 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const path = API_ENDPOINTS.SESSIONS.LIST;
-    const signature = await this.signWithSessionKey({ sessionId, iat, path });
-    const response = await this.apiClient.sessions.getSessions(sessionId, iat, signature);
+    const jti = crypto.randomUUID();
+    const signature = await this.signWithSessionKey({
+      htm: 'GET',
+      htu: API_ENDPOINTS.SESSIONS.LIST,
+      iat,
+      jti,
+      sessionId,
+    });
+    const response = await this.apiClient.sessions.getSessions(sessionId, iat, signature, jti);
     return response.sessions;
   }
 
@@ -350,9 +371,10 @@ export class GhostID {
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
-    const path = `${API_ENDPOINTS.SESSIONS.REVOKE}/${targetSessionId}`;
-    const signature = await this.signWithSessionKey({ sessionId, iat, path });
-    await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature);
+    const jti = crypto.randomUUID();
+    const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${targetSessionId}`;
+    const signature = await this.signWithSessionKey({ htm: 'DELETE', htu, iat, jti, sessionId });
+    await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature, jti);
     if (targetSessionId === sessionId) {
       this.session = null;
     }
