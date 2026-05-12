@@ -13,6 +13,13 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 
 export async function buildServer() {
+  if (!config.COOKIE_SECURE) {
+    console.warn(
+      '\nCOOKIE_SECURE=false — session cookies will be sent over plain HTTP.\n' +
+        '   This is only safe for local development. Do not use in production.\n'
+    );
+  }
+
   const app = Fastify({
     logger: { level: config.LOG_LEVEL },
     // Trust exactly one proxy hop (the load balancer / reverse proxy in front of
@@ -26,6 +33,14 @@ export async function buildServer() {
   await app.register(cors, {
     origin: config.RP_ORIGIN,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-GhostID-Nonce',
+      'X-GhostID-Signature',
+      'X-GhostID-Timestamp',
+    ],
   });
 
   await app.register(rateLimit, {

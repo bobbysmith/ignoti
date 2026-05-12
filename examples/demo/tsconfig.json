@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "noEmit": true
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../../packages/sdk/src/*"]
+    }
   },
   "include": ["src"]
 }

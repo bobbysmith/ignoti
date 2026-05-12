@@ -42,8 +42,9 @@ describe('crypto', () => {
 
   describe('deriveRootKeysFromMnemonic', () => {
     it('derives deterministic Ed25519 keypair', async () => {
-      const ks1 = await deriveRootKeysFromMnemonic(generateMnemonic());
-      const ks2 = await deriveRootKeysFromMnemonic(generateMnemonic());
+      const mnemonic = generateMnemonic();
+      const ks1 = await deriveRootKeysFromMnemonic(mnemonic);
+      const ks2 = await deriveRootKeysFromMnemonic(mnemonic);
 
       expect(ks1.signing.publicKey).toHaveLength(32);
       expect(ks1.signing.privateKey).toBeInstanceOf(CryptoKey);

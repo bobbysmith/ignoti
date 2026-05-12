@@ -215,6 +215,26 @@ describe('code api', () => {
       expect(fetch.mock.calls[0][1].body).toBeUndefined();
     });
 
+    it('does not send Content-Type on bodyless DELETE', async () => {
+      const client = makeClient();
+      const fetch = mockFetch(200, {});
+      vi.stubGlobal('fetch', fetch);
+      await client.makeRequest('DELETE', API_TEST_PATH);
+      const headers = fetch.mock.calls[0][1].headers as Record<string, string>;
+      expect(headers['content-type']).toBeUndefined();
+      expect(fetch.mock.calls[0][1].body).toBeUndefined();
+    });
+
+    it('sends Content-Type on DELETE with body', async () => {
+      const client = makeClient();
+      const fetch = mockFetch(200, {});
+      vi.stubGlobal('fetch', fetch);
+      await client.makeRequest('DELETE', API_TEST_PATH, { id: '123' });
+      const headers = fetch.mock.calls[0][1].headers as Record<string, string>;
+      expect(headers['Content-Type']).toBe('application/json');
+      expect(fetch.mock.calls[0][1].body).toBe('{"id":"123"}');
+    });
+
     it('uses statusText as error message when response is not JSON', async () => {
       const client = makeClient();
       vi.stubGlobal(

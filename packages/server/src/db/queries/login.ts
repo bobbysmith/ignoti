@@ -11,7 +11,7 @@ export async function incrementSignCountWithChallenge(
     const [updated] = await tx<{ id: string }[]>`
       update devices set sign_count = ${newCounter}, last_used_at = now()
       where id = ${deviceId}
-        and sign_count < ${newCounter}
+        and (${newCounter} = 0 or sign_count < ${newCounter})
       returning id
     `;
 

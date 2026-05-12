@@ -166,10 +166,7 @@ export class CoreApiClient {
     const validatedHeaders = this.validateHeaders(headers);
 
     const url = `${this.baseUrl}${validatedPath}`;
-    const requestHeaders: Record<string, string> = {
-      [HTTP_HEADERS.CONTENT_TYPE]: HTTP_HEADERS.APPLICATION_JSON,
-      ...validatedHeaders,
-    };
+    const requestHeaders: Record<string, string> = { ...validatedHeaders };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -177,6 +174,7 @@ export class CoreApiClient {
       method,
       headers: requestHeaders,
       signal: controller.signal,
+      credentials: 'include',
     };
 
     if (
@@ -186,6 +184,7 @@ export class CoreApiClient {
         method === HTTP_METHODS.PATCH ||
         method === HTTP_METHODS.DELETE)
     ) {
+      requestHeaders[HTTP_HEADERS.CONTENT_TYPE] = HTTP_HEADERS.APPLICATION_JSON;
       requestOptions.body = this.safeStringify(data);
     }
     // POST and PATCH are not idempotent. Retrying them is safe here because
