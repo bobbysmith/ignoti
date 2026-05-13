@@ -1,8 +1,27 @@
 import { Link } from 'react-router-dom';
 
-function LandingPage() {
+export function Landing() {
   return (
-    <>
+    <div className="container">
+      <section>
+        <h1>GhostID</h1>
+        <p>Your users are ghosts, not profiles.</p>
+        <p>
+          <Link to="/demo">→ try it</Link>
+        </p>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>you own it.</h2>
+        <p>
+          One npm package. No WebAuthn code, no token management, no key handling. You deploy the
+          server with Docker. You own the database. No third party sees your users, issues your
+          tokens, or can revoke access.
+        </p>
+      </section>
+
       <hr />
 
       <section>
@@ -57,17 +76,13 @@ function LandingPage() {
             </tr>
             <tr>
               <td>last used timestamps</td>
-              <td>your IP address (linked to you)</td>
-            </tr>
-            <tr>
-              <td></td>
-              <td>any PII whatsoever</td>
+              <td>your IP address</td>
             </tr>
           </tbody>
         </table>
         <p>
-          The server knows a public key exists and that someone with the matching private key
-          authenticated. It cannot tell you who that someone is.
+          The server knows a public key exists and that someone with the matching private key has
+          authenticated, but it doesn't know who that someone is.
         </p>
       </section>
 
@@ -104,33 +119,6 @@ function LandingPage() {
           </li>
         </ul>
       </section>
-
-      <hr />
-
-      <section>
-        <h2>you own it.</h2>
-        <p>
-          You deploy the server. You own the database. No third party sees your users, issues your
-          tokens, or can revoke access. One Docker command gets you running:
-        </p>
-        <pre>docker compose up</pre>
-        <p>Postgres + the GhostID server. Point your SDK at it and you're done.</p>
-      </section>
-    </>
-  );
-}
-
-export function Landing() {
-  return (
-    <div className="container">
-      <section>
-        <h1>GhostID</h1>
-        <p>Your users are not profiles, they're ghosts.</p>
-        <p>
-          <Link to="/demo">→ try it</Link>
-        </p>
-      </section>
-      <LandingPage />
     </div>
   );
 }
