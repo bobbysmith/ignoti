@@ -27,16 +27,16 @@ export function Landing() {
       <section>
         <h2>sign in. leave nothing behind.</h2>
         <p>Three layers of identity, each with a different lifetime and threat model:</p>
-        <pre>{`┌─────────────────────────────────────────────────┐
-│  root key       BIP39 mnemonic + Ed25519        │
-│                 offline, recovery only          │
-├─────────────────────────────────────────────────┤
-│  device key     WebAuthn passkey                │
-│                 registered per device           │
-├─────────────────────────────────────────────────┤
-│  session key    ephemeral Ed25519 (WebCrypto)   │
-│                 lives in memory, signs requests │
-└─────────────────────────────────────────────────┘`}</pre>
+        <dl>
+          <dt>root key</dt>
+          <dd>BIP39 mnemonic + Ed25519 — offline, recovery only</dd>
+          <dd className="layer-arrow">↓</dd>
+          <dt>device key</dt>
+          <dd>WebAuthn passkey — registered per device</dd>
+          <dd className="layer-arrow">↓</dd>
+          <dt>session key</dt>
+          <dd>ephemeral Ed25519 (WebCrypto) — lives in memory, signs requests</dd>
+        </dl>
         <p>
           You create your identity through a generated 12-word mnemonic. From that a root keypair is
           derived that is never sent to the server whole, only the public key is registered. A

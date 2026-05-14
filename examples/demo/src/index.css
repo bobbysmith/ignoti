@@ -3,9 +3,9 @@
   --font-color: #d4d0c8;
   --invert-font-color: #080808;
   --primary-color: #c8ff00;
-  --secondary-color: #444;
+  --secondary-color: #404040;
   --error-color: #ff4444;
-  --block-background-color: #0e0e0e;
+  --block-background-color: #0c0c0c;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -30,9 +30,21 @@
   caret-shape: block;
 }
 
+dl {
+  border-left: 2px solid var(--primary-color);
+  padding-left: var(--space-4);
+}
+
+.layer-arrow {
+  color: var(--primary-color);
+  font-size: var(--text-lg);
+  margin: 0;
+  list-style: none;
+}
+
 pre, code {
   color: var(--font-color);
-  background-color: #1e1e1e;
+    background-color: #303030;
 }
 
 body::before {
@@ -41,11 +53,11 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: 0.06;
+  opacity: 0.12;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65 0.73' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 400px 400px;
-  mix-blend-mode: overlay;
+  mix-blend-mode: screen;
 }
 
 body {
