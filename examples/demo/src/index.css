@@ -5,12 +5,34 @@
   --primary-color: #c8ff00;
   --secondary-color: #444;
   --error-color: #ff4444;
-  --code-bg-color: #111;
   --block-background-color: #0e0e0e;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+
+  --header-height: 80px;
 }
 
 * {
   box-sizing: border-box;
+  caret-color: var(--primary-color);
+  caret-shape: block;
+}
+
+pre, code {
+  color: var(--font-color);
+  background-color: #1e1e1e;
 }
 
 body::before {
@@ -33,21 +55,26 @@ body {
 
 #root {
   min-height: 100vh;
-  padding-bottom: 4rem;
+  padding-bottom: var(--space-16);
 }
 
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 2rem;
+  padding: var(--space-4) var(--space-8);
   border-bottom: 1px solid var(--secondary-color);
-  margin-bottom: 2rem;
+  background-color: var(--background-color);
+  z-index: 10;
 }
 
 .app-header-logo {
   font-weight: bold;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   text-decoration: none;
   color: inherit;
   letter-spacing: 0.05em;
@@ -55,34 +82,34 @@ body {
 
 .app-header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
 }
 
 .app-main {
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: var(--header-height) var(--space-8) 0;
 }
 
 .app-main--centered {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - var(--header-height));
 }
 
 .dashboard-section {
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-10);
 }
 
 .dashboard-section h2 {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--secondary-color);
-  padding-bottom: 0.4rem;
+  padding-bottom: var(--space-2);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--secondary-color);
 }
 
@@ -122,7 +149,7 @@ body {
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: 900;
   letter-spacing: 0.25em;
-  margin: 0 0 2.5rem;
+  margin: 0 0 var(--space-10);
   text-transform: uppercase;
   line-height: 1;
   animation: flicker 8s infinite;
@@ -131,7 +158,7 @@ body {
 
 .rave-embed-wrap {
   width: 100%;
-  margin-bottom: 3rem;
+  margin-bottom: var(--space-12);
   border: 1px solid var(--secondary-color);
 }
 
@@ -164,8 +191,7 @@ body {
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  padding: 2rem;
-  margin: 1rem;
+  padding: var(--space-6);
   border: 1px solid var(--secondary-color);
   background-color: var(--block-background-color);
 }
@@ -174,14 +200,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
 .modal-titlebar h2 {
   margin: 0;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .modal-titlebar button {
@@ -190,20 +216,20 @@ body {
   color: inherit;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.85rem;
-  padding: 0.1rem 0.4rem;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-1);
   line-height: 1;
 }
 
 .modal-footer {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
 }
 
 .link-btn {
   background: none;
   border: none;
-  color: var(--secondary-color);
+  color: var(--primary-color);
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;

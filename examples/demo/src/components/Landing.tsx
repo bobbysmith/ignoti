@@ -38,10 +38,11 @@ export function Landing() {
 │                 lives in memory, signs requests │
 └─────────────────────────────────────────────────┘`}</pre>
         <p>
-          To create an identity you generate a 12-word mnemonic. From it we derive a root keypair
-          that's never sent to the server whole, only the public key is registered. You then
-          register a passkey on your device. From that point on, your passkey is your daily auth.
-          The mnemonic stays offline and is only needed to add a new device or recover access.
+          You create your identity through a generated 12-word mnemonic. From that a root keypair is
+          derived that is never sent to the server whole, only the public key is registered. A
+          passkey is then registered on your device. That's it. From that point on, your passkey is
+          your daily auth. The mnemonic stays offline and is only needed to add a new device or
+          recover access.
         </p>
         <p>
           On login, the server issues a challenge. Your passkey signs it. The server verifies, then
