@@ -118,11 +118,7 @@ export function AuthForm({
   return (
     <>
       <p>Enter your 12-word recovery phrase to register this device.</p>
-      <input
-        ref={mnemonicRef}
-        placeholder="word1 word2 word3 ..."
-        style={{ width: '100%' }}
-      />
+      <input ref={mnemonicRef} placeholder="word1 word2 word3 ..." style={{ width: '100%' }} />
       <br />
       <br />
       <button type="button" onClick={handleRecover} disabled={loading}>

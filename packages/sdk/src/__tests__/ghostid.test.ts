@@ -255,11 +255,11 @@ describe('GhostID', () => {
       expect(g.getSession()).toBeNull();
     });
 
-    it('throws and leaves session intact when server revocation fails', async () => {
+    it('clears local session before network call so state is clean even if server revocation fails', async () => {
       const { g } = await withSession();
       mockRevokeSession.mockRejectedValue(new Error('network'));
       await expect(g.logout()).rejects.toThrow('network');
-      expect(g.getSession()).not.toBeNull();
+      expect(g.getSession()).toBeNull();
     });
 
     it('is a no-op when no session is active', async () => {

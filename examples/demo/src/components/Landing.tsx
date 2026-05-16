@@ -29,13 +29,13 @@ export function Landing() {
         <p>Three layers of identity, each with a different lifetime and threat model:</p>
         <dl>
           <dt>root key</dt>
-          <dd>BIP39 mnemonic + Ed25519 — offline, recovery only</dd>
+          <dd>BIP39 mnemonic + Ed25519 - offline, recovery only</dd>
           <dd className="layer-arrow">↓</dd>
           <dt>device key</dt>
-          <dd>WebAuthn passkey — registered per device</dd>
+          <dd>WebAuthn passkey - registered per device</dd>
           <dd className="layer-arrow">↓</dd>
           <dt>session key</dt>
-          <dd>ephemeral Ed25519 (WebCrypto) — lives in memory, signs requests</dd>
+          <dd>ephemeral Ed25519 (WebCrypto) - lives in memory, signs requests</dd>
         </dl>
         <p>
           You create your identity through a generated 12-word mnemonic. From that a root keypair is

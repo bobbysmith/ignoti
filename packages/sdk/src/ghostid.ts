@@ -278,6 +278,7 @@ export class GhostID {
       return;
     }
     const { sessionId, sessionPrivateKey } = this.session;
+    this.session = null;
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
@@ -286,7 +287,6 @@ export class GhostID {
       sessionPrivateKey
     );
     await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature, jti);
-    this.session = null;
   }
 
   async getDevices(): Promise<DeviceInfo[]> {

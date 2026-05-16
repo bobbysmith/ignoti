@@ -46,10 +46,7 @@ export function Demo({ onSession }: Props) {
       </main>
 
       {authView && (
-        <AuthModal
-          title={modalTitle(authView)}
-          onClose={() => setAuthView(null)}
-        >
+        <AuthModal title={modalTitle(authView)} onClose={() => setAuthView(null)}>
           <AuthForm view={authView} onSession={handleSession} onSwitchView={setAuthView} />
         </AuthModal>
       )}

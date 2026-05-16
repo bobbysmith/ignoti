@@ -11,13 +11,21 @@ const TRACK_URL = 'https://soundcloud.com/lensldn/lens-boomtown-2024';
 
 export function Account({ session, onLogout }: Props) {
   const [devices, setDevices] = useState<Awaited<ReturnType<typeof ghost.getDevices>> | null>(null);
-  const [sessions, setSessions] = useState<Awaited<ReturnType<typeof ghost.getSessions>> | null>(null);
+  const [sessions, setSessions] = useState<Awaited<ReturnType<typeof ghost.getSessions>> | null>(
+    null
+  );
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    ghost.getDevices().then(setDevices).catch(() => {});
-    ghost.getSessions().then(setSessions).catch(() => {});
+    ghost
+      .getDevices()
+      .then(setDevices)
+      .catch(() => {});
+    ghost
+      .getSessions()
+      .then(setSessions)
+      .catch(() => {});
   }, []);
 
   async function handleRevokeSession(sessionId: string) {
@@ -28,7 +36,10 @@ export function Account({ session, onLogout }: Props) {
         onLogout();
         return;
       }
-      ghost.getSessions().then(setSessions).catch(() => {});
+      ghost
+        .getSessions()
+        .then(setSessions)
+        .catch(() => {});
     } catch (e) {
       setError((e as Error).message);
     }
@@ -69,20 +80,40 @@ export function Account({ session, onLogout }: Props) {
           <h2>session</h2>
           <table>
             <tbody>
-              <tr><td>user</td><td>{session.userId}</td></tr>
-              <tr><td>session</td><td>{session.sessionId}</td></tr>
-              <tr><td>device</td><td>{session.deviceId}</td></tr>
-              <tr><td>expires</td><td>{new Date(session.expiresAt).toLocaleString()}</td></tr>
+              <tr>
+                <td>user</td>
+                <td>{session.userId}</td>
+              </tr>
+              <tr>
+                <td>session</td>
+                <td>{session.sessionId}</td>
+              </tr>
+              <tr>
+                <td>device</td>
+                <td>{session.deviceId}</td>
+              </tr>
+              <tr>
+                <td>expires</td>
+                <td>{new Date(session.expiresAt).toLocaleString()}</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
         <div className="dashboard-section">
           <h2>devices</h2>
-          {devices === null ? <p>loading...</p> : devices.length === 0 ? <p>none</p> : (
+          {devices === null ? (
+            <p>loading...</p>
+          ) : devices.length === 0 ? (
+            <p>none</p>
+          ) : (
             <table>
               <thead>
-                <tr><th>name</th><th>registered</th><th>last used</th></tr>
+                <tr>
+                  <th>name</th>
+                  <th>registered</th>
+                  <th>last used</th>
+                </tr>
               </thead>
               <tbody>
                 {devices.map(d => (
@@ -100,15 +131,26 @@ export function Account({ session, onLogout }: Props) {
         <div className="dashboard-section">
           <h2>sessions</h2>
           {error && <p style={{ color: 'var(--error-color)' }}>error: {error}</p>}
-          {sessions === null ? <p>loading...</p> : sessions.length === 0 ? <p>none</p> : (
+          {sessions === null ? (
+            <p>loading...</p>
+          ) : sessions.length === 0 ? (
+            <p>none</p>
+          ) : (
             <table>
               <thead>
-                <tr><th>session</th><th>created</th><th>expires</th><th></th></tr>
+                <tr>
+                  <th>session</th>
+                  <th>created</th>
+                  <th>expires</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody>
                 {sessions.map(s => (
                   <tr key={s.id}>
-                    <td>{s.id.slice(0, 8)}…{s.isCurrent ? ' (this)' : ''}</td>
+                    <td>
+                      {s.id.slice(0, 8)}…{s.isCurrent ? ' (this)' : ''}
+                    </td>
                     <td>{new Date(s.createdAt).toLocaleString()}</td>
                     <td>{new Date(s.expiresAt).toLocaleString()}</td>
                     <td>
