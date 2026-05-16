@@ -56,6 +56,10 @@ describe('code api', () => {
       expect(() => makeClient({ timeout: 300_001 })).toThrow(GhostIDError);
     });
 
+    it('rejects retryAttempts < 1', () => {
+      expect(() => makeClient({ retryAttempts: 0 })).toThrow(GhostIDError);
+    });
+
     it('rejects retryAttempts > 10', () => {
       expect(() => makeClient({ retryAttempts: 11 })).toThrow(GhostIDError);
     });

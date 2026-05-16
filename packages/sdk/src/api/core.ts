@@ -58,7 +58,7 @@ export class CoreApiClient {
     if (this.timeout <= 0 || this.timeout > 300_000) {
       throw new GhostIDError(ERROR_MESSAGES.INVALID_TIMEOUT, ErrorCodes.INVALID_INPUT);
     }
-    if (this.retryAttempts < 0 || this.retryAttempts > 10) {
+    if (this.retryAttempts < 1 || this.retryAttempts > 10) {
       throw new GhostIDError(ERROR_MESSAGES.INVALID_RETRY_ATTEMPTS, ErrorCodes.INVALID_INPUT);
     }
   }
