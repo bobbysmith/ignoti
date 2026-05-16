@@ -306,25 +306,6 @@ describe('GhostID', () => {
     });
   });
 
-  describe('signWithSessionKey', () => {
-    it('throws NO_KEYS when no session', async () => {
-      const g = initializedSdk();
-      await expect(g.signWithSessionKey({ foo: 1 })).rejects.toThrow(GhostIDError);
-    });
-
-    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
-      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.signWithSessionKey({ foo: 1 })).rejects.toThrow('expired');
-      expect(g.getSession()).toBeNull();
-    });
-
-    it('returns signature from ApiClient.signRequest when session is valid', async () => {
-      mockApiClientSignRequest.mockResolvedValue('signed-payload');
-      const { g } = await withSession();
-      expect(await g.signWithSessionKey({ foo: 'bar' })).toBe('signed-payload');
-    });
-  });
-
   describe('getDevices', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();

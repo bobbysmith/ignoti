@@ -234,8 +234,7 @@ export class GhostID {
     return { userId, deviceId: deviceResponse.deviceId };
   }
 
-  /** Signs a payload with the in-memory session key. Throws if no session. */
-  async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
+  private async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
     this.ensureInitialized();
     if (!this.session) {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
