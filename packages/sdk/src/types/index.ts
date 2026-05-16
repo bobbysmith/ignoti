@@ -245,8 +245,6 @@ export interface RestoreSessionResponse extends Record<string, unknown> {
 
 export interface GhostIDOptions {
   backendUrl: string;
-  /** Optional caller-managed device ID, used by `login()` if not passed explicitly. */
-  deviceId?: string;
   /** Human-readable name for newly registered devices. */
   defaultDeviceName?: string;
   apiClientOptions?: Partial<ApiClientOptions>;
