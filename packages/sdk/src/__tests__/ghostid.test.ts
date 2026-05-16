@@ -282,6 +282,22 @@ describe('GhostID', () => {
     });
   });
 
+  describe('isSessionExpired', () => {
+    it('returns true when no session', () => {
+      expect(initializedSdk().isSessionExpired()).toBe(true);
+    });
+
+    it('returns false when session is active', async () => {
+      const { g } = await withSession();
+      expect(g.isSessionExpired()).toBe(false);
+    });
+
+    it('returns true when session is past expiresAt', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      expect(g.isSessionExpired()).toBe(true);
+    });
+  });
+
   describe('getSessionHeaders', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();

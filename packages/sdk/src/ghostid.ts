@@ -386,6 +386,13 @@ export class GhostID {
     };
   }
 
+  isSessionExpired(): boolean {
+    if (!this.session) {
+      return true;
+    }
+    return Date.now() > this.session.expiresAt;
+  }
+
   destroy(): void {
     this.session = null;
     this.initialized = false;
