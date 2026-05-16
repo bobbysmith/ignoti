@@ -393,11 +393,6 @@ export class GhostID {
     return Date.now() > this.session.expiresAt;
   }
 
-  destroy(): void {
-    this.session = null;
-    this.initialized = false;
-  }
-
   private guessDeviceName(): string {
     if (typeof navigator === 'undefined') {
       return 'Unknown Device';

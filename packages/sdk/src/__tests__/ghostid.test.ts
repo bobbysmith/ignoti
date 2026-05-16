@@ -470,20 +470,7 @@ describe('GhostID', () => {
     });
   });
 
-  describe('destroy', () => {
-    it('wipes session key, clears session, and resets initialized flag', async () => {
-      const { g } = await withSession();
-      g.destroy();
 
-      expect(g.getSession()).toBeNull();
-      await expect(g.logout()).rejects.toThrow(GhostIDError);
-    });
-
-    it('is safe to call when no session is active', () => {
-      const g = initializedSdk();
-      expect(() => g.destroy()).not.toThrow();
-    });
-  });
 
   describe('restoreSession', () => {
     it('throws NOT_INITIALIZED before init()', async () => {

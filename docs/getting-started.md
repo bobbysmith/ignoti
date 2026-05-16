@@ -210,13 +210,6 @@ await ghost.logout();
 
 The session is revoked server-side (clearing the httpOnly cookie) and the in-memory key is wiped. If the server call fails, the local key is still wiped but the error is rethrown — the server session remains active. The user will need to authenticate again on success.
 
-When your app is shutting down (e.g. a single-page app unmounting its root component), call `destroy()` to wipe all 
-in-memory keys:
-
-```ts
-ghost.destroy();
-```
-
 ---
 
 ## Error handling
