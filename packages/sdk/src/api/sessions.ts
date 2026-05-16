@@ -15,6 +15,12 @@ import type { GetSessionsResponse } from '@/types';
 import { BaseApiClient } from './base';
 import { validateString } from './validation';
 
+interface RawSessionsResponse {
+  sessions: Array<
+    Omit<GetSessionsResponse['sessions'][number], 'expiresAt'> & { expiresAt: string }
+  >;
+}
+
 export class SessionsApiClient extends BaseApiClient {
   constructor(
     protected makeRequest: <T>(
@@ -32,7 +38,7 @@ export class SessionsApiClient extends BaseApiClient {
     iat: number,
     signature: string,
     jti: string
-  ): Promise<GetSessionsResponse> {
+  ): Promise<RawSessionsResponse> {
     const validatedSessionId = validateString(
       sessionId,
       'sessionId',
@@ -44,7 +50,7 @@ export class SessionsApiClient extends BaseApiClient {
       VALIDATION.MAX_SIGNATURE_LENGTH
     );
 
-    return this.makeRequest<GetSessionsResponse>(
+    return this.makeRequest<RawSessionsResponse>(
       HTTP_METHODS.GET,
       API_ENDPOINTS.SESSIONS.LIST,
       undefined,

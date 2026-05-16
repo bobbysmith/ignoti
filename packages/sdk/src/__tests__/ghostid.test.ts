@@ -382,6 +382,7 @@ describe('GhostID', () => {
       const sessions = await g.getSessions();
       expect(sessions).toHaveLength(1);
       expect(sessions[0].id).toBe('sess-1');
+      expect(sessions[0].expiresAt).toBe(new Date('2024-01-08T00:00:00.000Z').getTime());
     });
 
     it('calls getSessions with correct session auth args', async () => {

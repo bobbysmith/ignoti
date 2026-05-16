@@ -215,7 +215,7 @@ export interface SessionListItem extends Record<string, unknown> {
   deviceId: string;
   createdAt: string;
   lastUsedAt: string | null;
-  expiresAt: string;
+  expiresAt: number;
   isCurrent: boolean;
 }
 

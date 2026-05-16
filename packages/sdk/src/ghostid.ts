@@ -344,7 +344,7 @@ export class GhostID {
       sessionId,
     });
     const response = await this.apiClient.sessions.getSessions(sessionId, iat, signature, jti);
-    return response.sessions;
+    return response.sessions.map(s => ({ ...s, expiresAt: new Date(s.expiresAt).getTime() }));
   }
 
   async revokeSession(targetSessionId: string): Promise<void> {
