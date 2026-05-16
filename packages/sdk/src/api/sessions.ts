@@ -10,15 +10,18 @@ import {
   SESSION_AUTH_SCHEME,
   VALIDATION,
 } from '@/constants';
-import type { GetSessionsResponse } from '@/types';
-
 import { BaseApiClient } from './base';
 import { validateString } from './validation';
 
 interface RawSessionsResponse {
-  sessions: Array<
-    Omit<GetSessionsResponse['sessions'][number], 'expiresAt'> & { expiresAt: string }
-  >;
+  sessions: Array<{
+    id: string;
+    deviceId: string;
+    createdAt: string;
+    lastUsedAt: string | null;
+    expiresAt: string;
+    isCurrent: boolean;
+  }>;
 }
 
 export class SessionsApiClient extends BaseApiClient {

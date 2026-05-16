@@ -219,10 +219,6 @@ export interface SessionListItem extends Record<string, unknown> {
   isCurrent: boolean;
 }
 
-export interface GetSessionsResponse extends Record<string, unknown> {
-  sessions: SessionListItem[];
-}
-
 export interface RecoverAccountRequest extends Record<string, unknown> {
   rootPublicKey: string;
 }
