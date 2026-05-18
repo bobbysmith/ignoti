@@ -11,13 +11,14 @@ const SESSION_ID = 'session-uuid-1234';
 const TARGET_SESSION_ID = 'session-uuid-5678';
 const IAT = 1700000000;
 const SIGNATURE = 'sig-abc';
+const JTI = 'nonce-uuid-abcd';
 
 describe('SessionsApiClient', () => {
   describe('getSessions', () => {
     it('calls makeRequest with correct method and path', async () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ sessions: [] });
-      await client.getSessions(SESSION_ID, IAT, SIGNATURE);
+      await client.getSessions(SESSION_ID, IAT, SIGNATURE, JTI);
       expect(makeRequest).toHaveBeenCalledWith(
         'GET',
         '/api/sessions',
@@ -29,7 +30,7 @@ describe('SessionsApiClient', () => {
     it('sends session auth headers', async () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ sessions: [] });
-      await client.getSessions(SESSION_ID, IAT, SIGNATURE);
+      await client.getSessions(SESSION_ID, IAT, SIGNATURE, JTI);
       const headers = makeRequest.mock.calls[0][3];
       expect(headers).toMatchObject({
         Authorization: expect.stringContaining(SESSION_ID),
@@ -42,23 +43,25 @@ describe('SessionsApiClient', () => {
       const { client, makeRequest } = makeClient();
       const mockResponse = { sessions: [{ id: SESSION_ID, deviceId: 'dev-1' }] };
       makeRequest.mockResolvedValue(mockResponse);
-      await expect(client.getSessions(SESSION_ID, IAT, SIGNATURE)).resolves.toEqual(mockResponse);
+      await expect(client.getSessions(SESSION_ID, IAT, SIGNATURE, JTI)).resolves.toEqual(
+        mockResponse
+      );
     });
 
     it('throws when sessionId is empty', async () => {
       const { client } = makeClient();
-      await expect(client.getSessions('', IAT, SIGNATURE)).rejects.toThrow();
+      await expect(client.getSessions('', IAT, SIGNATURE, JTI)).rejects.toThrow();
     });
 
     it('throws when signature is empty', async () => {
       const { client } = makeClient();
-      await expect(client.getSessions(SESSION_ID, IAT, '')).rejects.toThrow();
+      await expect(client.getSessions(SESSION_ID, IAT, '', JTI)).rejects.toThrow();
     });
 
     it('throws when sessionId exceeds MAX_SESSION_TOKEN_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SESSION_TOKEN_LENGTH + 1);
-      await expect(client.getSessions(long, IAT, SIGNATURE)).rejects.toThrow(
+      await expect(client.getSessions(long, IAT, SIGNATURE, JTI)).rejects.toThrow(
         'exceeds maximum length'
       );
     });
@@ -66,7 +69,7 @@ describe('SessionsApiClient', () => {
     it('throws when signature exceeds MAX_SIGNATURE_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SIGNATURE_LENGTH + 1);
-      await expect(client.getSessions(SESSION_ID, IAT, long)).rejects.toThrow(
+      await expect(client.getSessions(SESSION_ID, IAT, long, JTI)).rejects.toThrow(
         'exceeds maximum length'
       );
     });
@@ -76,7 +79,7 @@ describe('SessionsApiClient', () => {
     it('calls makeRequest with DELETE and targetSessionId in path', async () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ ok: true });
-      await client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE);
+      await client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE, JTI);
       expect(makeRequest).toHaveBeenCalledWith(
         'DELETE',
         expect.stringContaining(TARGET_SESSION_ID),
@@ -88,7 +91,7 @@ describe('SessionsApiClient', () => {
     it('sends session auth headers using currentSessionId', async () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ ok: true });
-      await client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE);
+      await client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE, JTI);
       const headers = makeRequest.mock.calls[0][3];
       expect(headers).toMatchObject({
         Authorization: expect.stringContaining(SESSION_ID),
@@ -101,29 +104,33 @@ describe('SessionsApiClient', () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ ok: true });
       await expect(
-        client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE)
+        client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, SIGNATURE, JTI)
       ).resolves.toEqual({ ok: true });
     });
 
     it('throws when targetSessionId is empty', async () => {
       const { client } = makeClient();
-      await expect(client.revokeSession('', SESSION_ID, IAT, SIGNATURE)).rejects.toThrow();
+      await expect(client.revokeSession('', SESSION_ID, IAT, SIGNATURE, JTI)).rejects.toThrow();
     });
 
     it('throws when currentSessionId is empty', async () => {
       const { client } = makeClient();
-      await expect(client.revokeSession(TARGET_SESSION_ID, '', IAT, SIGNATURE)).rejects.toThrow();
+      await expect(
+        client.revokeSession(TARGET_SESSION_ID, '', IAT, SIGNATURE, JTI)
+      ).rejects.toThrow();
     });
 
     it('throws when signature is empty', async () => {
       const { client } = makeClient();
-      await expect(client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, '')).rejects.toThrow();
+      await expect(
+        client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, '', JTI)
+      ).rejects.toThrow();
     });
 
     it('throws when targetSessionId exceeds MAX_SESSION_TOKEN_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SESSION_TOKEN_LENGTH + 1);
-      await expect(client.revokeSession(long, SESSION_ID, IAT, SIGNATURE)).rejects.toThrow(
+      await expect(client.revokeSession(long, SESSION_ID, IAT, SIGNATURE, JTI)).rejects.toThrow(
         'exceeds maximum length'
       );
     });
@@ -131,17 +138,17 @@ describe('SessionsApiClient', () => {
     it('throws when currentSessionId exceeds MAX_SESSION_TOKEN_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SESSION_TOKEN_LENGTH + 1);
-      await expect(client.revokeSession(TARGET_SESSION_ID, long, IAT, SIGNATURE)).rejects.toThrow(
-        'exceeds maximum length'
-      );
+      await expect(
+        client.revokeSession(TARGET_SESSION_ID, long, IAT, SIGNATURE, JTI)
+      ).rejects.toThrow('exceeds maximum length');
     });
 
     it('throws when signature exceeds MAX_SIGNATURE_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SIGNATURE_LENGTH + 1);
-      await expect(client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, long)).rejects.toThrow(
-        'exceeds maximum length'
-      );
+      await expect(
+        client.revokeSession(TARGET_SESSION_ID, SESSION_ID, IAT, long, JTI)
+      ).rejects.toThrow('exceeds maximum length');
     });
   });
 });

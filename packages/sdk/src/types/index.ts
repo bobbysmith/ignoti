@@ -125,6 +125,7 @@ export interface ApiClientOptions {
   baseUrl: string;
   timeout?: number;
   retryAttempts?: number;
+  onUnauthorized?: (method: string, path: string) => Promise<Record<string, string>>;
 }
 
 export interface ApiResponse<T = Record<string, unknown>> {

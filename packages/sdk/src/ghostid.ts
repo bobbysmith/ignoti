@@ -61,13 +61,41 @@ export class GhostID {
   private readonly defaultDeviceName?: string;
   private initialized = false;
   private session: ActiveSession | null = null;
+  private restorePromise: Promise<void> | null = null;
 
   constructor(options: GhostIDOptions) {
     this.apiClient = createApiClient({
       baseUrl: options.backendUrl,
       ...options.apiClientOptions,
+      onUnauthorized: (m, p) => this.handleUnauthorized(m, p),
     });
     this.defaultDeviceName = options.defaultDeviceName;
+  }
+
+  private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
+    if (!this.restorePromise) {
+      this.restorePromise = this.restoreSession().finally(() => {
+        this.restorePromise = null;
+      });
+    }
+    await this.restorePromise;
+    const { sessionId } = this.session as ActiveSession;
+    const iat = Math.floor(Date.now() / 1000);
+    const jti = crypto.randomUUID();
+    const signature = await this.signWithSessionKey({
+      htm: method.toUpperCase(),
+      htu: path,
+      iat,
+      jti,
+      sessionId,
+    });
+
+    return {
+      [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
+      [HTTP_HEADERS.SESSION_NONCE]: jti,
+      [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
+      [HTTP_HEADERS.SESSION_SIGNATURE]: signature,
+    };
   }
 
   init(): void {
@@ -236,14 +264,7 @@ export class GhostID {
 
   private async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
     this.ensureInitialized();
-    if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
-    }
-    if (Date.now() > this.session.expiresAt) {
-      this.session = null;
-      throw new GhostIDError(ERROR_MESSAGES.SESSION_EXPIRED, ErrorCodes.EXPIRED_CHALLENGE);
-    }
-    return ApiClient.signRequest(payload, this.session.sessionPrivateKey);
+    return ApiClient.signRequest(payload, (this.session as ActiveSession).sessionPrivateKey);
   }
 
   /**
@@ -258,7 +279,15 @@ export class GhostID {
     if (!this.session) {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
-    const { sessionId } = this.session;
+    if (this.isSessionExpired()) {
+      if (!this.restorePromise) {
+        this.restorePromise = this.restoreSession().finally(() => {
+          this.restorePromise = null;
+        });
+      }
+      await this.restorePromise;
+    }
+    const { sessionId } = this.session as ActiveSession;
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htm = method.toUpperCase();

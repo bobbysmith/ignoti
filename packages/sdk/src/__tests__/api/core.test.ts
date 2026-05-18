@@ -316,4 +316,93 @@ describe('code api', () => {
       expect(sentHeaders['x-request-id']).toBe('abc123');
     });
   });
+
+  describe('onUnauthorized interceptor', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    function makeClientWithInterceptor(
+      onUnauthorized: (method: string, path: string) => Promise<Record<string, string>>
+    ) {
+      return new CoreApiClient({ baseUrl: BASE_URL, retryAttempts: 1, onUnauthorized });
+    }
+
+    it('calls onUnauthorized on 401, retries with fresh headers, and returns result', async () => {
+      const freshHeaders = { Authorization: 'GhostID-Session new-sess' };
+      const onUnauthorized = vi.fn().mockResolvedValue(freshHeaders);
+      const client = makeClientWithInterceptor(onUnauthorized);
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: { get: () => 'application/json' },
+          json: () => Promise.resolve({ error: 'unauthorized' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: { get: () => 'application/json' },
+          json: () => Promise.resolve({ data: 'ok' }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await client.makeRequest('GET', API_TEST_PATH);
+      expect(onUnauthorized).toHaveBeenCalledWith('GET', API_TEST_PATH);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ data: 'ok' });
+
+      const retryHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
+      expect(retryHeaders.authorization).toBe('GhostID-Session new-sess');
+    });
+
+    it('throws on 401 without retrying when onUnauthorized is not configured', async () => {
+      const client = makeClient({ retryAttempts: 1 });
+      const fetchMock = mockFetch(401, { error: 'unauthorized' });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not intercept 401 on the login path', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({});
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
+
+      await expect(client.makeRequest('POST', '/api/auth/login', {})).rejects.toThrow(GhostIDError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('does not intercept 401 on the session restore path', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({});
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
+
+      await expect(client.makeRequest('POST', '/api/auth/session/restore', {})).rejects.toThrow(
+        GhostIDError
+      );
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('propagates onUnauthorized error when the callback throws', async () => {
+      const onUnauthorized = vi.fn().mockRejectedValue(new Error('restore failed'));
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
+
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow('restore failed');
+    });
+
+    it('does not retry a second time if the retried request also returns 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'GhostID-Session new' });
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
+
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2);
+    });
+  });
 });

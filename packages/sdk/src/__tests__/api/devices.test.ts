@@ -10,6 +10,7 @@ function makeClient() {
 const SESSION_ID = 'session-uuid-1234';
 const IAT = 1700000000;
 const SIGNATURE = 'sig-abc';
+const JTI = 'nonce-uuid-abcd';
 const DEVICE_ID = 'device-uuid-5678';
 
 describe('DevicesApiClient', () => {
@@ -17,7 +18,7 @@ describe('DevicesApiClient', () => {
     it('calls makeRequest with session headers', async () => {
       const { client, makeRequest } = makeClient();
       makeRequest.mockResolvedValue({ devices: [] });
-      await client.getDevices(SESSION_ID, IAT, SIGNATURE);
+      await client.getDevices(SESSION_ID, IAT, SIGNATURE, JTI);
       expect(makeRequest).toHaveBeenCalledWith(
         'GET',
         '/api/devices',
@@ -32,18 +33,18 @@ describe('DevicesApiClient', () => {
 
     it('throws when sessionId is empty', async () => {
       const { client } = makeClient();
-      await expect(client.getDevices('', IAT, SIGNATURE)).rejects.toThrow();
+      await expect(client.getDevices('', IAT, SIGNATURE, JTI)).rejects.toThrow();
     });
 
     it('throws when signature is empty', async () => {
       const { client } = makeClient();
-      await expect(client.getDevices(SESSION_ID, IAT, '')).rejects.toThrow();
+      await expect(client.getDevices(SESSION_ID, IAT, '', JTI)).rejects.toThrow();
     });
 
     it('throws when sessionId exceeds MAX_SESSION_TOKEN_LENGTH', async () => {
       const { client } = makeClient();
       const long = 'a'.repeat(VALIDATION.MAX_SESSION_TOKEN_LENGTH + 1);
-      await expect(client.getDevices(long, IAT, SIGNATURE)).rejects.toThrow(
+      await expect(client.getDevices(long, IAT, SIGNATURE, JTI)).rejects.toThrow(
         'exceeds maximum length'
       );
     });

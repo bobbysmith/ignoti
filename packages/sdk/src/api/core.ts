@@ -8,6 +8,7 @@
 
 import type { ServerErrorResponse } from '@ghostid/shared';
 import {
+  API_ENDPOINTS,
   ERROR_MESSAGES,
   HTTP_HEADERS,
   HTTP_METHODS,
@@ -33,6 +34,16 @@ export class CoreApiClient {
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly retryAttempts: number;
+  private readonly onUnauthorized?: (
+    method: string,
+    path: string
+  ) => Promise<Record<string, string>>;
+
+  // Paths where a 401 must not trigger the interceptor, prevents infinite loops.
+  private static readonly SKIP_UNAUTHORIZED_RETRY = new Set<string>([
+    API_ENDPOINTS.AUTH.SESSION_RESTORE,
+    API_ENDPOINTS.AUTH.LOGIN,
+  ]);
 
   constructor(options: ApiClientOptions) {
     if (!options.baseUrl) {
@@ -61,6 +72,7 @@ export class CoreApiClient {
     if (this.retryAttempts < 1 || this.retryAttempts > 10) {
       throw new GhostIDError(ERROR_MESSAGES.INVALID_RETRY_ATTEMPTS, ErrorCodes.INVALID_INPUT);
     }
+    this.onUnauthorized = options.onUnauthorized;
   }
 
   private validateHttpMethod(method: string): void {
@@ -161,6 +173,16 @@ export class CoreApiClient {
     data?: Record<string, unknown> | string | number | boolean,
     headers: Record<string, string> = {}
   ): Promise<T> {
+    return this.executeRequest<T>(method, path, data, headers, true);
+  }
+
+  private async executeRequest<T>(
+    method: string,
+    path: string,
+    data: Record<string, unknown> | string | number | boolean | undefined,
+    headers: Record<string, string>,
+    allowUnauthorizedRetry: boolean
+  ): Promise<T> {
     this.validateHttpMethod(method);
     const validatedPath = this.validatePath(path);
     const validatedHeaders = this.validateHeaders(headers);
@@ -245,8 +267,19 @@ export class CoreApiClient {
           );
           lastError = ghostError;
           const { httpStatus: status } = ghostError;
-          // 4xx: retrying won't change the outcome.
-          // 501: server does not implement the endpoint - not transient.
+
+          // 401: call the interceptor to restore the session and re-sign, then retry once.
+          if (
+            status === HTTP_STATUS.UNAUTHORIZED &&
+            allowUnauthorizedRetry &&
+            this.onUnauthorized &&
+            !CoreApiClient.SKIP_UNAUTHORIZED_RETRY.has(validatedPath)
+          ) {
+            const freshHeaders = await this.onUnauthorized(method, validatedPath);
+            return this.executeRequest<T>(method, path, data, freshHeaders, false);
+          }
+
+          // 4xx (not handled above) and 501: retrying won't change the outcome.
           if (
             (status &&
               status >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&

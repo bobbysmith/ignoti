@@ -470,6 +470,27 @@ describe('session auth', () => {
     });
 
     describe('nonce replay', () => {
+      it('sweeps expired nonces from cache before inserting a new one', async () => {
+        vi.useFakeTimers();
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+
+        const iat1 = Math.floor(Date.now() / 1000);
+        await requireSession(
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat1, keypair.privateKey)),
+          makeMockReply() as never
+        );
+
+        // Advance past the tolerance window so the stored nonce expires
+        vi.advanceTimersByTime(SESSION_SIG_TOLERANCE_SECONDS * 1000 + 1);
+
+        const iat2 = Math.floor(Date.now() / 1000);
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat2, keypair.privateKey));
+        await requireSession(req, makeMockReply() as never);
+        expect(req.sessionContext).not.toBeNull();
+
+        vi.useRealTimers();
+      });
+
       it('returns 401 SESSION_NONCE_USED when the same jti is presented twice', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);

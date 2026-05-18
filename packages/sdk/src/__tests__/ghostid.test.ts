@@ -25,6 +25,12 @@ const { mockIsWebAuthnSupported, mockCreatePasskey, mockGetPasskeyAssertion } = 
 }));
 
 const { mockSignDeviceBindingJWS } = vi.hoisted(() => ({ mockSignDeviceBindingJWS: vi.fn() }));
+
+const onUnauthorizedRef = vi.hoisted(() => ({
+  current: undefined as
+    | ((method: string, path: string) => Promise<Record<string, string>>)
+    | undefined,
+}));
 vi.mock('@/api/root-jws.ts', () => ({ signDeviceBindingJWS: mockSignDeviceBindingJWS }));
 
 const { mockSignSessionBindingJWS } = vi.hoisted(() => ({
@@ -97,7 +103,15 @@ vi.mock('@/api/client.ts', () => {
     static signRequest = mockApiClientSignRequest;
     static verifyRequest = vi.fn();
   }
-  return { ApiClient, createApiClient: () => new ApiClient() };
+  return {
+    ApiClient,
+    createApiClient: (opts: {
+      onUnauthorized?: (method: string, path: string) => Promise<Record<string, string>>;
+    }) => {
+      onUnauthorizedRef.current = opts.onUnauthorized;
+      return new ApiClient();
+    },
+  };
 });
 
 const ROOT_PRIVATE_KEY = {} as unknown as CryptoKey;
@@ -173,6 +187,7 @@ async function withSession(opts?: Parameters<typeof stubLoginMocks>[0]) {
 describe('GhostID', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    onUnauthorizedRef.current = undefined;
     mockBase64UrlToBuffer.mockReturnValue(new Uint8Array(32).buffer);
     mockBufferToBase64Url.mockReturnValue('challenge-b64url');
     mockToBase64.mockReturnValue('root-pub-b64');
@@ -304,10 +319,10 @@ describe('GhostID', () => {
       await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow(GhostIDError);
     });
 
-    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
+    it('propagates restore error when session is expired and restore fails', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('expired');
-      expect(g.getSession()).toBeNull();
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
     });
 
     it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
@@ -320,18 +335,33 @@ describe('GhostID', () => {
       expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
       expect(headers['X-GhostID-Signature']).toBe('sig-abc');
     });
+
+    it('proactively restores when expired and returns headers from the new session', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockResolvedValue({
+        sessionId: 'sess-restored',
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+
+      const headers = await g.getSessionHeaders('GET', '/api/data');
+
+      expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+      expect(headers.Authorization).toBe('GhostID-Session sess-restored');
+      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
+    });
   });
 
   describe('getDevices', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
       await expect(g.getDevices()).rejects.toThrow(GhostIDError);
-    });
-
-    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
-      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.getDevices()).rejects.toThrow('expired');
-      expect(g.getSession()).toBeNull();
     });
 
     it('returns device list on success', async () => {
@@ -375,12 +405,6 @@ describe('GhostID', () => {
       await expect(g.getSessions()).rejects.toThrow(GhostIDError);
     });
 
-    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
-      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.getSessions()).rejects.toThrow('expired');
-      expect(g.getSession()).toBeNull();
-    });
-
     it('returns session list on success', async () => {
       const { g } = await withSession();
       mockGetSessions.mockResolvedValue({
@@ -418,12 +442,6 @@ describe('GhostID', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
       await expect(g.revokeSession('other-sess')).rejects.toThrow(GhostIDError);
-    });
-
-    it('throws EXPIRED_CHALLENGE and logs out when session is expired', async () => {
-      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      await expect(g.revokeSession('other-sess')).rejects.toThrow('expired');
-      expect(g.getSession()).toBeNull();
     });
 
     it('revokes another session without clearing local session', async () => {
@@ -470,7 +488,89 @@ describe('GhostID', () => {
     });
   });
 
+  describe('onUnauthorized interceptor callback', () => {
+    function capturedOnUnauthorized() {
+      const cb = onUnauthorizedRef.current;
+      if (!cb) {
+        throw new Error('onUnauthorized not captured — was GhostID constructed?');
+      }
+      return cb;
+    }
 
+    function stubRestoreSuccess(sessionId = 'sess-restored') {
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockResolvedValue({
+        sessionId,
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+    }
+
+    it('restores session, re-signs, and returns fresh session headers', async () => {
+      await withSession();
+      stubRestoreSuccess();
+      const onUnauthorized = capturedOnUnauthorized();
+
+      const headers = await onUnauthorized('GET', '/api/devices');
+
+      expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+      expect(headers.Authorization).toBe('GhostID-Session sess-restored');
+      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
+      expect(headers['X-GhostID-Nonce']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+      expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
+    });
+
+    it('uppercases the http method in the signed payload', async () => {
+      await withSession();
+      stubRestoreSuccess();
+      const onUnauthorized = capturedOnUnauthorized();
+
+      await onUnauthorized('delete', '/api/sessions/sess-1');
+
+      expect(mockApiClientSignRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({ htm: 'DELETE', htu: '/api/sessions/sess-1' }),
+        expect.anything()
+      );
+    });
+
+    it('deduplicates concurrent restore calls', async () => {
+      await withSession();
+      stubRestoreSuccess();
+      const onUnauthorized = capturedOnUnauthorized();
+
+      await Promise.all([
+        onUnauthorized('GET', '/api/devices'),
+        onUnauthorized('GET', '/api/sessions'),
+      ]);
+
+      expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates restore failure to the caller', async () => {
+      await withSession();
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      const onUnauthorized = capturedOnUnauthorized();
+
+      await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+    });
+
+    it('updates the active session after a successful restore', async () => {
+      const { g } = await withSession();
+      stubRestoreSuccess('sess-brand-new');
+      const onUnauthorized = capturedOnUnauthorized();
+
+      await onUnauthorized('GET', '/api/devices');
+
+      expect(g.getSession()?.sessionId).toBe('sess-brand-new');
+    });
+  });
 
   describe('restoreSession', () => {
     it('throws NOT_INITIALIZED before init()', async () => {
