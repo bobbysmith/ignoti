@@ -559,6 +559,27 @@ describe('GhostID', () => {
     });
   });
 
+  describe('recoverAndLogin', () => {
+    it('recovers identity then logs in and returns SessionInfo', async () => {
+      mockIsWebAuthnSupported.mockReturnValue(true);
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      mockRecoverAccount.mockResolvedValue({ userId: 'user-1', options: makeOptions() });
+      mockCreatePasskey.mockResolvedValue(makePasskeyResponse());
+      mockRegisterDevice.mockResolvedValue({ deviceId: 'device-2', credentialId: 'cred-id' });
+      const info = stubLoginMocks();
+
+      const g = initializedSdk();
+      const result = await g.recoverAndLogin('word '.repeat(12).trim());
+
+      expect(result).toMatchObject({
+        sessionId: info.sessionId,
+        userId: info.userId,
+        deviceId: info.deviceId,
+      });
+      expect(g.getSession()).not.toBeNull();
+    });
+  });
+
   describe('onUnauthorized interceptor callback', () => {
     function capturedOnUnauthorized() {
       const cb = onUnauthorizedRef.current;

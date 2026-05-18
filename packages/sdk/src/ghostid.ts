@@ -277,6 +277,11 @@ export class GhostID {
     return { userId, deviceId: deviceResponse.deviceId };
   }
 
+  async recoverAndLogin(mnemonic: string): Promise<SessionInfo> {
+    await this.recoverIdentity(mnemonic);
+    return this.login();
+  }
+
   private async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
     this.ensureInitialized();
     return ApiClient.signRequest(payload, (this.session as ActiveSession).sessionPrivateKey);
