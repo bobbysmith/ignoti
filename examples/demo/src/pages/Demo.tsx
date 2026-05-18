@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AuthForm } from '../components/AuthForm';
 import { AuthModal } from '../components/AuthModal';
-import type { AuthView, SessionInfo } from '../types';
+import type { AuthView } from '../types';
 
 function modalTitle(view: AuthView): string {
   if (view === 'login') {
@@ -13,17 +13,8 @@ function modalTitle(view: AuthView): string {
   return 'sign up';
 }
 
-interface Props {
-  onSession: (session: SessionInfo) => void;
-}
-
-export function Demo({ onSession }: Props) {
+export function Demo() {
   const [authView, setAuthView] = useState<AuthView | null>(null);
-
-  function handleSession(s: SessionInfo) {
-    onSession(s);
-    setAuthView(null);
-  }
 
   return (
     <>
@@ -47,7 +38,7 @@ export function Demo({ onSession }: Props) {
 
       {authView && (
         <AuthModal title={modalTitle(authView)} onClose={() => setAuthView(null)}>
-          <AuthForm view={authView} onSession={handleSession} onSwitchView={setAuthView} />
+          <AuthForm view={authView} onSession={() => {}} onSwitchView={setAuthView} />
         </AuthModal>
       )}
     </>

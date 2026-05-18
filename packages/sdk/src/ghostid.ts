@@ -62,6 +62,7 @@ export class GhostID {
   private initialized = false;
   private session: ActiveSession | null = null;
   private restorePromise: Promise<void> | null = null;
+  private sessionChangeCallback: ((session: SessionInfo | null) => void) | null = null;
 
   constructor(options: GhostIDOptions) {
     this.apiClient = createApiClient({
@@ -98,6 +99,14 @@ export class GhostID {
     };
   }
 
+  onSessionChange(callback: (session: SessionInfo | null) => void): void {
+    this.sessionChangeCallback = callback;
+  }
+
+  private notifySessionChange(): void {
+    this.sessionChangeCallback?.(this.getSession());
+  }
+
   init(): void {
     this.initialized = true;
   }
@@ -120,6 +129,7 @@ export class GhostID {
         expiresAt: response.expiresAt,
         sessionPrivateKey: sessionKeyPair.privateKey,
       };
+      this.notifySessionChange();
     } catch (error) {
       if (error instanceof GhostIDError && error.httpStatus === 401) {
         throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
@@ -218,6 +228,7 @@ export class GhostID {
       expiresAt: sessionResponse.expiresAt,
       sessionPrivateKey: sessionKeyPair.privateKey,
     };
+    this.notifySessionChange();
 
     return { sessionId: sessionResponse.sessionId, expiresAt: sessionResponse.expiresAt };
   }
@@ -307,6 +318,7 @@ export class GhostID {
     }
     const { sessionId, sessionPrivateKey } = this.session;
     this.session = null;
+    this.notifySessionChange();
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
@@ -398,6 +410,7 @@ export class GhostID {
     await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature, jti);
     if (targetSessionId === sessionId) {
       this.session = null;
+      this.notifySessionChange();
     }
   }
 

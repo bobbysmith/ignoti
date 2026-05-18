@@ -488,6 +488,73 @@ describe('GhostID', () => {
     });
   });
 
+  describe('onSessionChange', () => {
+    it('fires with session info after login', async () => {
+      const cb = vi.fn();
+      const info = stubLoginMocks();
+      const g = initializedSdk();
+      g.onSessionChange(cb);
+      await g.login();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(expect.objectContaining({ sessionId: info.sessionId }));
+    });
+
+    it('fires with null after logout', async () => {
+      const { g } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+      await g.logout();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(null);
+    });
+
+    it('fires with session info after restoreSession', async () => {
+      const cb = vi.fn();
+      const g = initializedSdk();
+      g.onSessionChange(cb);
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockResolvedValue({
+        sessionId: 'sess-restored',
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+      await g.restoreSession();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'sess-restored' }));
+    });
+
+    it('fires with null when revoking the current session', async () => {
+      const { g, sessionId } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+      await g.revokeSession(sessionId);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(null);
+    });
+
+    it('does not fire when revoking a different session', async () => {
+      const { g } = await withSession();
+      mockRevokeSession.mockResolvedValue({ ok: true });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+      await g.revokeSession('other-session');
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when no callback is registered', async () => {
+      const info = stubLoginMocks();
+      const g = initializedSdk();
+      await expect(g.login()).resolves.toMatchObject({ sessionId: info.sessionId });
+    });
+  });
+
   describe('onUnauthorized interceptor callback', () => {
     function capturedOnUnauthorized() {
       const cb = onUnauthorizedRef.current;

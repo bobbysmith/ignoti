@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useSession } from '../context/session';
 import { ghost } from '../ghost';
-import type { SessionInfo } from '../types';
-
-interface Props {
-  session: SessionInfo;
-  onLogout: () => void;
-}
 
 const TRACK_URL = 'https://soundcloud.com/lensldn/lens-boomtown-2024';
 
-export function Account({ session, onLogout }: Props) {
+export function Account() {
+  const { session } = useSession();
   const [devices, setDevices] = useState<Awaited<ReturnType<typeof ghost.getDevices>> | null>(null);
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof ghost.getSessions>> | null>(
     null
@@ -28,12 +24,17 @@ export function Account({ session, onLogout }: Props) {
       .catch(() => {});
   }, []);
 
+  if (!session) {
+    return null;
+  }
+
   async function handleRevokeSession(sessionId: string) {
+    const currentSession = session;
+    if (!currentSession) return;
     setError(null);
     try {
       await ghost.revokeSession(sessionId);
-      if (sessionId === session.sessionId) {
-        onLogout();
+      if (sessionId === currentSession.sessionId) {
         return;
       }
       ghost
@@ -49,7 +50,6 @@ export function Account({ session, onLogout }: Props) {
     setLoggingOut(true);
     try {
       await ghost.logout();
-      onLogout();
     } finally {
       setLoggingOut(false);
     }
