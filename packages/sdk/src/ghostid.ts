@@ -42,7 +42,6 @@ import type {
   CreateIdentityResult,
   DeviceInfo,
   GhostIDOptions,
-  LoginResult,
   RecoverIdentityResult,
   SessionInfo,
   SessionListItem,
@@ -204,7 +203,7 @@ export class GhostID {
    *   5. POST /session → server verifies PoP, persists the session row,
    *      returns `{ sessionId, expiresAt }`.
    */
-  async login(): Promise<LoginResult> {
+  async login(): Promise<SessionInfo> {
     this.ensureInitialized();
 
     const challengeResponse = await this.apiClient.auth.requestChallenge();
@@ -230,7 +229,12 @@ export class GhostID {
     };
     this.notifySessionChange();
 
-    return { sessionId: sessionResponse.sessionId, expiresAt: sessionResponse.expiresAt };
+    return {
+      sessionId: sessionResponse.sessionId,
+      userId: sessionResponse.userId,
+      deviceId: loginResponse.deviceId,
+      expiresAt: sessionResponse.expiresAt,
+    };
   }
 
   /**

@@ -22,11 +22,8 @@ export function AuthForm({
     setLoading(true);
     setError(null);
     try {
-      await ghost.login();
-      const s = ghost.getSession();
-      if (s) {
-        onSession(s);
-      }
+      const s = await ghost.login();
+      onSession(s);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -52,11 +49,8 @@ export function AuthForm({
     setError(null);
     try {
       await ghost.recoverIdentity(mnemonicRef.current?.value ?? '');
-      await ghost.login();
-      const s = ghost.getSession();
-      if (s) {
-        onSession(s);
-      }
+      const s = await ghost.login();
+      onSession(s);
     } catch (e) {
       setError((e as Error).message);
     } finally {

@@ -260,11 +260,6 @@ export interface CreateIdentityResult {
   deviceId: string;
 }
 
-export interface LoginResult {
-  sessionId: string;
-  expiresAt: number;
-}
-
 export interface RecoverIdentityResult {
   userId: string;
   deviceId: string;

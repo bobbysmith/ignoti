@@ -52,7 +52,6 @@ export type {
   KeyPair,
   LoginRequest,
   LoginResponse,
-  LoginResult,
   RecoverAccountRequest,
   RecoverAccountResponse,
   RecoverIdentityResult,

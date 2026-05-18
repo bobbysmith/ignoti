@@ -237,13 +237,17 @@ describe('GhostID', () => {
   });
 
   describe('login', () => {
-    it('sets active session on success', async () => {
+    it('returns full SessionInfo on success', async () => {
       const info = stubLoginMocks();
       const g = initializedSdk();
       const result = await g.login();
 
-      expect(result.sessionId).toBe(info.sessionId);
-      expect(result.expiresAt).toBe(info.expiresAt);
+      expect(result).toEqual({
+        sessionId: info.sessionId,
+        userId: info.userId,
+        deviceId: info.deviceId,
+        expiresAt: info.expiresAt,
+      });
       expect(g.getSession()).toMatchObject({ sessionId: info.sessionId, deviceId: 'device-1' });
     });
 
