@@ -22,6 +22,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm --filter @ghostid/shared build
+
       - run: pnpm lint
 
       - run: pnpm typecheck
@@ -66,6 +68,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @ghostid/shared build
 
       - name: Run migrations
         run: pnpm --filter @ghostid/server db:migrate:ci
