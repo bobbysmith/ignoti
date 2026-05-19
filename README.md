@@ -28,7 +28,8 @@ A 12-word phrase derived into an Ed25519 keypair. Never stored anywhere - not on
 A WebAuthn passkey bound to the user's authenticator - Touch ID, Face ID, Windows Hello, a hardware key. Hardware-backed, phishing-resistant. This is how users log in day to day.
 
 **Session identity (ephemeral)**
-An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key. A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session survives page reloads via an httpOnly cookie — the private key is never persisted, only a session token that JavaScript cannot read.
+An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key.
+A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session survives page reloads via an httpOnly cookie, the private key is never persisted, only a session token that JavaScript cannot read.
 
 The server stores only opaque public keys and UUIDs. No email, no phone, no OAuth token, no PII of any kind.
 
@@ -83,7 +84,7 @@ const { userId, deviceId, mnemonic } = await ghost.createIdentity();
 const { sessionId, expiresAt } = await ghost.login();
 
 // Sign authenticated requests
-const headers = await ghost.getSessionHeaders();
+const headers = await ghost.getSessionHeaders('GET', '/api/feed');
 ```
 
 ---
@@ -121,6 +122,8 @@ GhostID is designed to be self-hosted. User identity data lives in your Postgres
 | `PORT`                  | No       | `8787`                  | Port the server listens on.                                                                                           |
 | `HOST`                  | No       | `0.0.0.0`               | Network interface to bind to.                                                                                         |
 | `LOG_LEVEL`             | No       | `info`                  | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`.                                            |
+| `COOKIE_SECURE`         | No       | `true`                  | Set to `false` in local development when not using HTTPS.                                                             |
+| `RATE_LIMIT_DISABLED`   | No       | `false`                 | Set to `true` to disable rate limiting. For testing only — never disable in production.                               |
 
 **Database:**
 
@@ -142,7 +145,7 @@ select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
 
 ## Security
 
-GhostID's cryptographic design is documented in [THREAT_MODEL.md](./THREAT_MODEL.md). Key properties:
+GhostID's cryptographic design is documented in [docs/threat-model.md](./docs/threat-model.md). Key properties:
 
 - **No passwords** - nothing to steal from the server
 - **No PII stored** - a breached database reveals no real world identities

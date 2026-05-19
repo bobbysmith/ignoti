@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthForm } from '../components/AuthForm';
 import { AuthModal } from '../components/AuthModal';
+import { Header } from '../components/Header';
 import type { AuthView } from '../types';
 
 function modalTitle(view: AuthView): string {
@@ -18,18 +19,11 @@ export function Demo() {
 
   return (
     <>
-      <header className="app-header">
-        <span className="app-header-logo">ghostid://rave</span>
-        <div className="app-header-actions">
-          <button type="button" className="link-btn" onClick={() => setAuthView('login')}>
-            sign in
-          </button>
-        </div>
-      </header>
+      <Header slug="demo" />
 
       <main className="app-main app-main--centered">
         <div className="flyer">
-          <h1 className="flyer-title">GHOST RAVE</h1>
+          <h1 className="flyer-title">GHOST</h1>
           <button type="button" onClick={() => setAuthView('signup')}>
             → enter
           </button>

@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import { Header } from './Header';
 
 export function Landing() {
   return (
-    <div className="container">
+    <div className="container" style={{ paddingTop: 'var(--header-height)' }}>
+      <Header />
+
       <section>
         <h1>GhostID</h1>
         <p>Your users are ghosts, not profiles.</p>

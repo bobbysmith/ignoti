@@ -33,4 +33,4 @@ USER ghostid
 EXPOSE 8787
 ENV NODE_ENV=production
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]

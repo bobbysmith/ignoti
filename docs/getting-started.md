@@ -39,7 +39,7 @@ docker compose up -d
 
 The server starts on port `8787`. Database migrations run automatically on first boot.
 
-> For a full list of configuration options see the [environment variable reference](../README.md#self-hosting).
+> For a full list of configuration options see the [environment variable reference](https://github.com/dipsettheory/ghostid#self-hosting).
 
 ---
 
@@ -65,7 +65,7 @@ export const ghost = new GhostID({
 ghost.init();
 ```
 
-`init()` is synchronous. The session private key stays in memory only — nothing is written to disk or localStorage.
+`init()` is synchronous. The session private key stays in memory only, nothing is written to disk or localStorage.
 
 ---
 
@@ -97,14 +97,15 @@ establishes an in-memory session.
 const { sessionId, expiresAt } = await ghost.login();
 ```
 
-The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from the httpOnly cookie — no passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
+The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from 
+the httpOnly cookie, no passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
 
 ---
 
 ## 6. Handle returning users
 
 On page load, call `restoreSession()` before rendering any authenticated UI. It sends a fresh keypair binding to the
-server, which validates the session cookie and re-establishes the in-memory session — no passkey prompt needed.
+server, which validates the session cookie and re-establishes the in-memory session, no passkey prompt needed.
 
 ```ts
 ghost.init();
@@ -137,7 +138,7 @@ All requests to your backend that require authentication must include a session 
 to get pre-built headers to attach to each request.
 
 ```ts
-const headers = await ghost.getSessionHeaders();
+const headers = await ghost.getSessionHeaders('GET', '/api/protected');
 
 const response = await fetch('https://myapp.com/api/protected', {
   headers,
@@ -208,7 +209,8 @@ Revoking the current session is equivalent to logging out - the in-memory sessio
 await ghost.logout();
 ```
 
-The session is revoked server-side (clearing the httpOnly cookie) and the in-memory key is wiped. If the server call fails, the local key is still wiped but the error is rethrown — the server session remains active. The user will need to authenticate again on success.
+The session is revoked server-side (clearing the httpOnly cookie) and the in-memory key is wiped. If the server call 
+fails, the local key is still wiped but the error is rethrown, the server session remains active. The user will need to authenticate again on success.
 
 ---
 

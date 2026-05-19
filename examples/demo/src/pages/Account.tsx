@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { Header } from '../components/Header';
 import { useSession } from '../context/session';
 import { ghost } from '../ghost';
-
-const TRACK_URL = 'https://soundcloud.com/lensldn/lens-boomtown-2024';
 
 export function Account() {
   const { session } = useSession();
@@ -94,25 +93,16 @@ export function Account() {
 
   return (
     <>
-      <header className="app-header">
-        <span className="app-header-logo">ghostid://rave</span>
-        <div className="app-header-actions">
+      <Header
+        slug="demo"
+        actions={
           <button type="button" className="link-btn" onClick={handleLogout} disabled={loggingOut}>
             {loggingOut ? 'leaving...' : 'leave'}
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <main className="app-main">
-        <div className="rave-embed-wrap">
-          <iframe
-            className="rave-embed"
-            src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(TRACK_URL)}&color=%23c8ff00&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`}
-            title="ghost rave"
-            allow="autoplay"
-          />
-        </div>
-
         <div className="dashboard-section">
           <h2>session</h2>
           <table>
