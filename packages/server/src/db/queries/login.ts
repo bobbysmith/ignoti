@@ -1,5 +1,5 @@
-import { CHALLENGE_PURPOSE } from '../../constants';
-import { sql } from '../client';
+import { CHALLENGE_PURPOSE } from '../../constants.js';
+import { sql } from '../client.js';
 
 export async function incrementSignCountWithChallenge(
   deviceId: string,
