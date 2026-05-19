@@ -5,7 +5,7 @@ import { signDeviceBindingJWS } from '@/api/root-jws.ts';
 import { deriveRootKeysFromMnemonic, generateMnemonic, toBase64 } from '@/core/crypto.ts';
 
 async function makeKeypair() {
-  const ks = await deriveRootKeysFromMnemonic(generateMnemonic());
+  const ks = await deriveRootKeysFromMnemonic(generateMnemonic().join(' '));
   return { privateKey: ks.signing.privateKey, publicKey: ks.signing.publicKey };
 }
 

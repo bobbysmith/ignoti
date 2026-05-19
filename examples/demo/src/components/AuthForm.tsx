@@ -14,7 +14,7 @@ export function AuthForm({
   onSwitchView: (v: AuthView) => void;
 }) {
   const mnemonicRef = useRef<HTMLInputElement>(null);
-  const [newMnemonic, setNewMnemonic] = useState<string | null>(null);
+  const [newMnemonic, setNewMnemonic] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

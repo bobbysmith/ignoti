@@ -160,7 +160,7 @@ export class GhostID {
     }
 
     const mnemonic = generateMnemonic();
-    const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
+    const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic.join(' '));
     const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
     const registerResponse = await this.apiClient.auth.registerUser({ rootPublicKey });

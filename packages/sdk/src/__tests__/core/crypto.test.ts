@@ -30,8 +30,8 @@ describe('crypto', () => {
   describe('generateMnemonic / validateMnemonic', () => {
     it('generates a valid 12-word mnemonic', () => {
       const m = generateMnemonic();
-      expect(m.split(' ').length).toBe(12);
-      expect(validateMnemonic(m)).toBe(true);
+      expect(m.length).toBe(12);
+      expect(validateMnemonic(m.join(' '))).toBe(true);
     });
 
     it('rejects invalid mnemonics', () => {
@@ -42,7 +42,7 @@ describe('crypto', () => {
 
   describe('deriveRootKeysFromMnemonic', () => {
     it('derives deterministic Ed25519 keypair', async () => {
-      const mnemonic = generateMnemonic();
+      const mnemonic = generateMnemonic().join(' ');
       const ks1 = await deriveRootKeysFromMnemonic(mnemonic);
       const ks2 = await deriveRootKeysFromMnemonic(mnemonic);
 
@@ -63,13 +63,13 @@ describe('crypto', () => {
     });
 
     it('different mnemonics produce different keys', async () => {
-      const ks1 = await deriveRootKeysFromMnemonic(generateMnemonic());
-      const ks2 = await deriveRootKeysFromMnemonic(generateMnemonic());
+      const ks1 = await deriveRootKeysFromMnemonic(generateMnemonic().join(' '));
+      const ks2 = await deriveRootKeysFromMnemonic(generateMnemonic().join(' '));
       expect(ks1.signing.publicKey).not.toEqual(ks2.signing.publicKey);
     });
 
     it('different versions produce different keys from the same mnemonic', async () => {
-      const mnemonic = generateMnemonic();
+      const mnemonic = generateMnemonic().join(' ');
       const ks1 = await deriveRootKeysFromMnemonic(mnemonic, 1);
       const ks2 = await deriveRootKeysFromMnemonic(mnemonic, 2);
       expect(ks1.signing.publicKey).not.toEqual(ks2.signing.publicKey);
@@ -81,7 +81,7 @@ describe('crypto', () => {
 
     it('wraps unexpected internal errors as GhostIDError (catch branch)', async () => {
       mockMnemonicToSeed.mockRejectedValueOnce(new Error('internal failure'));
-      await expect(deriveRootKeysFromMnemonic(generateMnemonic())).rejects.toBeInstanceOf(
+      await expect(deriveRootKeysFromMnemonic(generateMnemonic().join(' '))).rejects.toBeInstanceOf(
         GhostIDError
       );
     });
@@ -89,7 +89,7 @@ describe('crypto', () => {
     it('re-throws GhostIDError unchanged when thrown inside try (catch branch)', async () => {
       const original = new GhostIDError('already wrapped', ErrorCodes.CRYPTOGRAPHY_ERROR);
       mockMnemonicToSeed.mockRejectedValueOnce(original);
-      const thrown = await deriveRootKeysFromMnemonic(generateMnemonic()).catch(e => e);
+      const thrown = await deriveRootKeysFromMnemonic(generateMnemonic().join(' ')).catch(e => e);
       expect(thrown).toBe(original);
     });
   });

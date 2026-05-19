@@ -101,8 +101,8 @@ export function fromBase64(base64: string): Uint8Array {
   return base64UrlToBytes(base64);
 }
 
-export function generateMnemonic(): string {
-  return bip39GenerateMnemonic(wordlist, 128);
+export function generateMnemonic(): string[] {
+  return bip39GenerateMnemonic(wordlist, 128).split(' ');
 }
 
 export function validateMnemonic(mnemonic: string): boolean {

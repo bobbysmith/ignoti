@@ -155,7 +155,7 @@ function initializedSdk() {
 
 function stubCreateIdentityMocks(registerUserOptions = makeOptions()) {
   mockIsWebAuthnSupported.mockReturnValue(true);
-  mockGenerateMnemonic.mockReturnValue('word '.repeat(12).trim());
+  mockGenerateMnemonic.mockReturnValue('word '.repeat(12).trim().split(' '));
   mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
   mockRegisterUser.mockResolvedValue({ userId: 'user-1', options: registerUserOptions });
   mockCreatePasskey.mockResolvedValue(makePasskeyResponse());
@@ -225,7 +225,8 @@ describe('GhostID', () => {
       const g = initializedSdk();
       const result = await g.createIdentity();
 
-      expect(result.mnemonic).toBeTruthy();
+      expect(Array.isArray(result.mnemonic)).toBe(true);
+      expect(result.mnemonic.length).toBe(12);
       expect(result.userId).toBe('user-1');
       expect(result.deviceId).toBe('device-1');
       expect(mockRegisterUser).toHaveBeenCalledWith({ rootPublicKey: 'root-pub-b64' });

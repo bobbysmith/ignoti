@@ -255,7 +255,7 @@ export interface SessionInfo {
 }
 
 export interface CreateIdentityResult {
-  mnemonic: string;
+  mnemonic: string[];
   userId: string;
   deviceId: string;
 }
