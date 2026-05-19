@@ -53,7 +53,9 @@ Many auth systems store session tokens or JWTs in `localStorage`. Any script run
 
 ## CSRF is blocked by design
 
-The session cookie is `SameSite=Strict`. Browsers will not send it on cross-site requests, so a malicious page that tricks a user into clicking a link or submitting a form cannot make authenticated requests to your server on their behalf. There is no need for CSRF tokens or double-submit patterns.
+Every authenticated request must include a live Ed25519 signature produced by the session private key, which exists only in memory on the user's page. A malicious page on a different origin cannot read that key and cannot produce a valid signature. A forged request without a valid signature is rejected by the server regardless of whether the session cookie was sent.
+
+In production, the session cookie is `SameSite=None; Secure`, which is required for cross-origin deployments where your frontend and GhostID server are on different domains. The SameSite attribute alone is not the CSRF protection — the per-request signature is.
 
 ## Replay attacks are blocked
 

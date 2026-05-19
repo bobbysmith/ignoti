@@ -335,7 +335,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.setCookie(SESSION_COOKIE_NAME, session.id, {
         httpOnly: true,
         secure,
-        sameSite: 'strict',
+        sameSite: secure ? 'none' : 'lax',
         path: '/',
         maxAge: config.SESSION_TTL_SECONDS,
       });
