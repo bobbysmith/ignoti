@@ -5,12 +5,12 @@ import { Account } from './pages/Account';
 import { Demo } from './pages/Demo';
 
 export function App() {
-  const { session, restoring } = useSession();
+  const { session, restoring, persistedUserId } = useSession();
 
   if (restoring) {
     return (
       <div className="container">
-        <p>-</p>
+        <p>{persistedUserId ? `welcome back ${persistedUserId}` : '-'}</p>
       </div>
     );
   }

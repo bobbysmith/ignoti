@@ -18,6 +18,13 @@ export function AuthForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function parseError(e: unknown): string {
+    if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
+      return 'passkey canceled';
+    }
+    return (e as Error).message ?? 'something went wrong';
+  }
+
   async function handleLogin() {
     setLoading(true);
     setError(null);
@@ -25,7 +32,7 @@ export function AuthForm({
       const s = await ghost.login();
       onSession(s);
     } catch (e) {
-      setError((e as Error).message);
+      setError(parseError(e));
     } finally {
       setLoading(false);
     }
@@ -38,7 +45,7 @@ export function AuthForm({
       const result = await ghost.createIdentity();
       setNewMnemonic(result.mnemonic);
     } catch (e) {
-      setError((e as Error).message);
+      setError(parseError(e));
     } finally {
       setLoading(false);
     }
@@ -52,7 +59,7 @@ export function AuthForm({
       const s = await ghost.login();
       onSession(s);
     } catch (e) {
-      setError((e as Error).message);
+      setError(parseError(e));
     } finally {
       setLoading(false);
     }

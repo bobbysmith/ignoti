@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../context/session';
 import { ghost } from '../ghost';
 
@@ -11,7 +11,14 @@ export function Account() {
     null
   );
   const [loggingOut, setLoggingOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{
+    deviceId: string;
+    credentialId: string;
+  } | null>(null);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const mnemonicRef = useRef<HTMLInputElement>(null);
+  const [signedHeaders, setSignedHeaders] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
     ghost
@@ -31,7 +38,7 @@ export function Account() {
   async function handleRevokeSession(sessionId: string) {
     const currentSession = session;
     if (!currentSession) return;
-    setError(null);
+    setSessionError(null);
     try {
       await ghost.revokeSession(sessionId);
       if (sessionId === currentSession.sessionId) {
@@ -42,7 +49,28 @@ export function Account() {
         .then(setSessions)
         .catch(() => {});
     } catch (e) {
-      setError((e as Error).message);
+      setSessionError((e as Error).message);
+    }
+  }
+
+  async function handleRevokeDevice() {
+    if (!revokeTarget) return;
+    const mnemonic = mnemonicRef.current?.value ?? '';
+    setDeviceError(null);
+    try {
+      await ghost.revokeDevice(
+        revokeTarget.deviceId,
+        mnemonic,
+        session?.userId ?? '',
+        revokeTarget.credentialId
+      );
+      setRevokeTarget(null);
+      ghost
+        .getDevices()
+        .then(setDevices)
+        .catch(() => {});
+    } catch (e) {
+      setDeviceError((e as Error).message);
     }
   }
 
@@ -52,6 +80,15 @@ export function Account() {
       await ghost.logout();
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleSignRequest() {
+    try {
+      const headers = await ghost.getSessionHeaders('GET', '/api/my-app/feed');
+      setSignedHeaders(headers);
+    } catch {
+      setSignedHeaders(null);
     }
   }
 
@@ -101,7 +138,24 @@ export function Account() {
         </div>
 
         <div className="dashboard-section">
+          <h2>session signing</h2>
+          <p>
+            Call <code>getSessionHeaders</code> to authenticate requests from your app to your own
+            backend. GhostID&apos;s server middleware validates the resulting headers.
+          </p>
+          <button type="button" onClick={handleSignRequest}>
+            → sign GET /api/my-app/feed
+          </button>
+          {signedHeaders && (
+            <pre style={{ marginTop: '1rem', overflowX: 'auto' }}>
+              {JSON.stringify(signedHeaders, null, 2)}
+            </pre>
+          )}
+        </div>
+
+        <div className="dashboard-section">
           <h2>devices</h2>
+          {deviceError && <p style={{ color: 'var(--error-color)' }}>error: {deviceError}</p>}
           {devices === null ? (
             <p>loading...</p>
           ) : devices.length === 0 ? (
@@ -113,15 +167,46 @@ export function Account() {
                   <th>name</th>
                   <th>registered</th>
                   <th>last used</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {devices.map(d => (
-                  <tr key={d.id}>
-                    <td>{d.deviceName ?? 'unnamed'}</td>
-                    <td>{new Date(d.createdAt).toLocaleString()}</td>
-                    <td>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleString() : '—'}</td>
-                  </tr>
+                  <>
+                    <tr key={d.id}>
+                      <td>{d.deviceName ?? 'unnamed'}</td>
+                      <td>{new Date(d.createdAt).toLocaleString()}</td>
+                      <td>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleString() : '—'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRevokeTarget(
+                              revokeTarget?.deviceId === d.id
+                                ? null
+                                : { deviceId: d.id, credentialId: d.credentialId }
+                            )
+                          }
+                        >
+                          {revokeTarget?.deviceId === d.id ? 'cancel' : 'revoke'}
+                        </button>
+                      </td>
+                    </tr>
+                    {revokeTarget?.deviceId === d.id && (
+                      <tr key={`${d.id}-revoke`}>
+                        <td colSpan={4}>
+                          <input
+                            ref={mnemonicRef}
+                            placeholder="enter recovery phrase to confirm"
+                            style={{ width: '100%' }}
+                          />
+                          <button type="button" onClick={handleRevokeDevice}>
+                            → confirm revoke
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -130,7 +215,7 @@ export function Account() {
 
         <div className="dashboard-section">
           <h2>sessions</h2>
-          {error && <p style={{ color: 'var(--error-color)' }}>error: {error}</p>}
+          {sessionError && <p style={{ color: 'var(--error-color)' }}>error: {sessionError}</p>}
           {sessions === null ? (
             <p>loading...</p>
           ) : sessions.length === 0 ? (
@@ -142,7 +227,7 @@ export function Account() {
                   <th>session</th>
                   <th>created</th>
                   <th>expires</th>
-                  <th></th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
