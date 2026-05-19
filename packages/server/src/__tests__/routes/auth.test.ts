@@ -818,7 +818,7 @@ describe('auth', () => {
         });
       });
 
-      it('sets httpOnly SameSite=Strict session cookie with sessionId', async () => {
+      it('sets httpOnly SameSite=Lax session cookie with sessionId', async () => {
         const session = makeSession();
         vi.mocked(insertSession).mockResolvedValue(session);
         const res = await postSession();
@@ -826,7 +826,7 @@ describe('auth', () => {
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
         expect(cookieStr).toContain(`ghostid_session=${session.id}`);
         expect(cookieStr).toContain('HttpOnly');
-        expect(cookieStr).toContain('SameSite=Strict');
+        expect(cookieStr).toContain('SameSite=Lax');
         expect(cookieStr).toContain('Path=/');
         expect(cookieStr).toContain('Max-Age=86400');
         expect(cookieStr).not.toContain('Secure');
