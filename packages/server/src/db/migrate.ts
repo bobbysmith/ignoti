@@ -46,7 +46,7 @@ async function runMigration(filename: string, content: string, hash: string): Pr
   });
 }
 
-async function main(): Promise<void> {
+export async function runMigrations(): Promise<void> {
   await bootstrap();
 
   const applied = await getApplied();
@@ -78,10 +78,13 @@ async function main(): Promise<void> {
   }
   // biome-ignore lint/suspicious/noConsole: <until logs added>
   console.log(ran > 0 ? `\n${ran} migration(s) applied.` : '\nNo new migrations.');
-  await sql.end();
 }
 
-main().catch(err => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runMigrations()
+    .then(() => sql.end())
+    .catch(err => {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    });
+}

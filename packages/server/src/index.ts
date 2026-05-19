@@ -46,6 +46,7 @@ export async function buildServer() {
   await app.register(rateLimit, {
     max: RATE_LIMITS.DEFAULT.max,
     timeWindow: RATE_LIMITS.DEFAULT.timeWindow,
+    allowList: config.RATE_LIMIT_DISABLED ? () => true : undefined,
   });
 
   registerSessionAuthPlugin(app);

@@ -45,6 +45,10 @@ const envSchema = z.object({
     .string()
     .default('true')
     .transform(v => v.toLowerCase() !== 'false'),
+  RATE_LIMIT_DISABLED: z
+    .string()
+    .default('false')
+    .transform(v => v.toLowerCase() === 'true'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

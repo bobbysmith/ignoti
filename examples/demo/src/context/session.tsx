@@ -16,8 +16,8 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [persistedUserId, setPersistedUserId] = useState<string | null>(
-    () => localStorage.getItem(STORAGE_KEY)
+  const [persistedUserId, setPersistedUserId] = useState<string | null>(() =>
+    localStorage.getItem(STORAGE_KEY)
   );
   const restored = useRef(false);
 
