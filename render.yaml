@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: ghostid-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ghostid-db
+          property: connectionString
+      - key: RP_ID
+        sync: false
+      - key: RP_ORIGIN
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: DB_PREPARE
+        value: false
+
+databases:
+  - name: ghostid-db
+    databaseName: ghostid
+    user: ghostid
