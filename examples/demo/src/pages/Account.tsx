@@ -93,16 +93,23 @@ export function Account() {
 
   return (
     <>
-      <Header
-        slug="demo"
-        actions={
-          <button type="button" className="link-btn" onClick={handleLogout} disabled={loggingOut}>
-            {loggingOut ? 'leaving...' : 'leave'}
-          </button>
-        }
-      />
+      <Header slug="demo" />
 
       <main className="app-main">
+        <div
+          className="dashboard-section"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}
+        >
+          <button
+            type="button"
+            className="link-btn"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            style={{ marginLeft: 'auto' }}
+          >
+            {loggingOut ? 'leaving...' : '→ leave'}
+          </button>
+        </div>
         <div className="dashboard-section">
           <h2>session</h2>
           <table>
