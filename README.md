@@ -144,8 +144,10 @@ GhostID requires Postgres 14 or later. When using Docker Compose, a Postgres con
 run automatically on startup. To run migrations manually against an external database:
 
 ```bash
-docker run --rm -e DATABASE_URL=postgres://... ghostid/server node dist/db/migrate.js
+docker run --rm -e DATABASE_URL=postgres://... ghostid/server:latest node dist/db/migrate.js
 ```
+
+The server image is published to Docker Hub as `ghostid/server`. You can also build it yourself from the repo root with `docker build -t ghostid/server .`
 
 **Database maintenance:**
 
