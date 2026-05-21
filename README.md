@@ -1,6 +1,6 @@
 # GhostID
 
-![CI](https://github.com/dipsettheory/ghostid/actions/workflows/ci.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![npm](https://img.shields.io/npm/v/ghostid)
+[![CI](https://github.com/dipsettheory/ghostid/actions/workflows/ci.yml/badge.svg)](https://github.com/dipsettheory/ghostid/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![npm](https://img.shields.io/npm/v/ghostid)](https://www.npmjs.com/package/ghostid)
 
 **A free, open-source, self-hosted authentication platform. A privacy-first alternative to auth that treats your users as the product.**
 
