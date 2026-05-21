@@ -119,7 +119,7 @@ management. Your database stores only public keys and opaque identifiers.
 GhostID is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in 
 your infrastructure. GhostID never has access to it.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dipsettheory/ghostid)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dipsettheory/ghostid) [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/dipsettheory/ghostid)
 
 **Environment variables:**
 
