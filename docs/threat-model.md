@@ -72,12 +72,16 @@ Sessions are bound to an ephemeral public key registered at login. Every authori
 corresponding private key, which never leaves the client. A stolen session ID alone cannot be replayed - the 
 attacker would also need the in-memory private key.
 
-Session persistence across page reloads is handled by an httpOnly, Secure, SameSite=Strict cookie containing the 
-session token. JavaScript on the page cannot read this cookie - a successful XSS cannot exfiltrate it. On reload, 
-the SDK calls the restore endpoint with the cookie and generates a fresh ephemeral keypair; the private key is 
-never written to disk or localStorage. A stolen cookie cannot be used to forge signed API requests, and CSRF is 
-blocked by SameSite=Strict. The only viable attack surface for the cookie is a network-level attacker, which TLS 
-prevents. **Mitigation: signed-request sessions with ephemeral keys; httpOnly cookie for session restore.**
+Session persistence across page reloads is handled by an httpOnly, Secure cookie containing the session token. 
+JavaScript on the page cannot read this cookie - a successful XSS cannot exfiltrate it. On reload, the SDK calls 
+the restore endpoint with the cookie and generates a fresh ephemeral keypair; the private key is never written to 
+disk or localStorage. A stolen cookie cannot be used to forge signed API requests because every request also 
+requires a live Ed25519 signature from the session private key, which exists only in memory on the original page. 
+The SameSite policy is `None` in production (required for cross-origin deployments where the frontend and the 
+GhostID server run on different domains) and `Lax` in local development. CSRF protection comes from the per-request 
+signature, not the SameSite attribute; a forged request without a valid signature is rejected regardless of whether 
+the cookie was sent. The only viable attack surface for the cookie is a network-level attacker, which TLS prevents. 
+**Mitigation: signed-request sessions with ephemeral keys; httpOnly cookie for session restore.**
 
 ### Replay attacks (A1)
 Every challenge is single-use, scoped to a purpose (`register`, `login`, `recover`, `session`), and expires within 
@@ -164,8 +168,10 @@ These are not optional. A deployment that violates them is not implementing the 
 4. **Constant-time comparisons** for any signature/public-key check.
 5. **Challenge GC.** Expired challenges must be deleted, not just marked consumed.
 6. **No silent migrations.** Schema changes that could leak data require a documented migration path.
-7. **Cookie security.** The session cookie must remain httpOnly, Secure, and SameSite=Strict. Do not expose 
-   the session token via any other channel (response body, URL parameter, log line).
+7. **Cookie security.** The session cookie must remain httpOnly and Secure in production. SameSite is `None` for 
+   cross-origin deployments (the typical case) and `Lax` for local development; CSRF protection comes from the 
+   per-request signature, not SameSite. Do not expose the session token via any other channel (response body, 
+   URL parameter, log line).
 
 ## 9. Open questions / future work
 
