@@ -118,6 +118,15 @@ describe('Auth passkey', () => {
       const result = await createPasskey({} as never);
       expect(result.response.transports).toBeUndefined();
     });
+
+    it('handles missing authenticatorAttachment gracefully', async () => {
+      const response = makeAttestationResponse();
+      const cred = makeCredential(response, { authenticatorAttachment: undefined });
+      vi.stubGlobal('window', { PublicKeyCredential: class {} });
+      vi.stubGlobal('navigator', { credentials: { create: vi.fn().mockResolvedValue(cred) } });
+      const result = await createPasskey({} as never);
+      expect(result.authenticatorAttachment).toBeUndefined();
+    });
   });
 
   describe('getPasskeyAssertion', () => {
@@ -158,6 +167,15 @@ describe('Auth passkey', () => {
         credentials: { get: vi.fn().mockRejectedValue(new Error('cancelled')) },
       });
       await expect(getPasskeyAssertion({} as never)).rejects.toThrow(GhostIDError);
+    });
+
+    it('handles missing authenticatorAttachment gracefully', async () => {
+      const response = makeAssertionResponse();
+      const cred = makeCredential(response, { authenticatorAttachment: undefined });
+      vi.stubGlobal('window', { PublicKeyCredential: class {} });
+      vi.stubGlobal('navigator', { credentials: { get: vi.fn().mockResolvedValue(cred) } });
+      const result = await getPasskeyAssertion({} as never);
+      expect(result.authenticatorAttachment).toBeUndefined();
     });
   });
 });

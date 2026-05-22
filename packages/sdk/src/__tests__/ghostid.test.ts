@@ -760,6 +760,14 @@ describe('GhostID', () => {
       g.init();
       await expect(g.logout()).resolves.toBeUndefined();
     });
+
+    it('is idempotent and safe to call multiple times', async () => {
+      const g = sdk();
+      g.init();
+      g.init();
+      g.init();
+      await expect(g.logout()).resolves.toBeUndefined();
+    });
   });
 
   describe('guessDeviceName fallback', () => {

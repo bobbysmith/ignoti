@@ -160,6 +160,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       const credentialIdB64 = credential.id;
       const credentialPubKeyB64 = Buffer.from(credential.publicKey).toString('base64url');
 
+      const rawTransports = registrationResponse.response.transports as string[] | undefined;
+      const transports = rawTransports && rawTransports.length > 0 ? rawTransports : null;
+
       let device: Awaited<ReturnType<typeof insertDevice>>;
       try {
         device = await insertDevice({
@@ -167,7 +170,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           credentialId: credentialIdB64,
           passkeyPublicKey: credentialPubKeyB64,
           signCount: credential.counter ?? 0,
-          transports: (registrationResponse.response.transports ?? null) as string[] | null,
+          transports,
           deviceName: deviceName ?? null,
         });
       } catch (err) {

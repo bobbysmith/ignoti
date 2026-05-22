@@ -8,7 +8,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/index.ts', 'src/db/migrate.ts', 'src/db/schema.sql'],
+      exclude: [
+        'src/index.ts',
+        'src/db/migrate.ts',
+        'src/db/schema.sql',
+        'src/__tests__/integration/**',
+      ],
       thresholds: {
         lines: 100,
         functions: 100,

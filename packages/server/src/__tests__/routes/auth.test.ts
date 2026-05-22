@@ -481,6 +481,16 @@ describe('auth', () => {
         expect(insertDevice).toHaveBeenCalledWith(expect.objectContaining({ transports }));
       });
 
+      it('stores transports as null when response.transports is an empty array', async () => {
+        await registerDevice({
+          registrationResponse: {
+            ...VALID_REGISTRATION_RESPONSE,
+            response: { ...VALID_REGISTRATION_RESPONSE.response, transports: [] },
+          },
+        });
+        expect(insertDevice).toHaveBeenCalledWith(expect.objectContaining({ transports: null }));
+      });
+
       it('stores deviceName when provided', async () => {
         await registerDevice({ deviceName: 'My Phone' });
         expect(insertDevice).toHaveBeenCalledWith(
@@ -830,6 +840,23 @@ describe('auth', () => {
         expect(cookieStr).toContain('Path=/');
         expect(cookieStr).toContain('Max-Age=86400');
         expect(cookieStr).not.toContain('Secure');
+      });
+
+      it('sets SameSite=None and Secure when COOKIE_SECURE is true', async () => {
+        const { config } = await import('../../config.js');
+        const original = (config as Record<string, unknown>).COOKIE_SECURE;
+        (config as Record<string, unknown>).COOKIE_SECURE = true;
+        try {
+          const session = makeSession();
+          vi.mocked(insertSession).mockResolvedValue(session);
+          const res = await postSession();
+          const raw = res.headers['set-cookie'];
+          const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+          expect(cookieStr).toContain('SameSite=None');
+          expect(cookieStr).toContain('Secure');
+        } finally {
+          (config as Record<string, unknown>).COOKIE_SECURE = original;
+        }
       });
     });
   });

@@ -127,6 +127,12 @@ describe('code api', () => {
       await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow('timed out');
     });
 
+    it('wraps non-Error fetch rejections', async () => {
+      const client = makeClient({ retryAttempts: 1 });
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue('network down'));
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+    });
+
     it('throws on invalid path', async () => {
       const client = makeClient();
       await expect(client.makeRequest('GET', '')).rejects.toThrow(GhostIDError);
