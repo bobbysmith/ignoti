@@ -597,6 +597,14 @@ describe('auth', () => {
         expect(res.statusCode).toBe(404);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.DEVICE_NOT_FOUND });
       });
+
+      it('returns 401 when device.sign_count exceeds Number.MAX_SAFE_INTEGER', async () => {
+        const device = { ...makeDevice(), sign_count: BigInt(Number.MAX_SAFE_INTEGER) + 1n };
+        vi.mocked(getDeviceByCredentialId).mockResolvedValue(device as never);
+        const res = await login();
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.ASSERTION_VERIFICATION_FAILED });
+      });
     });
 
     describe('challenge extraction', () => {

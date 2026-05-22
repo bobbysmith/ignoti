@@ -233,6 +233,14 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return sendError(reply, 404, ERROR_CODES.DEVICE_NOT_FOUND);
     }
 
+    if (device.sign_count > BigInt(Number.MAX_SAFE_INTEGER)) {
+      req.log.warn(
+        { deviceId: device.id },
+        'sign_count exceeds Number.MAX_SAFE_INTEGER, refusing to coerce'
+      );
+      return sendError(reply, 401, ERROR_CODES.ASSERTION_VERIFICATION_FAILED);
+    }
+
     let expectedChallenge: string;
     try {
       expectedChallenge = extractChallenge(assertion);
