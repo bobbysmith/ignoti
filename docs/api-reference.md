@@ -306,6 +306,14 @@ Throws:
 
 ## Types
 
+Types are exported from the main entry or the dedicated types entry:
+
+```ts
+import type { SessionInfo, DeviceInfo, SessionListItem } from 'ghostid';
+// or
+import type { SessionInfo, DeviceInfo, SessionListItem } from 'ghostid/types';
+```
+
 ### `GhostIDOptions`
 
 ```ts
