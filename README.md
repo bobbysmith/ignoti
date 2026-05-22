@@ -138,7 +138,24 @@ your infrastructure. GhostID never has access to it.
 | `HOST`                  | No       | `0.0.0.0`               | Network interface to bind to.                                                                                         |
 | `LOG_LEVEL`             | No       | `info`                  | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`.                                            |
 | `COOKIE_SECURE`         | No       | `true`                  | Set to `false` in local development when not using HTTPS.                                                             |
-| `RATE_LIMIT_DISABLED`   | No       | `false`                 | Set to `true` to disable rate limiting. For testing only — never disable in production.                               |
+| `RATE_LIMIT_DISABLED`   | No       | `false`                 | Set to `true` to disable rate limiting. For testing only, never disable in production.                                |
+
+**Cross-subdomain auth:**
+
+To share auth across multiple subdomains of the same registrable domain, set `RP_ID` to the parent domain and list every subdomain origin in `RP_ORIGIN`:
+
+```bash
+RP_ID=example.com
+RP_ORIGIN=https://app.example.com,https://admin.example.com,https://staging.example.com
+```
+
+A passkey registered on one subdomain works on every subdomain listed in `RP_ORIGIN`. WebAuthn requires `RP_ID` to 
+be either the exact hostname or a registrable suffix of every origin. The server enforces this match at verification 
+time.
+
+**Session signature timing:**
+
+Every authenticated request includes a signed timestamp. The server accepts signatures within a 60-second window to absorb normal clock skew. If your deployment has clients with persistently skewed clocks (more than a minute off), authenticated requests will fail with `SESSION_TIMESTAMP_OUT_OF_RANGE`. This window is currently a server-side constant in `src/constants.ts`; surface it as an env var if you need a different tolerance.
 
 **Database:**
 
@@ -159,6 +176,19 @@ least daily using your database's job scheduler.
 ```sql
 select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
 ```
+
+**Backups:**
+
+GhostID stores no PII, but losing the database means every registered user loses access to their account. The mnemonic alone is not enough to recover without a server record of the root public key. Back up regularly.
+
+A nightly `pg_dump` is the minimum:
+
+```bash
+pg_dump "$DATABASE_URL" --no-owner --no-privileges -Fc -f ghostid-$(date +%F).dump
+```
+
+For production, use your platform's native point-in-time recovery (Supabase, RDS, and most managed Postgres 
+providers include this) and verify a restore at least once before going live. Back up at least hourly so you never lose more than an hour of new registrations, and test your restore process so you know how long it takes to come back online. Until the database is restored, users cannot log in.
 
 ---
 

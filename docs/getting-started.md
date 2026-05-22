@@ -129,6 +129,26 @@ if (session) {
 - The user has never logged in on this device
 - The session has expired
 - The user logged out
+- The session cookie was cleared (browser storage wiped, incognito tab closed, device reset)
+
+The last case is worth handling explicitly. The session cookie is `httpOnly` and stored by the browser. If the user 
+clears site data, switches browsers, or wipes the device, the cookie is gone and `restoreSession()` will throw 
+`NO_KEYS`. The user is not logged out from the server's perspective until that session expires or is revoked, but 
+from the user's perspective they need to authenticate again. Show your login UI and let them tap their passkey. No 
+mnemonic needed unless they've lost the device entirely.
+
+```ts
+try {
+  await ghost.restoreSession();
+} catch (err) {
+  if (err instanceof GhostIDError && err.code === ErrorCodes.NO_KEYS) {
+    // session cookie missing or invalid, prompt for passkey
+    renderLoginScreen();
+    return;
+  }
+  throw err;
+}
+```
 
 ---
 
