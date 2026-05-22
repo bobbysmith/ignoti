@@ -107,6 +107,9 @@ export class GhostID {
   }
 
   init(): void {
+    if (this.initialized) {
+      return;
+    }
     this.initialized = true;
   }
 
