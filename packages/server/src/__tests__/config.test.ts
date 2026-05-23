@@ -102,7 +102,7 @@ describe('config', () => {
 
   describe('RP_ORIGIN', () => {
     it('parses a single origin into a one-element array', async () => {
-      stubEnv({ RP_ORIGIN: MOCK_URL });
+      stubEnv({ RP_ID: 'example.com', RP_ORIGIN: MOCK_URL });
       const config = await loadConfig();
       expect(config.RP_ORIGIN).toEqual([MOCK_URL]);
     });
@@ -115,19 +115,28 @@ describe('config', () => {
     });
 
     it('splits a comma-separated list into multiple origins', async () => {
-      stubEnv({ RP_ORIGIN: 'https://app.example.com,https://staging.example.com' });
+      stubEnv({
+        RP_ID: 'example.com',
+        RP_ORIGIN: 'https://app.example.com,https://staging.example.com',
+      });
       const config = await loadConfig();
       expect(config.RP_ORIGIN).toEqual([MOCK_URL, MOCK_STAGING_URL]);
     });
 
     it('trims whitespace around each entry', async () => {
-      stubEnv({ RP_ORIGIN: '  https://app.example.com  ,  https://staging.example.com  ' });
+      stubEnv({
+        RP_ID: 'example.com',
+        RP_ORIGIN: '  https://app.example.com  ,  https://staging.example.com  ',
+      });
       const config = await loadConfig();
       expect(config.RP_ORIGIN).toEqual([MOCK_URL, MOCK_STAGING_URL]);
     });
 
     it('filters out empty entries produced by trailing commas', async () => {
-      stubEnv({ RP_ORIGIN: 'https://app.example.com,,https://staging.example.com,' });
+      stubEnv({
+        RP_ID: 'example.com',
+        RP_ORIGIN: 'https://app.example.com,,https://staging.example.com,',
+      });
       const config = await loadConfig();
       expect(config.RP_ORIGIN).toEqual([MOCK_URL, MOCK_STAGING_URL]);
     });
@@ -198,7 +207,7 @@ describe('config', () => {
     });
 
     it('uses the provided RP_ID value', async () => {
-      stubEnv({ RP_ID: 'app.example.com' });
+      stubEnv({ RP_ID: 'app.example.com', RP_ORIGIN: 'https://app.example.com' });
       const config = await loadConfig();
       expect(config.RP_ID).toBe('app.example.com');
     });
@@ -215,6 +224,53 @@ describe('config', () => {
       stubEnv({ RP_NAME: 'My App' });
       const config = await loadConfig();
       expect(config.RP_NAME).toBe('My App');
+    });
+  });
+
+  describe('RP_ID/RP_ORIGIN cross-validation', () => {
+    it('accepts an origin whose hostname matches RP_ID exactly', async () => {
+      stubEnv({ RP_ID: 'example.com', RP_ORIGIN: 'https://example.com' });
+      const config = await loadConfig();
+      expect(config.RP_ORIGIN).toEqual(['https://example.com']);
+    });
+
+    it('accepts an origin whose hostname is a subdomain of RP_ID', async () => {
+      stubEnv({ RP_ID: 'example.com', RP_ORIGIN: 'https://app.example.com' });
+      const config = await loadConfig();
+      expect(config.RP_ORIGIN).toEqual(['https://app.example.com']);
+    });
+
+    it('accepts multiple subdomains of the same RP_ID', async () => {
+      stubEnv({
+        RP_ID: 'example.com',
+        RP_ORIGIN: 'https://app.example.com,https://admin.example.com',
+      });
+      const config = await loadConfig();
+      expect(config.RP_ORIGIN).toHaveLength(2);
+    });
+
+    it('throws when an origin hostname does not derive from RP_ID', async () => {
+      stubEnv({ RP_ID: 'example.com', RP_ORIGIN: 'https://other.com' });
+      await expect(loadConfig()).rejects.toThrow(/derive from RP_ID/);
+    });
+
+    it('throws when one origin in a list does not derive from RP_ID', async () => {
+      stubEnv({
+        RP_ID: 'example.com',
+        RP_ORIGIN: 'https://app.example.com,https://attacker.com',
+      });
+      await expect(loadConfig()).rejects.toThrow(/derive from RP_ID/);
+    });
+
+    it('rejects a near-miss where the suffix matches without a dot boundary', async () => {
+      stubEnv({ RP_ID: 'example.com', RP_ORIGIN: 'https://notexample.com' });
+      await expect(loadConfig()).rejects.toThrow(/derive from RP_ID/);
+    });
+
+    it('accepts localhost when RP_ID is localhost', async () => {
+      stubEnv({ RP_ID: 'localhost', RP_ORIGIN: 'http://localhost:5173' });
+      const config = await loadConfig();
+      expect(config.RP_ORIGIN).toEqual(['http://localhost:5173']);
     });
   });
 });

@@ -58,4 +58,21 @@ if (!result.success) {
   throw new Error(`Invalid environment configuration:\n${lines.join('\n')}`);
 }
 
+function originMatchesRpId(originStr: string, rpId: string): boolean {
+  const hostname = new URL(originStr).hostname;
+  return hostname === rpId || hostname.endsWith(`.${rpId}`);
+}
+
+const mismatched = result.data.RP_ORIGIN.filter(
+  origin => !originMatchesRpId(origin, result.data.RP_ID)
+);
+if (mismatched.length > 0) {
+  throw new Error(
+    `Invalid environment configuration:\n` +
+      `  RP_ORIGIN entries must derive from RP_ID="${result.data.RP_ID}". ` +
+      `WebAuthn rejects any origin whose hostname is not exactly RP_ID or a subdomain of it.\n` +
+      `  Mismatched: ${mismatched.join(', ')}`
+  );
+}
+
 export const config = result.data;
