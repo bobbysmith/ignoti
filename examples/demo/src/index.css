@@ -22,6 +22,8 @@
   --text-lg: 1.125rem;
 
   --header-height: 80px;
+
+  --font-stack: "Menlo", "Monaco", "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", monspace;
 }
 
 * {
