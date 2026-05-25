@@ -101,3 +101,15 @@ export async function revokeSessionForUser(sessionId: string, userId: string): P
   `;
   return row !== undefined;
 }
+
+export async function revokeAllSessionsForUser(userId: string): Promise<number> {
+  const rows = await sql<{ id: string }[]>`
+    update sessions set revoked_at = now()
+    where revoked_at is null
+      and device_id in (
+        select id from devices where user_id = ${userId} and revoked_at is null
+      )
+    returning id
+  `;
+  return rows.length;
+}

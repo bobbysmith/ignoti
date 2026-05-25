@@ -5,6 +5,7 @@ import {
   getSessionWithUser,
   insertSession,
   rebindSessionPublicKey,
+  revokeAllSessionsForUser,
   revokeSessionForUser,
   touchSession,
 } from '../../../db/queries/sessions.js';
@@ -208,6 +209,34 @@ describe('sessions db queries', () => {
       await revokeSessionForUser(SESSION_ID, USER_ID);
       const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
       expect(query.join('')).toContain('revoked_at is null');
+    });
+  });
+
+  describe('revokeAllSessionsForUser', () => {
+    it('returns the number of sessions revoked', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([{ id: 's1' }, { id: 's2' }, { id: 's3' }] as never);
+      await expect(revokeAllSessionsForUser(USER_ID)).resolves.toBe(3);
+    });
+
+    it('returns 0 when the user has no active sessions', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(revokeAllSessionsForUser(USER_ID)).resolves.toBe(0);
+    });
+
+    it('passes userId to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await revokeAllSessionsForUser(USER_ID);
+      const args = vi.mocked(sql).mock.calls[0];
+      expect(args).toEqual(expect.arrayContaining([USER_ID]));
+    });
+
+    it('query scopes to devices the user owns', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await revokeAllSessionsForUser(USER_ID);
+      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
+      const joined = query.join('');
+      expect(joined).toContain('revoked_at is null');
+      expect(joined).toContain('select id from devices');
     });
   });
 });

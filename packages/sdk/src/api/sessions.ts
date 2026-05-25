@@ -101,4 +101,34 @@ export class SessionsApiClient extends BaseApiClient {
       }
     );
   }
+
+  async revokeAllSessions(
+    sessionId: string,
+    iat: number,
+    signature: string,
+    jti: string
+  ): Promise<{ revoked: number }> {
+    const validatedSessionId = validateString(
+      sessionId,
+      'sessionId',
+      VALIDATION.MAX_SESSION_TOKEN_LENGTH
+    );
+    const validatedSignature = validateString(
+      signature,
+      'signature',
+      VALIDATION.MAX_SIGNATURE_LENGTH
+    );
+
+    return this.makeRequest<{ revoked: number }>(
+      HTTP_METHODS.DELETE,
+      API_ENDPOINTS.SESSIONS.LIST,
+      undefined,
+      {
+        [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${validatedSessionId}`,
+        [HTTP_HEADERS.SESSION_NONCE]: jti,
+        [HTTP_HEADERS.SESSION_TIMESTAMP]: String(iat),
+        [HTTP_HEADERS.SESSION_SIGNATURE]: validatedSignature,
+      }
+    );
+  }
 }

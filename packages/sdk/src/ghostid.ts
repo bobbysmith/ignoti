@@ -427,6 +427,32 @@ export class GhostID {
   }
 
   /**
+   * Revokes every active session for the current user across all devices,
+   * including this one. Devices remain registered so the user can log back
+   * in with any of their passkeys. The current session is cleared and
+   * `onSessionChange` fires with null.
+   */
+  async revokeAllSessions(): Promise<void> {
+    this.ensureInitialized();
+    if (!this.session) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    const { sessionId } = this.session;
+    const iat = Math.floor(Date.now() / 1000);
+    const jti = crypto.randomUUID();
+    const signature = await this.signWithSessionKey({
+      htm: 'DELETE',
+      htu: API_ENDPOINTS.SESSIONS.LIST,
+      iat,
+      jti,
+      sessionId,
+    });
+    await this.apiClient.sessions.revokeAllSessions(sessionId, iat, signature, jti);
+    this.session = null;
+    this.notifySessionChange();
+  }
+
+  /**
    * Returns information about the active session, or null if logged out.
    * The session private key is intentionally not exposed.
    */

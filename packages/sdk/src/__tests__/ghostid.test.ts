@@ -51,6 +51,7 @@ const {
   mockRevokeDevice,
   mockGetSessions,
   mockRevokeSession,
+  mockRevokeAllSessions,
 } = vi.hoisted(() => ({
   mockApiClientSignRequest: vi.fn(),
   mockRegisterUser: vi.fn(),
@@ -64,6 +65,7 @@ const {
   mockRevokeDevice: vi.fn(),
   mockGetSessions: vi.fn(),
   mockRevokeSession: vi.fn(),
+  mockRevokeAllSessions: vi.fn(),
 }));
 
 vi.mock('@/core/crypto.ts', () => ({
@@ -99,6 +101,7 @@ vi.mock('@/api/client.ts', () => {
     sessions = {
       getSessions: mockGetSessions,
       revokeSession: mockRevokeSession,
+      revokeAllSessions: mockRevokeAllSessions,
     };
     static signRequest = mockApiClientSignRequest;
     static verifyRequest = vi.fn();
@@ -468,6 +471,35 @@ describe('GhostID', () => {
       mockRevokeSession.mockResolvedValue({ ok: true });
       await g.revokeSession(sessionId);
       expect(g.getSession()).toBeNull();
+    });
+  });
+
+  describe('revokeAllSessions', () => {
+    it('throws NO_KEYS when no active session', async () => {
+      const g = initializedSdk();
+      await expect(g.revokeAllSessions()).rejects.toThrow(GhostIDError);
+    });
+
+    it('calls the API with signed session headers', async () => {
+      const { g, sessionId } = await withSession();
+      mockRevokeAllSessions.mockResolvedValue({ revoked: 3 });
+      await g.revokeAllSessions();
+      expect(mockRevokeAllSessions).toHaveBeenCalledWith(
+        sessionId,
+        expect.any(Number),
+        'sig-abc',
+        expect.any(String)
+      );
+    });
+
+    it('clears local session and fires onSessionChange with null', async () => {
+      const { g } = await withSession();
+      mockRevokeAllSessions.mockResolvedValue({ revoked: 2 });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+      await g.revokeAllSessions();
+      expect(g.getSession()).toBeNull();
+      expect(cb).toHaveBeenCalledWith(null);
     });
   });
 

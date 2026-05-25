@@ -4,7 +4,11 @@ import Fastify from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ERROR_CODES } from '../../constants';
-import { getSessionsForUser, revokeSessionForUser } from '../../db/queries/sessions.js';
+import {
+  getSessionsForUser,
+  revokeAllSessionsForUser,
+  revokeSessionForUser,
+} from '../../db/queries/sessions.js';
 import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
 import { registerSessionRoutes } from '../../routes/sessions.js';
 
@@ -65,6 +69,7 @@ describe('sessions', () => {
     });
     vi.mocked(getSessionsForUser).mockReset();
     vi.mocked(revokeSessionForUser).mockReset();
+    vi.mocked(revokeAllSessionsForUser).mockReset();
   });
 
   describe('GET /api/sessions', () => {
@@ -188,6 +193,40 @@ describe('sessions', () => {
         const res = await deleteSession(OTHER_SESSION_ID);
         expect(res.headers['set-cookie']).toBeUndefined();
       });
+    });
+  });
+
+  describe('DELETE /api/sessions', () => {
+    function deleteAllSessions() {
+      return app.inject({ method: 'DELETE', url: '/api/sessions' });
+    }
+
+    it('returns 200 with the number of revoked sessions', async () => {
+      vi.mocked(revokeAllSessionsForUser).mockResolvedValue(4);
+      const res = await deleteAllSessions();
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ revoked: 4 });
+    });
+
+    it('returns 0 when the user has no other active sessions', async () => {
+      vi.mocked(revokeAllSessionsForUser).mockResolvedValue(0);
+      const res = await deleteAllSessions();
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ revoked: 0 });
+    });
+
+    it('calls revokeAllSessionsForUser with the authenticated userId', async () => {
+      vi.mocked(revokeAllSessionsForUser).mockResolvedValue(1);
+      await deleteAllSessions();
+      expect(revokeAllSessionsForUser).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('clears the session cookie', async () => {
+      vi.mocked(revokeAllSessionsForUser).mockResolvedValue(1);
+      const res = await deleteAllSessions();
+      const raw = res.headers['set-cookie'];
+      const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+      expect(cookieStr).toMatch(/ghostid_session=(?:;|$| )/);
     });
   });
 });

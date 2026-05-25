@@ -151,4 +151,49 @@ describe('SessionsApiClient', () => {
       ).rejects.toThrow('exceeds maximum length');
     });
   });
+
+  describe('revokeAllSessions', () => {
+    it('calls makeRequest with DELETE on the sessions list endpoint', async () => {
+      const { client, makeRequest } = makeClient();
+      makeRequest.mockResolvedValue({ revoked: 2 });
+      await client.revokeAllSessions(SESSION_ID, IAT, SIGNATURE, JTI);
+      expect(makeRequest).toHaveBeenCalledWith(
+        'DELETE',
+        '/api/sessions',
+        undefined,
+        expect.any(Object)
+      );
+    });
+
+    it('sends session auth headers', async () => {
+      const { client, makeRequest } = makeClient();
+      makeRequest.mockResolvedValue({ revoked: 1 });
+      await client.revokeAllSessions(SESSION_ID, IAT, SIGNATURE, JTI);
+      const headers = makeRequest.mock.calls[0][3];
+      expect(headers).toMatchObject({
+        Authorization: expect.stringContaining(SESSION_ID),
+        'X-GhostID-Nonce': JTI,
+        'X-GhostID-Timestamp': String(IAT),
+        'X-GhostID-Signature': SIGNATURE,
+      });
+    });
+
+    it('returns { revoked: N } on success', async () => {
+      const { client, makeRequest } = makeClient();
+      makeRequest.mockResolvedValue({ revoked: 5 });
+      await expect(client.revokeAllSessions(SESSION_ID, IAT, SIGNATURE, JTI)).resolves.toEqual({
+        revoked: 5,
+      });
+    });
+
+    it('throws when sessionId is empty', async () => {
+      const { client } = makeClient();
+      await expect(client.revokeAllSessions('', IAT, SIGNATURE, JTI)).rejects.toThrow();
+    });
+
+    it('throws when signature is empty', async () => {
+      const { client } = makeClient();
+      await expect(client.revokeAllSessions(SESSION_ID, IAT, '', JTI)).rejects.toThrow();
+    });
+  });
 });

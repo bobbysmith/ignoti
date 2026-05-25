@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { ERROR_CODES, ROUTES, SESSION_COOKIE_NAME } from '../constants.js';
-import { getSessionsForUser, revokeSessionForUser } from '../db/queries/sessions.js';
+import {
+  getSessionsForUser,
+  revokeAllSessionsForUser,
+  revokeSessionForUser,
+} from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
 import { requireSession } from '../plugins/session-auth.js';
 import { revokeSessionParams } from '../schemas/sessions.js';
@@ -61,5 +65,23 @@ export async function registerSessionRoutes(app: FastifyInstance) {
 
     req.log.info({ targetSessionId, currentSessionId, userId }, 'session revoked');
     return reply.send({ ok: true });
+  });
+
+  /**
+   * DELETE /api/sessions
+   * Returns: { revoked: number }
+   *
+   * Revokes every active session for the authenticated user across all devices,
+   * including the current one. Devices remain registered so the user can log
+   * back in with any of their passkeys. Clears the session cookie since the
+   * current session is now revoked.
+   */
+  app.delete(ROUTES.SESSIONS.LIST, { preHandler: [requireSession] }, async (req, reply) => {
+    // biome-ignore lint/style/noNonNullAssertion: requireSession preHandler guarantees non-null
+    const { userId } = req.sessionContext!;
+    const revoked = await revokeAllSessionsForUser(userId);
+    reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+    req.log.info({ userId, revoked }, 'all sessions revoked');
+    return reply.send({ revoked });
   });
 }

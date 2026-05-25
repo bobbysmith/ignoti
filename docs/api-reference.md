@@ -304,6 +304,22 @@ Throws:
 
 ---
 
+### `ghost.revokeAllSessions()`
+
+Revokes every active session for the current user across all devices, including this one. Devices remain registered so the user can log back in with any of their passkeys. Clears local state and fires `onSessionChange` with `null`.
+
+```ts
+await ghost.revokeAllSessions();
+```
+
+Returns: `Promise<void>`
+
+Throws:
+- `NOT_INITIALIZED`
+- `NO_KEYS` - not logged in
+
+---
+
 ## Types
 
 Types are exported from the main entry or the dedicated types entry:
