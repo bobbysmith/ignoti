@@ -1,0 +1,44 @@
+{
+  "name": "@ghostid/verify",
+  "version": "0.0.1",
+  "description": "Server-side session verification for GhostID. Validate signed session headers on your own backend.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "authentication",
+    "passkey",
+    "webauthn",
+    "session",
+    "verification",
+    "middleware",
+    "ghostid"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ghostid/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

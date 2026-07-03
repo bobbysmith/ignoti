@@ -6,10 +6,53 @@ import {
   revokeSessionForUser,
 } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
-import { requireSession } from '../plugins/session-auth.js';
-import { revokeSessionParams } from '../schemas/sessions.js';
+import { requireSession, verifySessionAuth } from '../plugins/session-auth.js';
+import { revokeSessionParams, verifySessionBody } from '../schemas/sessions.js';
 
 export async function registerSessionRoutes(app: FastifyInstance) {
+  /**
+   * POST /api/sessions/verify
+   * Body: { method, path, authorization, nonce, timestamp, signature }
+   * Returns: 200 { valid: true, sessionId, userId, deviceId, expiresAt }
+   *        | 200 { valid: false, error }  (RFC 7662-style: an invalid session
+   *          is a successful introspection, not a failed request)
+   *
+   * Lets an integrator's own backend validate the session headers the SDK
+   * produced via getSessionHeaders(). The backend forwards the four header
+   * values plus the method and path of the request it received; verification
+   * runs the exact same checks as GhostID's own protected routes, including
+   * nonce replay prevention — so verify each request exactly once.
+   */
+  // Rate limiting is disabled here: this endpoint sits on the integrator
+  // backend's hot path (one call per authenticated request from a single IP),
+  // so any fixed per-IP budget would throttle legitimate traffic. Forging a
+  // positive result requires an Ed25519 signature over a server-issued
+  // session, so unauthenticated callers can't brute-force anything useful.
+  app.post(ROUTES.SESSIONS.VERIFY, { config: { rateLimit: false } }, async (req, reply) => {
+    const parsed = verifySessionBody.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, ERROR_CODES.INVALID_INPUT, parsed.error.flatten());
+    }
+    const { method, path, authorization, nonce, timestamp, signature } = parsed.data;
+
+    const result = await verifySessionAuth(
+      { authorization, nonce, timestamp, signature, method, path },
+      req.log
+    );
+
+    if (!result.ok) {
+      return reply.send({ valid: false, error: result.code });
+    }
+
+    return reply.send({
+      valid: true,
+      sessionId: result.context.sessionId,
+      userId: result.context.userId,
+      deviceId: result.context.deviceId,
+      expiresAt: result.expiresAt.getTime(),
+    });
+  });
+
   /**
    * GET /api/sessions
    * Returns: { sessions: SessionListItem[] }

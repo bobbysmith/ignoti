@@ -9,6 +9,7 @@
     "dev:sdk": "pnpm --filter @ghostid/sdk dev",
     "dev:server": "pnpm --filter @ghostid/server dev",
     "dev:demo": "pnpm --filter @ghostid/demo dev",
+    "dev:api": "pnpm --filter @ghostid/example-api dev",
     "test": "pnpm -r test",
     "lint": "biome check packages examples",
     "lint:fix": "biome check --write packages examples",

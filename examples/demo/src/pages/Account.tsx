@@ -18,6 +18,8 @@ export function Account() {
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const mnemonicRef = useRef<HTMLInputElement>(null);
   const [signedHeaders, setSignedHeaders] = useState<Record<string, string> | null>(null);
+  const [apiResponse, setApiResponse] = useState<Record<string, unknown> | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     ghost
@@ -83,11 +85,29 @@ export function Account() {
   }
 
   async function handleSignRequest() {
+    setApiResponse(null);
+    setApiError(null);
+
+    let headers: Record<string, string>;
     try {
-      const headers = await ghost.getSessionHeaders('GET', '/api/my-app/feed');
+      headers = await ghost.getSessionHeaders('GET', '/api/my-app/feed');
       setSignedHeaders(headers);
     } catch {
       setSignedHeaders(null);
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_EXAMPLE_API_URL ?? 'http://localhost:8788';
+    try {
+      const res = await fetch(`${apiUrl}/api/my-app/feed`, { headers });
+      const body = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        setApiError(`rejected: ${String(body.error ?? res.status)}`);
+        return;
+      }
+      setApiResponse(body);
+    } catch {
+      setApiError('example API not reachable - start it with `pnpm dev:api` (see examples/api)');
     }
   }
 
@@ -138,15 +158,25 @@ export function Account() {
           <h2>session signing</h2>
           <p>
             Call <code>getSessionHeaders</code> to authenticate requests from your app to your own
-            backend. GhostID&apos;s server middleware validates the resulting headers.
+            backend. The backend validates them with <code>@ghostid/verify</code> - this button
+            signs a request and sends it to the example API in <code>examples/api</code>.
           </p>
           <button type="button" onClick={handleSignRequest}>
-            → sign GET /api/my-app/feed
+            → sign &amp; call GET /api/my-app/feed
           </button>
           {signedHeaders && (
             <pre style={{ marginTop: '1rem', overflowX: 'auto' }}>
               {JSON.stringify(signedHeaders, null, 2)}
             </pre>
+          )}
+          {apiError && <p style={{ color: 'var(--error-color)' }}>{apiError}</p>}
+          {apiResponse && (
+            <>
+              <p style={{ marginBottom: 0 }}>verified response from the example backend:</p>
+              <pre style={{ marginTop: '0.5rem', overflowX: 'auto' }}>
+                {JSON.stringify(apiResponse, null, 2)}
+              </pre>
+            </>
           )}
         </div>
 

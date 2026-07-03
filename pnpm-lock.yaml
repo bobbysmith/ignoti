@@ -15,6 +15,28 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  examples/api:
+    dependencies:
+      '@fastify/cors':
+        specifier: ^10.0.1
+        version: 10.1.0
+      '@ghostid/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
+      fastify:
+        specifier: ^5.1.0
+        version: 5.8.5
+    devDependencies:
+      '@types/node':
+        specifier: ^24.1.0
+        version: 24.12.2
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   examples/demo:
     dependencies:
       '@ghostid/sdk':
@@ -143,6 +165,22 @@ importers:
 
   packages/shared:
     devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.2)(tsx@4.21.0)
+
+  packages/verify:
+    dependencies:
+      '@ghostid/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.4(vitest@3.2.4(@types/debug@4.1.13)(@types/node@24.12.2)(tsx@4.21.0))
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

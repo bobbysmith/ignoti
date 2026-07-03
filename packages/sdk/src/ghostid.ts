@@ -292,7 +292,8 @@ export class GhostID {
 
   /**
    * Returns headers that authenticate a specific request to the integrator's own backend.
-   * The GhostID server's `requireSession` middleware validates these headers.
+   * The backend validates them by forwarding to the GhostID server's
+   * POST /api/sessions/verify endpoint.
    *
    * Every call generates a fresh nonce and signature, do not cache or reuse the result.
    * Pass the exact HTTP method and path of the request you are about to make.

@@ -16,6 +16,7 @@ interface SessionAuthRow {
   session_public_key: string;
   user_id: string;
   device_id: string;
+  expires_at: Date;
 }
 
 interface SessionListRow {
@@ -43,7 +44,7 @@ export async function insertSession(params: InsertSessionParams): Promise<Sessio
 
 export async function getSessionWithUser(sessionId: string): Promise<SessionAuthRow | undefined> {
   const [row] = await sql<SessionAuthRow[]>`
-    select s.session_public_key, s.device_id, d.user_id
+    select s.session_public_key, s.device_id, s.expires_at, d.user_id
     from sessions s
     join devices d on d.id = s.device_id
     where s.id = ${sessionId}

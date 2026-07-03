@@ -77,6 +77,7 @@ export const ROUTES = {
   SESSIONS: {
     LIST: '/',
     REVOKE: '/:id',
+    VERIFY: '/verify',
   },
   HEALTH: '/health',
 } as const;

@@ -213,10 +213,12 @@ Returns signed headers to attach to an authenticated request to your backend. Th
 
 ```ts
 const headers = await ghost.getSessionHeaders('GET', '/api/feed');
-const res = await fetch('https://api.example.com/feed', { headers });
+const res = await fetch('https://api.example.com/api/feed', { headers });
 ```
 
 If the session is expired, automatically attempts to restore it before signing. Do not cache the result - each call generates a fresh signature with a unique nonce.
+
+Your backend validates these headers by forwarding them to the GhostID server's `POST /api/sessions/verify` endpoint, which returns the authenticated `userId` on success. See [getting started, section 7](./getting-started.md#7-make-authenticated-requests) for a full example.
 
 **Parameters**
 

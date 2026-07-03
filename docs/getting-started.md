@@ -168,6 +168,57 @@ const response = await fetch('https://myapp.com/api/protected', {
 The session key signs a short-lived timestamp on every call. A stolen session ID alone cannot be replayed - the 
 attacker would also need the in-memory private key.
 
+The `method` and `path` you pass to `getSessionHeaders()` are baked into the signature. They must match what your
+backend forwards for verification below, character for character.
+
+### Verify on your backend
+
+Your backend validates the headers with the `@ghostid/verify` package, which forwards them to your GhostID
+server's verification endpoint. GhostID runs the full check - signature, session state, timestamp window, and
+nonce replay - and tells you who the request came from.
+
+```bash
+npm install @ghostid/verify
+```
+
+```ts
+import { GhostIDVerifier } from '@ghostid/verify';
+
+const verifier = new GhostIDVerifier({
+  serverUrl: 'https://your-ghostid-server.example.com',
+});
+
+// Express: protect routes with one line
+app.use('/api', verifier.expressMiddleware());
+
+app.get('/api/feed', (req, res) => {
+  // req.ghostid = { sessionId, userId, deviceId, expiresAt }
+  res.json({ feed: loadFeedFor(req.ghostid.userId) });
+});
+```
+
+Fastify users get a preHandler instead:
+
+```ts
+app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, async req => {
+  return { feed: await loadFeedFor(req.ghostid.userId) };
+});
+```
+
+For other frameworks, call `verifier.verify({ method, path, headers })` directly - it returns
+`{ valid: true, userId, deviceId, sessionId, expiresAt }` or `{ valid: false, error }`.
+
+Under the hood this is one POST to your GhostID server's `POST /api/sessions/verify` endpoint
+(RFC 7662-style introspection), so it works from any language - forward `{ method, path, authorization,
+nonce, timestamp, signature }` and read the same JSON back.
+
+Two rules:
+
+- **Verify each request exactly once.** The nonce is consumed on verification; a second verify of the same
+  headers returns `session_nonce_used`. Don't retry a verification call that already returned a result.
+- **Do not cache a `valid: true` result across requests.** Every request carries a fresh signature; the
+  verification is per-request by design.
+
 ---
 
 ## 8. Recover an account

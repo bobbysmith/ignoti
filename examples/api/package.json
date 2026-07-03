@@ -1,0 +1,21 @@
+{
+  "name": "@ghostid/example-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example integrator backend: protects its routes with @ghostid/verify.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@ghostid/verify": "workspace:*",
+    "fastify": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}

@@ -9,7 +9,11 @@ import {
   revokeAllSessionsForUser,
   revokeSessionForUser,
 } from '../../db/queries/sessions.js';
-import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
+import {
+  registerSessionAuthPlugin,
+  requireSession,
+  verifySessionAuth,
+} from '../../plugins/session-auth.js';
 import { registerSessionRoutes } from '../../routes/sessions.js';
 
 vi.mock('../../config.js', () => ({
@@ -30,6 +34,7 @@ vi.mock('../../plugins/session-auth.js', () => ({
   requireSession: vi.fn(async (req: FastifyRequest) => {
     req.sessionContext = { sessionId: SESSION_ID, userId: USER_ID, deviceId: DEVICE_ID };
   }),
+  verifySessionAuth: vi.fn(),
 }));
 
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -70,6 +75,111 @@ describe('sessions', () => {
     vi.mocked(getSessionsForUser).mockReset();
     vi.mocked(revokeSessionForUser).mockReset();
     vi.mocked(revokeAllSessionsForUser).mockReset();
+    vi.mocked(verifySessionAuth).mockReset();
+  });
+
+  describe('POST /api/sessions/verify', () => {
+    const EXPIRES_AT = new Date('2024-01-08T00:00:00Z');
+
+    function makeVerifyBody(overrides: Record<string, unknown> = {}) {
+      return {
+        method: 'GET',
+        path: '/api/feed',
+        authorization: `GhostID-Session ${SESSION_ID}`,
+        nonce: crypto.randomUUID(),
+        timestamp: String(Math.floor(Date.now() / 1000)),
+        signature: 'c2lnbmF0dXJl',
+        ...overrides,
+      };
+    }
+
+    function postVerify(body: Record<string, unknown>) {
+      return app.inject({ method: 'POST', url: '/api/sessions/verify', payload: body });
+    }
+
+    describe('body validation', () => {
+      it.each([
+        'method',
+        'path',
+        'authorization',
+        'nonce',
+        'timestamp',
+        'signature',
+      ])('returns 400 INVALID_INPUT when %s is missing', async field => {
+        const body = makeVerifyBody();
+        delete body[field as keyof typeof body];
+        const res = await postVerify(body);
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+        expect(verifySessionAuth).not.toHaveBeenCalled();
+      });
+
+      it('returns 400 INVALID_INPUT when a field is empty', async () => {
+        const res = await postVerify(makeVerifyBody({ signature: '' }));
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+    });
+
+    describe('invalid session', () => {
+      it('returns 200 with valid=false and the error code', async () => {
+        vi.mocked(verifySessionAuth).mockResolvedValue({
+          ok: false,
+          code: ERROR_CODES.SESSION_NOT_FOUND,
+        });
+        const res = await postVerify(makeVerifyBody());
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ valid: false, error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('surfaces nonce replay as valid=false SESSION_NONCE_USED', async () => {
+        vi.mocked(verifySessionAuth).mockResolvedValue({
+          ok: false,
+          code: ERROR_CODES.SESSION_NONCE_USED,
+        });
+        const res = await postVerify(makeVerifyBody());
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ valid: false, error: ERROR_CODES.SESSION_NONCE_USED });
+      });
+    });
+
+    describe('valid session', () => {
+      beforeEach(() => {
+        vi.mocked(verifySessionAuth).mockResolvedValue({
+          ok: true,
+          context: { sessionId: SESSION_ID, userId: USER_ID, deviceId: DEVICE_ID },
+          expiresAt: EXPIRES_AT,
+        });
+      });
+
+      it('returns 200 with valid=true and the session context', async () => {
+        const res = await postVerify(makeVerifyBody());
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({
+          valid: true,
+          sessionId: SESSION_ID,
+          userId: USER_ID,
+          deviceId: DEVICE_ID,
+          expiresAt: EXPIRES_AT.getTime(),
+        });
+      });
+
+      it('passes the forwarded material to verifySessionAuth verbatim', async () => {
+        const body = makeVerifyBody({ method: 'DELETE', path: '/api/things/42' });
+        await postVerify(body);
+        expect(verifySessionAuth).toHaveBeenCalledWith(
+          {
+            method: 'DELETE',
+            path: '/api/things/42',
+            authorization: body.authorization,
+            nonce: body.nonce,
+            timestamp: body.timestamp,
+            signature: body.signature,
+          },
+          expect.anything()
+        );
+      });
+    });
   });
 
   describe('GET /api/sessions', () => {
