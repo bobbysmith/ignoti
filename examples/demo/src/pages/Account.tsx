@@ -88,18 +88,20 @@ export function Account() {
     setApiResponse(null);
     setApiError(null);
 
+    const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8787';
+    const path = '/api/sessions';
+
     let headers: Record<string, string>;
     try {
-      headers = await ghost.getSessionHeaders('GET', '/api/my-app/feed');
+      headers = await ghost.getSessionHeaders('GET', path);
       setSignedHeaders(headers);
     } catch {
       setSignedHeaders(null);
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_EXAMPLE_API_URL ?? 'http://localhost:8788';
     try {
-      const res = await fetch(`${apiUrl}/api/my-app/feed`, { headers });
+      const res = await fetch(`${backendUrl}${path}`, { headers, credentials: 'include' });
       const body = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
         setApiError(`rejected: ${String(body.error ?? res.status)}`);
@@ -107,7 +109,7 @@ export function Account() {
       }
       setApiResponse(body);
     } catch {
-      setApiError('example API not reachable - start it with `pnpm dev:api` (see examples/api)');
+      setApiError('could not reach the backend');
     }
   }
 
@@ -157,12 +159,11 @@ export function Account() {
         <div className="dashboard-section">
           <h2>session signing</h2>
           <p>
-            Call <code>getSessionHeaders</code> to authenticate requests from your app to your own
-            backend. The backend validates them with <code>@ghostid/verify</code> - this button
-            signs a request and sends it to the example API in <code>examples/api</code>.
+            Call <code>getSessionHeaders</code> to sign an authenticated request, then send it to
+            the backend. The server verifies the session signature and responds.
           </p>
           <button type="button" onClick={handleSignRequest}>
-            → sign &amp; call GET /api/my-app/feed
+            → sign &amp; call GET /api/sessions
           </button>
           {signedHeaders && (
             <pre style={{ marginTop: '1rem', overflowX: 'auto' }}>
@@ -172,7 +173,7 @@ export function Account() {
           {apiError && <p style={{ color: 'var(--error-color)' }}>{apiError}</p>}
           {apiResponse && (
             <>
-              <p style={{ marginBottom: 0 }}>verified response from the example backend:</p>
+              <p style={{ marginBottom: 0 }}>response from the backend:</p>
               <pre style={{ marginTop: '0.5rem', overflowX: 'auto' }}>
                 {JSON.stringify(apiResponse, null, 2)}
               </pre>
