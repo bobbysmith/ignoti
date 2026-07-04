@@ -280,6 +280,7 @@ export const ErrorCodes = {
   EXPIRED_CHALLENGE: 'EXPIRED_CHALLENGE',
   API_ERROR: 'API_ERROR',
   INVALID_STATE: 'INVALID_STATE',
+  CLOCK_SKEW: 'CLOCK_SKEW',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

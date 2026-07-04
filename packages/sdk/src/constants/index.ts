@@ -125,6 +125,9 @@ export const TIMEOUTS = {
 export const RETRY = {
   DEFAULT_ATTEMPTS: 3,
   EXPONENTIAL_BACKOFF_BASE: 2,
+  // Consecutive failed session-restore attempts before the SDK stops trying;
+  // a successful restore or login resets the count.
+  MAX_RESTORE_FAILURES: 3,
 } as const;
 
 // ============================================================================
@@ -187,6 +190,8 @@ export const ERROR_MESSAGES = {
   NOT_INITIALIZED: 'GhostID not initialized: call init() first',
   NO_ACTIVE_SESSION: 'No active session: login() first',
   SESSION_EXPIRED: 'Session expired: please login again',
+  CLOCK_SKEW:
+    'Device clock is out of sync with the server: check the device date and time settings',
 
   // Crypto / keys
   INVALID_MNEMONIC: 'Invalid BIP39 mnemonic phrase provided',

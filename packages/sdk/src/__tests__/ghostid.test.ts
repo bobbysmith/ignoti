@@ -333,6 +333,20 @@ describe('GhostID', () => {
       await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
     });
 
+    it('stops attempting restore after the failure cap, same as the 401 interceptor', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      mockGenerateSessionKeypair.mockClear();
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+
+      for (let i = 0; i < 3; i++) {
+        await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
+      }
+
+      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as GhostIDError;
+      expect(err.code).toBe('NO_KEYS');
+      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+    });
+
     it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
       const { g, sessionId } = await withSession();
       const headers = await g.getSessionHeaders('GET', '/api/data');
@@ -694,6 +708,64 @@ describe('GhostID', () => {
       await onUnauthorized('GET', '/api/devices');
 
       expect(g.getSession()?.sessionId).toBe('sess-brand-new');
+    });
+
+    it('stops attempting restore after three consecutive failures', async () => {
+      await withSession();
+      mockGenerateSessionKeypair.mockClear();
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      const onUnauthorized = capturedOnUnauthorized();
+
+      for (let i = 0; i < 3; i++) {
+        await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+      }
+
+      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as GhostIDError;
+      expect(err.code).toBe('NO_KEYS');
+      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+    });
+
+    it('counts one failure per restore attempt, not per concurrent caller', async () => {
+      await withSession();
+      mockGenerateSessionKeypair.mockClear();
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      const onUnauthorized = capturedOnUnauthorized();
+
+      // Three concurrent 401s share one failed restore attempt
+      const results = await Promise.allSettled([
+        onUnauthorized('GET', '/api/devices'),
+        onUnauthorized('GET', '/api/sessions'),
+        onUnauthorized('DELETE', '/api/sessions/sess-1'),
+      ]);
+      expect(results.every(r => r.status === 'rejected')).toBe(true);
+      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(1);
+
+      // Two more real attempts remain before the cap trips
+      await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+      await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as GhostIDError;
+      expect(err.code).toBe('NO_KEYS');
+      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+    });
+
+    it('resets the failure count after a successful restore', async () => {
+      await withSession();
+      const onUnauthorized = capturedOnUnauthorized();
+
+      mockGenerateSessionKeypair
+        .mockRejectedValueOnce(new Error('restore failed'))
+        .mockRejectedValueOnce(new Error('restore failed'));
+      await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+      await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+
+      stubRestoreSuccess();
+      await onUnauthorized('GET', '/api/devices');
+
+      // Three more real attempts are allowed, proving the count was reset
+      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      for (let i = 0; i < 3; i++) {
+        await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
+      }
     });
   });
 

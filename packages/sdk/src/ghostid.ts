@@ -28,6 +28,7 @@ import {
   API_ENDPOINTS,
   ERROR_MESSAGES,
   HTTP_HEADERS,
+  RETRY,
   SESSION_AUTH_SCHEME,
   UA_HINTS,
 } from './constants';
@@ -61,6 +62,7 @@ export class GhostID {
   private initialized = false;
   private session: ActiveSession | null = null;
   private restorePromise: Promise<void> | null = null;
+  private restoreFailures = 0;
   private sessionChangeCallback: ((session: SessionInfo | null) => void) | null = null;
 
   constructor(options: GhostIDOptions) {
@@ -72,13 +74,31 @@ export class GhostID {
     this.defaultDeviceName = options.defaultDeviceName;
   }
 
-  private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
+  /**
+   * Deduplicated restore for automatic recovery paths: concurrent callers
+   * share one attempt, and the failure count increments once per attempt,
+   * not once per caller. After RETRY.MAX_RESTORE_FAILURES consecutive
+   * failures no new attempt is started until a restore or login succeeds.
+   */
+  private async restoreOnce(): Promise<void> {
     if (!this.restorePromise) {
-      this.restorePromise = this.restoreSession().finally(() => {
-        this.restorePromise = null;
-      });
+      if (this.restoreFailures >= RETRY.MAX_RESTORE_FAILURES) {
+        throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      }
+      this.restorePromise = this.restoreSession()
+        .catch(error => {
+          this.restoreFailures++;
+          throw error;
+        })
+        .finally(() => {
+          this.restorePromise = null;
+        });
     }
     await this.restorePromise;
+  }
+
+  private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
+    await this.restoreOnce();
     const { sessionId } = this.session as ActiveSession;
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
@@ -131,6 +151,7 @@ export class GhostID {
         expiresAt: response.expiresAt,
         sessionPrivateKey: sessionKeyPair.privateKey,
       };
+      this.restoreFailures = 0;
       this.notifySessionChange();
     } catch (error) {
       if (error instanceof GhostIDError && error.httpStatus === 401) {
@@ -230,6 +251,7 @@ export class GhostID {
       expiresAt: sessionResponse.expiresAt,
       sessionPrivateKey: sessionKeyPair.privateKey,
     };
+    this.restoreFailures = 0;
     this.notifySessionChange();
 
     return {
@@ -304,12 +326,7 @@ export class GhostID {
       throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     if (this.isSessionExpired()) {
-      if (!this.restorePromise) {
-        this.restorePromise = this.restoreSession().finally(() => {
-          this.restorePromise = null;
-        });
-      }
-      await this.restorePromise;
+      await this.restoreOnce();
     }
     const { sessionId } = this.session as ActiveSession;
     const iat = Math.floor(Date.now() / 1000);

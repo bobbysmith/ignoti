@@ -6,7 +6,7 @@
  * corrupt our payloads.
  */
 
-import type { ServerErrorResponse } from '@ghostid/shared';
+import { SERVER_ERROR_CODES, type ServerErrorResponse } from '@ghostid/shared';
 import {
   API_ENDPOINTS,
   ERROR_MESSAGES,
@@ -254,6 +254,21 @@ export class CoreApiClient {
 
         if (!response.ok) {
           const errorData = await this.parseErrorResponse(response);
+
+          // A skewed device clock fails the server's signature timestamp check;
+          // restoring the session re-signs with the same clock, so don't retry.
+          if (
+            response.status === HTTP_STATUS.UNAUTHORIZED &&
+            errorData.error === SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE
+          ) {
+            throw new GhostIDError(
+              ERROR_MESSAGES.CLOCK_SKEW,
+              ErrorCodes.CLOCK_SKEW,
+              new Error(`HTTP ${response.status}`),
+              response.status
+            );
+          }
+
           const message = this.capErrorMessage(
             errorData.error ||
               errorData.message ||

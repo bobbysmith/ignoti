@@ -413,15 +413,16 @@ class GhostIDError extends Error {
 
 ### `ErrorCodes`
 
-| Code                 | When it is thrown                                                      |
-|----------------------|------------------------------------------------------------------------|
-| `NOT_INITIALIZED`    | Any method called before `init()`                                      |
-| `INVALID_INPUT`      | WebAuthn is not supported in this browser                              |
-| `CRYPTOGRAPHY_ERROR` | Key generation or signing failed                                       |
-| `NO_KEYS`            | No active session - not logged in, session expired, or revoked         |
-| `INVALID_SIGNATURE`  | Signature verification failed                                          |
-| `INVALID_CHALLENGE`  | Challenge was invalid or already consumed                              |
-| `EXPIRED_CHALLENGE`  | Challenge has expired                                                  |
-| `API_ERROR`          | Server returned an error - check `httpStatus` for the HTTP status code |
-| `INVALID_STATE`      | SDK is in an unexpected internal state                                 |
-| `STORAGE_ERROR`      | Storage operation failed                                               |
+| Code                 | When it is thrown                                                                                                           |
+|----------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `NOT_INITIALIZED`    | Any method called before `init()`                                                                                           |
+| `INVALID_INPUT`      | WebAuthn is not supported in this browser                                                                                   |
+| `CRYPTOGRAPHY_ERROR` | Key generation or signing failed                                                                                            |
+| `NO_KEYS`            | No active session - not logged in, session expired, or revoked                                                              |
+| `INVALID_SIGNATURE`  | Signature verification failed                                                                                               |
+| `INVALID_CHALLENGE`  | Challenge was invalid or already consumed                                                                                   |
+| `EXPIRED_CHALLENGE`  | Challenge has expired                                                                                                       |
+| `API_ERROR`          | Server returned an error - check `httpStatus` for the HTTP status code                                                      |
+| `INVALID_STATE`      | SDK is in an unexpected internal state                                                                                      |
+| `STORAGE_ERROR`      | Storage operation failed                                                                                                    |
+| `CLOCK_SKEW`         | Device clock is more than 60s off the server's - signed requests are rejected until the user fixes their date/time settings |

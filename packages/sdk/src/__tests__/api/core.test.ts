@@ -364,6 +364,16 @@ describe('code api', () => {
       expect(retryHeaders.authorization).toBe('GhostID-Session new-sess');
     });
 
+    it('throws CLOCK_SKEW without invoking the interceptor on a timestamp-range 401', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({});
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'session_timestamp_out_of_range' }));
+
+      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
+      expect(err.code).toBe('CLOCK_SKEW');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
     it('throws on 401 without retrying when onUnauthorized is not configured', async () => {
       const client = makeClient({ retryAttempts: 1 });
       const fetchMock = mockFetch(401, { error: 'unauthorized' });
