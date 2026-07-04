@@ -204,7 +204,7 @@ export function Account() {
                     <tr key={d.id}>
                       <td>{d.deviceName ?? 'unnamed'}</td>
                       <td>{new Date(d.createdAt).toLocaleString()}</td>
-                      <td>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleString() : '—'}</td>
+                      <td>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleString() : '-'}</td>
                       <td>
                         <button
                           type="button"

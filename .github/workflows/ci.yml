@@ -22,7 +22,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @ghostid/shared build
+      - run: pnpm --filter @ghostid/shared --filter @ghostid/verify build
 
       - run: pnpm lint
 

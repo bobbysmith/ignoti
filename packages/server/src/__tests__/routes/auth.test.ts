@@ -21,7 +21,11 @@ import {
 } from '../../db/queries/challenges.js';
 import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../../db/queries/devices.js';
 import { incrementSignCountWithChallenge } from '../../db/queries/login.js';
-import { insertSession, rebindSessionPublicKey } from '../../db/queries/sessions.js';
+import {
+  insertSession,
+  revokeSessionById,
+  rotateSessionOnRestore,
+} from '../../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../../helpers/auth.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../../lib/root-jws.js';
@@ -71,6 +75,8 @@ const SESSION_URL = '/api/auth/session';
 const SESSION_RESTORE_URL = '/api/auth/session/restore';
 const RECOVER_URL = '/api/auth/recover';
 const VALID_SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
+const VALID_RESTORE_SECRET = 'cmVzdG9yZS1zZWNyZXQtdmFsdWU';
+const VALID_SESSION_COOKIE = `${VALID_SESSION_ID}.${VALID_RESTORE_SECRET}`;
 
 const VALID_REGISTRATION_RESPONSE = {
   id: VALID_CREDENTIAL_ID,
@@ -842,7 +848,7 @@ describe('auth', () => {
         const res = await postSession();
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toContain(`ghostid_session=${session.id}`);
+        expect(cookieStr).toContain(`ghostid_session=${session.id}.`);
         expect(cookieStr).toContain('HttpOnly');
         expect(cookieStr).toContain('SameSite=Lax');
         expect(cookieStr).toContain('Path=/');
@@ -889,26 +895,38 @@ describe('auth', () => {
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
-      it('returns 401 SESSION_NOT_FOUND when session cookie is not a valid UUID', async () => {
-        const res = await postRestore(undefined, 'not-a-uuid');
+      it('returns 401 SESSION_NOT_FOUND when cookie has no rotating secret (old bare-id format)', async () => {
+        const res = await postRestore(undefined, VALID_SESSION_ID);
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('returns 401 SESSION_NOT_FOUND when the cookie session id is not a valid UUID', async () => {
+        const res = await postRestore(undefined, `not-a-uuid.${VALID_RESTORE_SECRET}`);
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
       it('returns 400 INVALID_INPUT when sessionBinding is missing', async () => {
-        const res = await postRestore({}, VALID_SESSION_ID);
+        const res = await postRestore({}, VALID_SESSION_COOKIE);
         expect(res.statusCode).toBe(400);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
       });
 
       it('returns 400 INVALID_INPUT when sessionBinding is shorter than MIN_SESSION_BINDING_LENGTH', async () => {
-        const res = await postRestore({ sessionBinding: SHORT_SESSION_BINDING }, VALID_SESSION_ID);
+        const res = await postRestore(
+          { sessionBinding: SHORT_SESSION_BINDING },
+          VALID_SESSION_COOKIE
+        );
         expect(res.statusCode).toBe(400);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
       });
 
       it('returns 400 INVALID_INPUT when sessionBinding exceeds MAX_SESSION_BINDING_LENGTH', async () => {
-        const res = await postRestore({ sessionBinding: LONG_SESSION_BINDING }, VALID_SESSION_ID);
+        const res = await postRestore(
+          { sessionBinding: LONG_SESSION_BINDING },
+          VALID_SESSION_COOKIE
+        );
         expect(res.statusCode).toBe(400);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
       });
@@ -917,30 +935,37 @@ describe('auth', () => {
     describe('JWS verification', () => {
       it('returns 401 INVALID_SESSION_BINDING when verifySessionBindingJWS throws', async () => {
         vi.mocked(verifySessionBindingJWS).mockRejectedValue(new Error('bad jws'));
-        const res = await postRestore(undefined, VALID_SESSION_ID);
+        const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_SESSION_BINDING });
       });
     });
 
-    describe('rebind failure', () => {
+    describe('rotation failure and reuse detection', () => {
       beforeEach(() => {
         vi.mocked(verifySessionBindingJWS).mockResolvedValue({
           sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
           payload: { sessionChallenge: 'random-nonce' },
         } as never);
+        vi.mocked(rotateSessionOnRestore).mockResolvedValue(undefined);
       });
 
-      it('returns 401 SESSION_NOT_FOUND when rebindSessionPublicKey returns undefined', async () => {
-        vi.mocked(rebindSessionPublicKey).mockResolvedValue(undefined);
-        const res = await postRestore(undefined, VALID_SESSION_ID);
+      it('returns 401 SESSION_NOT_FOUND when rotateSessionOnRestore returns undefined', async () => {
+        vi.mocked(revokeSessionById).mockResolvedValue(false);
+        const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
-      it('clears the session cookie when rebind fails', async () => {
-        vi.mocked(rebindSessionPublicKey).mockResolvedValue(undefined);
-        const res = await postRestore(undefined, VALID_SESSION_ID);
+      it('revokes the session when the secret does not match (reuse detection)', async () => {
+        vi.mocked(revokeSessionById).mockResolvedValue(true);
+        await postRestore(undefined, VALID_SESSION_COOKIE);
+        expect(revokeSessionById).toHaveBeenCalledWith(VALID_SESSION_ID);
+      });
+
+      it('clears the session cookie on rotation failure', async () => {
+        vi.mocked(revokeSessionById).mockResolvedValue(true);
+        const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
         expect(cookieStr).toMatch(/ghostid_session=;|ghostid_session=(?:;| |$)/);
@@ -948,7 +973,7 @@ describe('auth', () => {
     });
 
     describe('success', () => {
-      const REBIND_ROW = {
+      const ROTATE_ROW = {
         user_id: VALID_USER_ID,
         device_id: VALID_DEVICE_ID,
         expires_at: new Date(Date.now() + 86_400_000),
@@ -959,25 +984,35 @@ describe('auth', () => {
           sessionPublicKey: VALID_SESSION_PUBLIC_KEY,
           payload: { sessionChallenge: 'random-nonce' },
         } as never);
-        vi.mocked(rebindSessionPublicKey).mockResolvedValue(REBIND_ROW);
+        vi.mocked(rotateSessionOnRestore).mockResolvedValue(ROTATE_ROW);
       });
 
-      it('calls rebindSessionPublicKey with sessionId from cookie and new public key', async () => {
-        await postRestore(undefined, VALID_SESSION_ID);
-        expect(rebindSessionPublicKey).toHaveBeenCalledWith(
+      it('rotates with the sessionId, a hashed secret, a new hash, and the new public key', async () => {
+        await postRestore(undefined, VALID_SESSION_COOKIE);
+        expect(rotateSessionOnRestore).toHaveBeenCalledWith(
           VALID_SESSION_ID,
+          expect.any(String),
+          expect.any(String),
           VALID_SESSION_PUBLIC_KEY
         );
       });
 
+      it('issues a rotated cookie (new secret, same session id)', async () => {
+        const res = await postRestore(undefined, VALID_SESSION_COOKIE);
+        const raw = res.headers['set-cookie'];
+        const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+        expect(cookieStr).toContain(`ghostid_session=${VALID_SESSION_ID}.`);
+        expect(cookieStr).not.toContain(VALID_RESTORE_SECRET);
+      });
+
       it('returns 200 with sessionId, userId, deviceId, and expiresAt', async () => {
-        const res = await postRestore(undefined, VALID_SESSION_ID);
+        const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({
           sessionId: VALID_SESSION_ID,
           userId: VALID_USER_ID,
           deviceId: VALID_DEVICE_ID,
-          expiresAt: REBIND_ROW.expires_at.getTime(),
+          expiresAt: ROTATE_ROW.expires_at.getTime(),
         });
       });
     });

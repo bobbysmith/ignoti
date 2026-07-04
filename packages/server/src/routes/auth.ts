@@ -4,7 +4,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { config } from '../config.js';
 import {
@@ -27,10 +27,20 @@ import {
 } from '../db/queries/challenges.js';
 import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../db/queries/devices.js';
 import { incrementSignCountWithChallenge } from '../db/queries/login.js';
-import { insertSession, rebindSessionPublicKey } from '../db/queries/sessions.js';
+import {
+  insertSession,
+  revokeSessionById,
+  rotateSessionOnRestore,
+} from '../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../helpers/auth.js';
 import { sendError } from '../helpers/response.js';
+import {
+  buildSessionCookie,
+  generateRestoreToken,
+  hashRestoreToken,
+  parseSessionCookie,
+} from '../lib/restore-token.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../lib/root-jws.js';
 import { verifySessionBindingJWS } from '../lib/session-jws.js';
 import {
@@ -40,6 +50,17 @@ import {
   registerDeviceBody,
   sessionBody,
 } from '../schemas/auth.js';
+
+function sessionCookieOptions() {
+  const secure = config.COOKIE_SECURE;
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? ('none' as const) : ('lax' as const),
+    path: '/',
+    maxAge: config.SESSION_TTL_SECONDS,
+  };
+}
 
 export async function registerAuthRoutes(app: FastifyInstance) {
   /**
@@ -335,21 +356,19 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       }
 
       const expiresAt = new Date(Date.now() + config.SESSION_TTL_SECONDS * 1000);
+      const { secret, hash } = generateRestoreToken();
       const session = await insertSession({
         deviceId: challenge.device_id,
         sessionPublicKey: verified.sessionPublicKey,
+        restoreTokenHash: hash,
         expiresAt,
       });
 
-      const secure = config.COOKIE_SECURE;
-
-      reply.setCookie(SESSION_COOKIE_NAME, session.id, {
-        httpOnly: true,
-        secure,
-        sameSite: secure ? 'none' : 'lax',
-        path: '/',
-        maxAge: config.SESSION_TTL_SECONDS,
-      });
+      reply.setCookie(
+        SESSION_COOKIE_NAME,
+        buildSessionCookie(session.id, secret),
+        sessionCookieOptions()
+      );
 
       return reply.send({
         sessionId: session.id,
@@ -361,7 +380,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
   /**
    * POST /api/auth/session/restore
-   * Cookie: ghostid_session=<sessionId>
+   * Cookie: ghostid_session=<sessionId>.<secret>
    * Body: { sessionBinding }  (compact JWS, EdDSA — same shape as /session)
    * Returns: { sessionId, userId, deviceId, expiresAt }
    *
@@ -369,16 +388,39 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    * the browser still holds the httpOnly session cookie. This endpoint lets the
    * SDK generate a fresh ephemeral keypair and re-bind it to the existing live
    * session. The JWS `exp` (60 s) provides freshness; the cookie identifies the
-   * session. The session's stored public key is atomically replaced.
+   * session and carries a rotating restore secret.
+   *
+   * Refresh-token rotation with reuse detection (RFC 9700): the cookie is
+   * `${sessionId}.${secret}`. A successful restore rebinds the public key and
+   * rotates to a fresh secret, invalidating the old cookie. If a secret is
+   * presented that does not match the current one on an otherwise-active
+   * session, the cookie was stolen and replayed — the session is revoked so a
+   * thief and the real user cannot both hold a working cookie.
    */
   app.post(
     ROUTES.AUTH.SESSION_RESTORE,
-    { config: { rateLimit: RATE_LIMITS.LOGIN } },
+    {
+      config: {
+        rateLimit: {
+          ...RATE_LIMITS.SESSION_RESTORE,
+          // Key on sessionId, not the raw cookie value — varying the secret
+          // must not grant a fresh bucket.
+          keyGenerator: (req: FastifyRequest) => {
+            const cookie = req.cookies[SESSION_COOKIE_NAME];
+            const parsed = cookie ? parseSessionCookie(cookie) : null;
+            return parsed ? `restore:${parsed.sessionId}` : req.ip;
+          },
+        },
+      },
+    },
     async (req, reply) => {
-      const sessionId = req.cookies[SESSION_COOKIE_NAME];
-      if (!sessionId || !z.string().uuid().safeParse(sessionId).success) {
+      const cookie = req.cookies[SESSION_COOKIE_NAME];
+      const parsedCookie = cookie ? parseSessionCookie(cookie) : null;
+      if (!parsedCookie || !z.string().uuid().safeParse(parsedCookie.sessionId).success) {
+        reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
+      const { sessionId, secret } = parsedCookie;
 
       const parsed = sessionBody.safeParse(req.body);
       if (!parsed.success) {
@@ -394,11 +436,30 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
-      const session = await rebindSessionPublicKey(sessionId, verified.sessionPublicKey);
+      const rotated = generateRestoreToken();
+      const session = await rotateSessionOnRestore(
+        sessionId,
+        hashRestoreToken(secret),
+        rotated.hash,
+        verified.sessionPublicKey
+      );
+
       if (!session) {
+        // No active session matched this secret. If the session is still active,
+        // the presented cookie was a stale/replayed one — revoke it as reuse.
+        const wasActive = await revokeSessionById(sessionId);
+        if (wasActive) {
+          req.log.warn({ sessionId }, 'session restore token reuse detected; session revoked');
+        }
         reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
+
+      reply.setCookie(
+        SESSION_COOKIE_NAME,
+        buildSessionCookie(sessionId, rotated.secret),
+        sessionCookieOptions()
+      );
 
       return reply.send({
         sessionId,

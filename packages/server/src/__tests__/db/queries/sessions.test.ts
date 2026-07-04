@@ -4,9 +4,10 @@ import {
   getSessionsForUser,
   getSessionWithUser,
   insertSession,
-  rebindSessionPublicKey,
   revokeAllSessionsForUser,
+  revokeSessionById,
   revokeSessionForUser,
+  rotateSessionOnRestore,
   touchSession,
 } from '../../../db/queries/sessions.js';
 
@@ -26,6 +27,7 @@ describe('sessions db queries', () => {
     const params = {
       deviceId: DEVICE_ID,
       sessionPublicKey: SESSION_PUBLIC_KEY,
+      restoreTokenHash: 'restore-token-hash-b64',
       expiresAt: new Date('2026-12-01T00:00:00Z'),
     };
 
@@ -40,14 +42,19 @@ describe('sessions db queries', () => {
       await expect(insertSession(params)).rejects.toThrow('insertSession returned no row');
     });
 
-    it('executes INSERT with deviceId, sessionPublicKey, and expiresAt', async () => {
+    it('executes INSERT with deviceId, sessionPublicKey, restoreTokenHash, and expiresAt', async () => {
       vi.mocked(sql).mockResolvedValueOnce([
         { id: SESSION_ID, expires_at: params.expiresAt },
       ] as never);
       await insertSession(params);
       const args = vi.mocked(sql).mock.calls[0];
       expect(args).toEqual(
-        expect.arrayContaining([DEVICE_ID, SESSION_PUBLIC_KEY, params.expiresAt])
+        expect.arrayContaining([
+          DEVICE_ID,
+          SESSION_PUBLIC_KEY,
+          params.restoreTokenHash,
+          params.expiresAt,
+        ])
       );
     });
   });
@@ -149,40 +156,69 @@ describe('sessions db queries', () => {
     });
   });
 
-  describe('rebindSessionPublicKey', () => {
+  describe('rotateSessionOnRestore', () => {
     const NEW_PUBLIC_KEY = 'new-session-pub-key-b64';
+    const PRESENTED_HASH = 'presented-hash-b64';
+    const NEW_HASH = 'new-hash-b64';
     const expiresAt = new Date('2026-12-01T00:00:00Z');
-    const rebindRow = { user_id: USER_ID, device_id: DEVICE_ID, expires_at: expiresAt };
+    const rotateRow = { user_id: USER_ID, device_id: DEVICE_ID, expires_at: expiresAt };
 
-    it('returns the rebind row when session is active and not revoked', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([rebindRow] as never);
-      await expect(rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY)).resolves.toEqual(rebindRow);
+    it('returns the rotated row when the presented hash matches an active session', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
+      await expect(
+        rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY)
+      ).resolves.toEqual(rotateRow);
     });
 
-    it('returns undefined when session is not found, revoked, or expired', async () => {
+    it('returns undefined when the hash does not match, or session is revoked/expired', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY)).resolves.toBeUndefined();
+      await expect(
+        rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY)
+      ).resolves.toBeUndefined();
     });
 
-    it('passes sessionId and newPublicKey to the query', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([rebindRow] as never);
-      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
+    it('passes sessionId, presented hash, new hash, and new public key to the query', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
+      await rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY);
       const args = vi.mocked(sql).mock.calls[0];
-      expect(args).toEqual(expect.arrayContaining([SESSION_ID, NEW_PUBLIC_KEY]));
+      expect(args).toEqual(
+        expect.arrayContaining([SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY])
+      );
     });
 
-    it('query guards against revoked sessions', async () => {
+    it('query matches on the current restore_token_hash', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
+      await rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY);
       const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('revoked_at is null');
+      expect(query.join('')).toContain('restore_token_hash =');
     });
 
-    it('query guards against expired sessions', async () => {
+    it('query guards against revoked and expired sessions', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await rebindSessionPublicKey(SESSION_ID, NEW_PUBLIC_KEY);
-      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('expires_at > now()');
+      await rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY);
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      expect(query).toContain('revoked_at is null');
+      expect(query).toContain('expires_at > now()');
+    });
+  });
+
+  describe('revokeSessionById', () => {
+    it('returns true when an active session was revoked', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([{ id: SESSION_ID }] as never);
+      await expect(revokeSessionById(SESSION_ID)).resolves.toBe(true);
+    });
+
+    it('returns false when no active session matched', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(revokeSessionById(SESSION_ID)).resolves.toBe(false);
+    });
+
+    it('only revokes sessions that are still active', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await revokeSessionById(SESSION_ID);
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      expect(query).toContain('revoked_at is null');
+      expect(query).toContain('expires_at > now()');
     });
   });
 

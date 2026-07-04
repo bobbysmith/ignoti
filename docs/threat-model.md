@@ -72,16 +72,32 @@ Sessions are bound to an ephemeral public key registered at login. Every authori
 corresponding private key, which never leaves the client. A stolen session ID alone cannot be replayed - the 
 attacker would also need the in-memory private key.
 
-Session persistence across page reloads is handled by an httpOnly, Secure cookie containing the session token. 
-JavaScript on the page cannot read this cookie - a successful XSS cannot exfiltrate it. On reload, the SDK calls 
-the restore endpoint with the cookie and generates a fresh ephemeral keypair; the private key is never written to 
-disk or localStorage. A stolen cookie cannot be used to forge signed API requests because every request also 
-requires a live Ed25519 signature from the session private key, which exists only in memory on the original page. 
-The SameSite policy is `None` in production (required for cross-origin deployments where the frontend and the 
-GhostID server run on different domains) and `Lax` in local development. CSRF protection comes from the per-request 
-signature, not the SameSite attribute; a forged request without a valid signature is rejected regardless of whether 
-the cookie was sent. The only viable attack surface for the cookie is a network-level attacker, which TLS prevents. 
-**Mitigation: signed-request sessions with ephemeral keys; httpOnly cookie for session restore.**
+Session persistence across page reloads is handled by an httpOnly, Secure cookie. JavaScript on the page cannot 
+read this cookie - a successful XSS cannot exfiltrate it. On reload, the SDK calls the restore endpoint with the 
+cookie and generates a fresh ephemeral keypair; the private key is never written to disk or localStorage.
+
+The cookie is a bearer credential *for session restore* - like an OAuth refresh token. Whoever presents it can bind 
+a new session keypair and obtain a working session, so it is protected the way refresh tokens are: httpOnly + Secure 
++ SameSite, plus **rotation with reuse detection** (RFC 9700). The cookie carries a rotating secret; every restore 
+issues a new one and invalidates the old. If a secret is ever presented that does not match the current one on an 
+otherwise-active session - the signature that a stolen, already-rotated cookie was replayed by a second party - the 
+server revokes the session, so a thief and the legitimate user cannot both hold a working cookie. This detects and 
+kills cookie theft after the fact; it does not prevent an attacker who has live XSS on the page from acting within 
+that page, which is game-over for any browser session regardless of storage mechanism (httpOnly prevents 
+exfiltration, not in-page use).
+
+Outside of restore, a stolen session ID cannot be used to forge signed API requests: every request also requires a 
+live Ed25519 signature from the session private key, which exists only in memory on the original page. The SameSite 
+policy is `None` in production (required for cross-origin deployments where the frontend and the GhostID server run 
+on different domains) and `Lax` in local development. CSRF protection comes from the per-request signature, not the 
+SameSite attribute; a forged request without a valid signature is rejected regardless of whether the cookie was 
+sent. **Mitigation: signed-request sessions with ephemeral keys; httpOnly restore cookie with refresh-token 
+rotation and reuse detection.**
+
+One operational note: because restore rotates the cookie, two page contexts (e.g. multiple tabs) restoring the same 
+session concurrently can race - the second restore presents an already-rotated secret and the session is revoked, 
+forcing a re-login. The SDK single-flights restore within a page, so this only arises across separate tabs/windows 
+reloaded at the same instant, and it fails safe (re-authenticate), never toward granting access.
 
 ### Replay attacks (A1)
 Every challenge is single-use, scoped to a purpose (`register`, `login`, `recover`, `session`), and expires within 
