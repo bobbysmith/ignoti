@@ -39,9 +39,9 @@ function makeSessionHeaders(
   iat: number,
   privateKey: KeyObject,
   htu = DEFAULT_PATH,
-  htm = DEFAULT_METHOD
+  htm = DEFAULT_METHOD,
+  jti = crypto.randomUUID()
 ) {
-  const jti = crypto.randomUUID();
   const payload = canonicalJson({ htm, htu, iat, jti, sessionId });
   const sig = cryptoSign(null, Buffer.from(payload, 'utf-8'), privateKey).toString('base64url');
   return {
@@ -505,6 +505,63 @@ describe('session auth', () => {
         expect(reply2.send).toHaveBeenCalledWith(
           expect.objectContaining({ error: ERROR_CODES.SESSION_NONCE_USED })
         );
+      });
+
+      it('does not consume the nonce when the signature is invalid', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const iat = Math.floor(Date.now() / 1000);
+        const jti = crypto.randomUUID();
+
+        const reply1 = makeMockReply();
+        await requireSession(
+          mockSessionRequest(
+            makeSessionHeaders(
+              SESSION_ID,
+              iat,
+              otherKeypair.privateKey,
+              DEFAULT_PATH,
+              DEFAULT_METHOD,
+              jti
+            )
+          ),
+          reply1 as never
+        );
+        expect(reply1.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
+        );
+
+        const req2 = mockSessionRequest(
+          makeSessionHeaders(SESSION_ID, iat, keypair.privateKey, DEFAULT_PATH, DEFAULT_METHOD, jti)
+        );
+        await requireSession(req2, makeMockReply() as never);
+        expect(req2.sessionContext).not.toBeNull();
+      });
+
+      it('does not consume the nonce when the session is not found', async () => {
+        const iat = Math.floor(Date.now() / 1000);
+        const jti = crypto.randomUUID();
+
+        vi.mocked(getSessionWithUser).mockResolvedValue(undefined as never);
+        await requireSession(
+          mockSessionRequest(
+            makeSessionHeaders(
+              SESSION_ID,
+              iat,
+              keypair.privateKey,
+              DEFAULT_PATH,
+              DEFAULT_METHOD,
+              jti
+            )
+          ),
+          makeMockReply() as never
+        );
+
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const req2 = mockSessionRequest(
+          makeSessionHeaders(SESSION_ID, iat, keypair.privateKey, DEFAULT_PATH, DEFAULT_METHOD, jti)
+        );
+        await requireSession(req2, makeMockReply() as never);
+        expect(req2.sessionContext).not.toBeNull();
       });
     });
 

@@ -4,7 +4,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { config } from '../config.js';
 import {
@@ -40,6 +40,7 @@ import {
   generateRestoreToken,
   hashRestoreToken,
   parseSessionCookie,
+  restoreRateLimitKey,
 } from '../lib/restore-token.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../lib/root-jws.js';
 import { verifySessionBindingJWS } from '../lib/session-jws.js';
@@ -403,13 +404,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       config: {
         rateLimit: {
           ...RATE_LIMITS.SESSION_RESTORE,
-          // Key on sessionId, not the raw cookie value — varying the secret
-          // must not grant a fresh bucket.
-          keyGenerator: (req: FastifyRequest) => {
-            const cookie = req.cookies[SESSION_COOKIE_NAME];
-            const parsed = cookie ? parseSessionCookie(cookie) : null;
-            return parsed ? `restore:${parsed.sessionId}` : req.ip;
-          },
+          keyGenerator: restoreRateLimitKey,
         },
       },
     },

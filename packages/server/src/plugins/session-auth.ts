@@ -121,10 +121,6 @@ export async function verifySessionAuth(
   const data = Buffer.from(payload, 'utf-8');
   const sig = Buffer.from(signature, 'base64url');
 
-  if (!checkAndStoreNonce(jti)) {
-    return { ok: false, code: ERROR_CODES.SESSION_NONCE_USED };
-  }
-
   let valid: boolean;
   try {
     const pubkey = createPublicKey({
@@ -138,6 +134,13 @@ export async function verifySessionAuth(
 
   if (!valid) {
     return { ok: false, code: ERROR_CODES.INVALID_SESSION_SIGNATURE };
+  }
+
+  // After signature verification so only holders of the session key can add
+  // entries. No await separates verify from insert, so a concurrent duplicate
+  // can't slip between them.
+  if (!checkAndStoreNonce(jti)) {
+    return { ok: false, code: ERROR_CODES.SESSION_NONCE_USED };
   }
 
   touchSession(sessionId).catch(err => {

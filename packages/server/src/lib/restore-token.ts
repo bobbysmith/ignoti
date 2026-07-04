@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { SESSION_COOKIE_NAME } from '../constants.js';
 
 /**
  * Rotating restore secret for the session cookie. The cookie carries
@@ -14,12 +15,25 @@ export function hashRestoreToken(secret: string): string {
   return createHash('sha256').update(secret).digest('base64url');
 }
 
-/** Cookie value format: `${sessionId}.${secret}`. */
+// Cookie value format: `${sessionId}.${secret}`.
 export function buildSessionCookie(sessionId: string, secret: string): string {
   return `${sessionId}.${secret}`;
 }
 
-/** Splits `${sessionId}.${secret}`; returns null if malformed. */
+/**
+ * Rate-limit key for /session/restore. Keys on sessionId, not the raw cookie
+ * value. Varying the secret must not grant a fresh bucket.
+ */
+export function restoreRateLimitKey(req: {
+  cookies: Record<string, string | undefined>;
+  ip: string;
+}): string {
+  const cookie = req.cookies[SESSION_COOKIE_NAME];
+  const parsed = cookie ? parseSessionCookie(cookie) : null;
+  return parsed ? `restore:${parsed.sessionId}` : req.ip;
+}
+
+// Splits `${sessionId}.${secret}`; returns null if malformed.
 export function parseSessionCookie(value: string): { sessionId: string; secret: string } | null {
   const dot = value.indexOf('.');
   if (dot < 1 || dot === value.length - 1) {

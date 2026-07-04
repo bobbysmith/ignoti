@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-
+import { SESSION_COOKIE_NAME } from '../../constants.js';
 import {
   buildSessionCookie,
   generateRestoreToken,
   hashRestoreToken,
   parseSessionCookie,
+  restoreRateLimitKey,
 } from '../../lib/restore-token.js';
 
 describe('restore-token', () => {
@@ -61,6 +62,32 @@ describe('restore-token', () => {
         sessionId,
         secret: dotted,
       });
+    });
+  });
+
+  describe('restoreRateLimitKey', () => {
+    const sessionId = '550e8400-e29b-41d4-a716-446655440001';
+    const ip = '203.0.113.7';
+
+    it('keys on the sessionId regardless of the secret', () => {
+      const a = restoreRateLimitKey({
+        cookies: { [SESSION_COOKIE_NAME]: `${sessionId}.secret-one` },
+        ip,
+      });
+      const b = restoreRateLimitKey({
+        cookies: { [SESSION_COOKIE_NAME]: `${sessionId}.secret-two` },
+        ip,
+      });
+      expect(a).toBe(`restore:${sessionId}`);
+      expect(b).toBe(a);
+    });
+
+    it('falls back to the IP when the cookie is missing', () => {
+      expect(restoreRateLimitKey({ cookies: {}, ip })).toBe(ip);
+    });
+
+    it('falls back to the IP when the cookie is malformed', () => {
+      expect(restoreRateLimitKey({ cookies: { [SESSION_COOKIE_NAME]: sessionId }, ip })).toBe(ip);
     });
   });
 });
