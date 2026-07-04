@@ -9,6 +9,7 @@ import {
   SESSION_SIG_TOLERANCE_SECONDS,
   type ServerErrorCode,
 } from '../constants.js';
+import { storeNonce } from '../db/queries/nonces.js';
 import { getSessionWithUser, touchSession } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
 
@@ -42,22 +43,7 @@ declare module 'fastify' {
   }
 }
 
-// jti: expiry timestamp in millis. Entries evicted on the next insert after they expire.
-const nonceCache = new Map<string, number>();
 const uuidSchema = z.string().uuid();
-
-function checkAndStoreNonce(jti: string): boolean {
-  const now = Date.now();
-  // Sweep expired entries before inserting to bound cache size
-  for (const [key, exp] of nonceCache) {
-    if (exp < now) {
-      nonceCache.delete(key);
-    }
-  }
-  if (nonceCache.has(jti)) return false;
-  nonceCache.set(jti, now + SESSION_SIG_TOLERANCE_SECONDS * 1000);
-  return true;
-}
 
 export function registerSessionAuthPlugin(app: FastifyInstance): void {
   app.decorateRequest('sessionContext', null);
@@ -136,10 +122,11 @@ export async function verifySessionAuth(
     return { ok: false, code: ERROR_CODES.INVALID_SESSION_SIGNATURE };
   }
 
-  // After signature verification so only holders of the session key can add
-  // entries. No await separates verify from insert, so a concurrent duplicate
-  // can't slip between them.
-  if (!checkAndStoreNonce(jti)) {
+  // After signature verification so only holders of the session key can write
+  // nonce rows. The primary-key insert is atomic, so concurrent duplicates
+  // cannot both succeed, on this instance or any other.
+  const expiresAt = new Date(Date.now() + SESSION_SIG_TOLERANCE_SECONDS * 1000);
+  if (!(await storeNonce(jti, expiresAt))) {
     return { ok: false, code: ERROR_CODES.SESSION_NONCE_USED };
   }
 

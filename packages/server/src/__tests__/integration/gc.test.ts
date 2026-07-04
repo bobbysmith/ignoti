@@ -42,4 +42,19 @@ describe('Integration: ghostid_gc', () => {
     expect(remaining).toContain(recentRevoked!.id);
     expect(remaining).toContain(active!.id);
   });
+
+  it('purges expired session nonces and keeps live ones', async () => {
+    const expired = crypto.randomUUID();
+    const live = crypto.randomUUID();
+    await sql`
+      insert into session_nonces (jti, expires_at)
+      values (${expired}, now() - interval '1 minute'), (${live}, now() + interval '1 minute')
+    `;
+
+    await sql`select ghostid_gc()`;
+
+    const remaining = (await sql`select jti from session_nonces`).map(r => r.jti);
+    expect(remaining).not.toContain(expired);
+    expect(remaining).toContain(live);
+  });
 });

@@ -5,7 +5,7 @@ import { sql } from '../../db/client.js';
 export { runMigrations } from '../../db/migrate.js';
 
 export async function cleanDatabase(): Promise<void> {
-  await sql`truncate users, devices, challenges, sessions restart identity cascade`;
+  await sql`truncate users, devices, challenges, sessions, session_nonces restart identity cascade`;
 }
 
 export async function generateRootKeypair(): Promise<{

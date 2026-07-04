@@ -6,5 +6,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/__tests__/integration/**/*.test.ts'],
     testTimeout: 30000,
+    // Test files share one database; parallel workers truncate each other's data
+    fileParallelism: false,
   },
 });

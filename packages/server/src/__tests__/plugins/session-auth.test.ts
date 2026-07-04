@@ -8,12 +8,17 @@ import {
   SESSION_AUTH_SCHEME,
   SESSION_SIG_TOLERANCE_SECONDS,
 } from '../../constants';
+import { storeNonce } from '../../db/queries/nonces.js';
 import { getSessionWithUser, touchSession } from '../../db/queries/sessions.js';
 import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
 
 vi.mock('../../db/queries/sessions.js', () => ({
   getSessionWithUser: vi.fn(),
   touchSession: vi.fn(),
+}));
+
+vi.mock('../../db/queries/nonces.js', () => ({
+  storeNonce: vi.fn(),
 }));
 
 interface Keypair {
@@ -104,6 +109,8 @@ describe('session auth', () => {
       vi.mocked(getSessionWithUser).mockReset();
       vi.mocked(touchSession).mockReset();
       vi.mocked(touchSession).mockResolvedValue(undefined);
+      vi.mocked(storeNonce).mockReset();
+      vi.mocked(storeNonce).mockResolvedValue(true);
     });
 
     describe('header presence', () => {
@@ -470,78 +477,11 @@ describe('session auth', () => {
     });
 
     describe('nonce replay', () => {
-      it('sweeps expired nonces from cache before inserting a new one', async () => {
-        vi.useFakeTimers();
-        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
-
-        const iat1 = Math.floor(Date.now() / 1000);
-        await requireSession(
-          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat1, keypair.privateKey)),
-          makeMockReply() as never
-        );
-
-        // Advance past the tolerance window so the stored nonce expires
-        vi.advanceTimersByTime(SESSION_SIG_TOLERANCE_SECONDS * 1000 + 1);
-
-        const iat2 = Math.floor(Date.now() / 1000);
-        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat2, keypair.privateKey));
-        await requireSession(req, makeMockReply() as never);
-        expect(req.sessionContext).not.toBeNull();
-
-        vi.useRealTimers();
-      });
-
-      it('returns 401 SESSION_NONCE_USED when the same jti is presented twice', async () => {
-        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
-        const iat = Math.floor(Date.now() / 1000);
-        const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
-
-        const req1 = mockSessionRequest(headers);
-        await requireSession(req1, makeMockReply() as never);
-        expect(req1.sessionContext).not.toBeNull();
-
-        const reply2 = makeMockReply();
-        await requireSession(mockSessionRequest(headers), reply2 as never);
-        expect(reply2.send).toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.SESSION_NONCE_USED })
-        );
-      });
-
-      it('does not consume the nonce when the signature is invalid', async () => {
+      it('stores the jti with an expiry one tolerance window ahead', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
         const jti = crypto.randomUUID();
-
-        const reply1 = makeMockReply();
-        await requireSession(
-          mockSessionRequest(
-            makeSessionHeaders(
-              SESSION_ID,
-              iat,
-              otherKeypair.privateKey,
-              DEFAULT_PATH,
-              DEFAULT_METHOD,
-              jti
-            )
-          ),
-          reply1 as never
-        );
-        expect(reply1.send).toHaveBeenCalledWith(
-          expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
-        );
-
-        const req2 = mockSessionRequest(
-          makeSessionHeaders(SESSION_ID, iat, keypair.privateKey, DEFAULT_PATH, DEFAULT_METHOD, jti)
-        );
-        await requireSession(req2, makeMockReply() as never);
-        expect(req2.sessionContext).not.toBeNull();
-      });
-
-      it('does not consume the nonce when the session is not found', async () => {
-        const iat = Math.floor(Date.now() / 1000);
-        const jti = crypto.randomUUID();
-
-        vi.mocked(getSessionWithUser).mockResolvedValue(undefined as never);
+        const before = Date.now();
         await requireSession(
           mockSessionRequest(
             makeSessionHeaders(
@@ -555,13 +495,52 @@ describe('session auth', () => {
           ),
           makeMockReply() as never
         );
-
-        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
-        const req2 = mockSessionRequest(
-          makeSessionHeaders(SESSION_ID, iat, keypair.privateKey, DEFAULT_PATH, DEFAULT_METHOD, jti)
+        expect(storeNonce).toHaveBeenCalledWith(jti, expect.any(Date));
+        const expiresAt = vi.mocked(storeNonce).mock.calls[0]?.[1] as Date;
+        expect(expiresAt.getTime()).toBeGreaterThanOrEqual(
+          before + SESSION_SIG_TOLERANCE_SECONDS * 1000
         );
-        await requireSession(req2, makeMockReply() as never);
-        expect(req2.sessionContext).not.toBeNull();
+        expect(expiresAt.getTime()).toBeLessThanOrEqual(
+          Date.now() + SESSION_SIG_TOLERANCE_SECONDS * 1000
+        );
+      });
+
+      it('returns 401 SESSION_NONCE_USED when the nonce store reports a replay', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        vi.mocked(storeNonce).mockResolvedValue(false);
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.SESSION_NONCE_USED })
+        );
+      });
+
+      it('does not consume the nonce when the signature is invalid', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, otherKeypair.privateKey)),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
+        );
+        expect(storeNonce).not.toHaveBeenCalled();
+      });
+
+      it('does not consume the nonce when the session is not found', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(undefined as never);
+        const iat = Math.floor(Date.now() / 1000);
+        await requireSession(
+          mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey)),
+          makeMockReply() as never
+        );
+        expect(storeNonce).not.toHaveBeenCalled();
       });
     });
 
