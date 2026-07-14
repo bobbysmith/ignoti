@@ -156,7 +156,7 @@ export const WEBAUTHN = {
   ATTESTATION: 'none',
   CREDENTIAL_TYPE: 'public-key',
   TIMEOUT: 60000, // 60 seconds
-  USER_VERIFICATION: 'preferred',
+  USER_VERIFICATION: 'required',
 } as const;
 
 // ============================================================================
