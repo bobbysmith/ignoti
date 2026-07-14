@@ -5,6 +5,12 @@ import { sql } from '../../db/client.js';
 export { runMigrations } from '../../db/migrate.js';
 
 export async function cleanDatabase(): Promise<void> {
+  const database = sql.options.database;
+  if (!database?.endsWith('_test')) {
+    throw new Error(
+      `Refusing to truncate database "${database}": integration tests only run against a database whose name ends in "_test"`
+    );
+  }
   await sql`truncate users, devices, challenges, sessions, session_nonces restart identity cascade`;
 }
 

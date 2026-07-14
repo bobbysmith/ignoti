@@ -125,6 +125,18 @@ if (session) {
 }
 ```
 
+Call `restoreSession()` only once per page load. Each call rebinds a fresh keypair to the server, so two concurrent calls race and can leave the server holding a public key that no longer matches the stored session, causing `invalid_session_signature` on subsequent requests. In React, StrictMode double-invokes effects in development, so guard with a `useRef`:
+
+```tsx
+const restored = useRef(false);
+
+useEffect(() => {
+  if (restored.current) return;
+  restored.current = true;
+  ghost.restoreSession().catch(() => {});
+}, []);
+```
+
 `getSession()` returns `null` if there is no active session. This happens when:
 - The user has never logged in on this device
 - The session has expired

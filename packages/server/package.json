@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx --env-file=.env.local src/db/migrate.ts",
-    "test:integration": "node --env-file=.env.local node_modules/vitest/dist/cli.js run --config vitest.integration.config.ts",
+    "db:migrate:test": "tsx --env-file=.env.test.local src/db/migrate.ts",
+    "test:integration": "node --env-file=.env.test.local node_modules/vitest/dist/cli.js run --config vitest.integration.config.ts",
     "test:integration:ci": "vitest run --config vitest.integration.config.ts",
     "db:migrate:ci": "tsx src/db/migrate.ts"
   },
