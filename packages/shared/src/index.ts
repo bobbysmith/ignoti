@@ -26,6 +26,11 @@ export type RootPurpose = 'register-device' | 'recover-device' | 'revoke-device'
 
 // Maximum age of a root-key JWS (register-device / recover-device / revoke-device).
 // SDK sets exp = iat + ROOT_JWS_MAX_AGE_SECONDS; server enforces via maxTokenAge.
+// The JWS is signed immediately before it is submitted (not when the challenge
+// is issued), so a long CHALLENGE_TTL_SECONDS does not consume this budget. The
+// realistic failure mode is client clock skew: jose applies zero clock tolerance
+// to maxTokenAge, so a client clock more than ROOT_JWS_MAX_AGE_SECONDS behind the
+// server rejects with INVALID_ROOT_SIGNATURE.
 export const ROOT_JWS_MAX_AGE_SECONDS = 300;
 
 // Maximum age of a session-binding JWS (POST /session).

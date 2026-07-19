@@ -312,8 +312,8 @@ try {
       case ErrorCodes.NO_KEYS:
         // no active session
         break;
-      case ErrorCodes.EXPIRED_CHALLENGE:
-        // session expired
+      case ErrorCodes.API_ERROR:
+        // server rejected the challenge or login (check err.httpStatus)
         break;
       default:
         // unexpected error

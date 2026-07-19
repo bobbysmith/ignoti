@@ -162,9 +162,10 @@ only usable for a short window. A signature from last week cannot be replayed to
 
 ## Revoking a device kills all its sessions atomically
 
-When a device is revoked, the server deletes both the device and all its active sessions in a single database 
-transaction. There is no window between the two operations where the device is revoked but its sessions are still 
-live. An attacker cannot race to use an active session after revocation has been issued.
+When a device is revoked, the server marks both the device and all its active sessions revoked in a single database 
+transaction (the rows are hard-deleted later by garbage collection, seven days on). There is no window between the 
+two operations where the device is revoked but its sessions are still live. An attacker cannot race to use an active 
+session after revocation has been issued.
 
 ## Sensitive endpoints are rate limited
 

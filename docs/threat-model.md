@@ -35,7 +35,7 @@ in the DB but is never echoed back to clients or included in tokens.
 | Passkey private key       | Authenticator's secure enclave          | Critical (hardware-bound) | Critical  | Medium (per-device)         |
 | Session private key       | Browser memory only, wiped on logout    | High                      | High      | Low (re-creatable on login) |
 | Session token (cookie)    | httpOnly browser cookie                 | High                      | N/A       | Low (re-creatable on login) |
-| User pseudonym (`userId`) | Backend DB and SDK localStorage         | Medium                    | High      | High                        |
+| User pseudonym (`userId`) | Backend DB only (SDK persists nothing)  | Medium                    | High      | High                        |
 | Device list               | Backend DB                              | Medium                    | High      | High                        |
 
 ## 3. Attacker model
@@ -139,8 +139,9 @@ version.
 
 ### Account enumeration via timing
 A naive `register`/`recover` implementation can leak whether a `userId` exists by timing differences. The backend 
-MUST issue identical responses, and identical timing within reason, regardless of existence. Tracked in the server 
-build.
+issues identical responses and equalizes timing regardless of existence: the not-found path runs the same
+registration-options work and inserts a throwaway NULL-user challenge so both branches take the same time
+(`routes/auth.ts`).
 
 ### Denial of service
 Standard mitigations only, rate limiting, infra-level WAF. Not a cryptographic guarantee.
@@ -155,8 +156,8 @@ We use a per-account opaque UUID, but downstream integrators must not echo it ba
 |-----------------------|-------------------------------------------------------------------|--------------------------------------|
 | Mnemonic              | BIP39 (12 words / 128-bit entropy)                                | `@scure/bip39`                       |
 | Root key derivation   | BLAKE2b KDF on BIP39 seed                                         | `@noble/hashes`                      |
-| Root signatures       | Ed25519                                                           | `@noble/curves`                      |
-| Session key           | Ed25519                                                           | `@noble/curves`                      |
+| Root signatures       | Ed25519                                                           | `@noble/curves` (public key) + WebCrypto (signing) |
+| Session key           | Ed25519, non-extractable                                         | WebCrypto (`crypto.subtle`)          |
 | Device authentication | WebAuthn (ES256 / RS256)                                          | Browser and `@simplewebauthn/server` |
 | Hashing               | BLAKE2b-256                                                       | `@noble/hashes`                      |
 | Random                | `crypto.getRandomValues` (client) / `crypto.randomBytes` (server) | Native                               |

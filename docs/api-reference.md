@@ -26,7 +26,7 @@ const ghost = new GhostID({
 
 ### `ghost.init()`
 
-Marks the instance as initialized. Must be called before any other method. Methods called before `init()` throw `NOT_INITIALIZED`.
+Marks the instance as initialized. Must be called before any method that touches identity or session state; those throw `NOT_INITIALIZED` if called first. The exception is `onSessionChange()`, which is designed to be registered before `init()` so you do not miss the initial session transition.
 
 ```ts
 ghost.init();
@@ -66,7 +66,7 @@ Returns: `void`
 
 ### `ghost.createIdentity()`
 
-Creates a new user identity. Generates a 12-word mnemonic, derives a root keypair, registers a passkey on the current device, and establishes a session.
+Creates a new user identity. Generates a 12-word mnemonic, derives a root keypair, and registers a passkey on the current device. Does not create a session - call `login()` afterward to authenticate.
 
 ```ts
 const { mnemonic, userId, deviceId } = await ghost.createIdentity();
