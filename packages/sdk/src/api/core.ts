@@ -1,5 +1,4 @@
 /**
- * @file core.ts
  * Core API client. Validates inputs at the type/format level (URL, header
  * grammar, body size) without applying HTML/SQL escaping. This is an HTTP
  * client not an HTML/SQL renderer, so context-mismatched escaping would
@@ -29,6 +28,14 @@ const HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const HEADER_VALUE_RE = /^[\t\x20-\x7E]*$/;
 
 const FORBIDDEN_REQUEST_HEADERS = new Set<string>(SECURITY.FORBIDDEN_HEADERS);
+
+/** The bound `CoreApiClient.makeRequest`, injected into each API module. */
+export type MakeRequest = <T>(
+  method: string,
+  path: string,
+  data?: Record<string, unknown> | string | number | boolean,
+  headers?: Record<string, string>
+) => Promise<T>;
 
 export class CoreApiClient {
   private readonly baseUrl: string;
@@ -242,9 +249,11 @@ export class CoreApiClient {
             );
           }
 
-          if (fetchError instanceof TypeError) {
-            throw fetchError;
-          }
+          // Browsers reject with TypeError for transient network failures
+          // (offline, DNS, connection reset) as well as for non-retryable ones
+          // (CORS, bad request config). We cannot reliably distinguish them from
+          // the error alone, so we retry: transient failures recover, and the
+          // non-retryable ones simply fail after the bounded attempt count.
           if (attempt < this.retryAttempts) {
             await retryDelay(attempt);
           }

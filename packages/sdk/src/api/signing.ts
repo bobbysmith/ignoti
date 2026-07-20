@@ -1,5 +1,4 @@
 /**
- * @file signing.ts
  * Request signing utilities for API client
  */
 

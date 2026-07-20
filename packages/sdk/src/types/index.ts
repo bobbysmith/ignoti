@@ -1,5 +1,4 @@
 /**
- * @file index.ts
  * Central type definitions for GhostID
  */
 

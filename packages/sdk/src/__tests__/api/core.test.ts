@@ -97,11 +97,41 @@ describe('code api', () => {
       expect(fetch).toHaveBeenCalledTimes(3);
     });
 
-    it('rethrows TypeError immediately on network-level failure', async () => {
-      const client = makeClient();
-      const networkError = new TypeError('Failed to fetch');
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(networkError);
+    it('retries a TypeError network failure and succeeds on a later attempt', async () => {
+      vi.useFakeTimers();
+      const client = makeClient({ retryAttempts: 3 });
+      const fetchMock = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: '200',
+          headers: { get: () => 'application/json' },
+          json: () => Promise.resolve({ userId: 'abc' }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const assertion = client.makeRequest('GET', API_TEST_PATH);
+      await vi.runAllTimersAsync();
+      await expect(assertion).resolves.toEqual({ userId: 'abc' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+
+    it('exhausts attempts when a TypeError network failure persists', async () => {
+      vi.useFakeTimers();
+      const client = makeClient({ retryAttempts: 3 });
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const assertion = expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(
+        GhostIDError
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      vi.useRealTimers();
     });
 
     it('retries on non-TypeError fetch error and exhausts attempts', async () => {

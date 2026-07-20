@@ -1,5 +1,4 @@
 /**
- * @file sessions.ts
  * Session management methods for API client
  */
 
@@ -10,7 +9,7 @@ import {
   SESSION_AUTH_SCHEME,
   VALIDATION,
 } from '@/constants';
-import { BaseApiClient } from './base';
+import type { MakeRequest } from './core';
 import { validateString } from './validation';
 
 interface RawSessionsResponse {
@@ -24,17 +23,8 @@ interface RawSessionsResponse {
   }>;
 }
 
-export class SessionsApiClient extends BaseApiClient {
-  constructor(
-    protected makeRequest: <T>(
-      method: string,
-      path: string,
-      data?: Record<string, unknown> | string | number | boolean,
-      headers?: Record<string, string>
-    ) => Promise<T>
-  ) {
-    super();
-  }
+export class SessionsApiClient {
+  constructor(protected makeRequest: MakeRequest) {}
 
   async getSessions(
     sessionId: string,

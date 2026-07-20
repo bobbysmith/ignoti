@@ -52,14 +52,18 @@ import {
   sessionBody,
 } from '../schemas/auth.js';
 
-function sessionCookieOptions() {
+// Cookie lifetime is pinned to the session's own expiry, not a fixed TTL:
+// /session/restore rebinds without extending expires_at, so a full-TTL cookie
+// would outlive the session and guarantee a doomed restore near end-of-life.
+function sessionCookieOptions(expiresAt: Date) {
   const secure = config.COOKIE_SECURE;
+  const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
   return {
     httpOnly: true,
     secure,
     sameSite: secure ? ('none' as const) : ('lax' as const),
     path: '/',
-    maxAge: config.SESSION_TTL_SECONDS,
+    maxAge,
   };
 }
 
@@ -368,7 +372,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.setCookie(
         SESSION_COOKIE_NAME,
         buildSessionCookie(session.id, secret),
-        sessionCookieOptions()
+        sessionCookieOptions(session.expires_at)
       );
 
       return reply.send({
@@ -453,7 +457,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.setCookie(
         SESSION_COOKIE_NAME,
         buildSessionCookie(sessionId, rotated.secret),
-        sessionCookieOptions()
+        sessionCookieOptions(session.expires_at)
       );
 
       return reply.send({

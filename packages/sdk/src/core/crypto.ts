@@ -1,5 +1,4 @@
 /**
- * @file crypto.ts
  * Crypto primitives backed by audited, ESM-native libraries:
  *   - `@noble/curves/ed25519` - Ed25519 sign/verify/keygen
  *   - `@noble/hashes/blake2`  - BLAKE2b hashing

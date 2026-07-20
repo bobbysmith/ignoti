@@ -1,5 +1,4 @@
 /**
- * @file client.ts
  * Main API client that composes all modules
  */
 

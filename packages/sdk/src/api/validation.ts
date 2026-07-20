@@ -1,5 +1,4 @@
 /**
- * @file validation.ts
  * Validation utilities for API client
  */
 

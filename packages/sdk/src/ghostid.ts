@@ -1,5 +1,4 @@
 /**
- * @file ghostid.ts
  * Main GhostID SDK class. Three-layer identity model:
  *   1. Root identity (BIP39 mnemonic and Ed25519) - recovery and high-stakes ops.
  *   2. Device identity (WebAuthn passkey) - daily auth.

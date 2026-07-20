@@ -1,5 +1,4 @@
 /**
- * @file session-jws.ts
  * Session-binding JWS (RFC 7515) signed with a freshly-generated session
  * Ed25519 keypair. The public key travels in the JWS protected header as a
  * `jwk` (RFC 7517) so the server can extract it and store it as the session's

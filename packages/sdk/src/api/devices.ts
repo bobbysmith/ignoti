@@ -1,5 +1,4 @@
 /**
- * @file devices.ts
  * Device management methods for API client
  */
 
@@ -12,20 +11,11 @@ import {
 } from '@/constants';
 import type { GetDevicesResponse } from '@/types';
 
-import { BaseApiClient } from './base';
+import type { MakeRequest } from './core';
 import { validateString } from './validation';
 
-export class DevicesApiClient extends BaseApiClient {
-  constructor(
-    protected makeRequest: <T>(
-      method: string,
-      path: string,
-      data?: Record<string, unknown> | string | number | boolean,
-      headers?: Record<string, string>
-    ) => Promise<T>
-  ) {
-    super();
-  }
+export class DevicesApiClient {
+  constructor(protected makeRequest: MakeRequest) {}
 
   async getDevices(
     sessionId: string,

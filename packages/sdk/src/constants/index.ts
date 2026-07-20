@@ -1,5 +1,4 @@
 /**
- * @file index.ts
  * Central constants for GhostID
  */
 
@@ -163,6 +162,8 @@ export const WEBAUTHN = {
 // Session Constants
 // ============================================================================
 
+// NOTE: informational only. Session TTL is server-authoritative
+// (SESSION_TTL_SECONDS); these do not configure the SDK.
 export const SESSION = {
   DEFAULT_EXPIRY_HOURS: 24,
   MAX_EXPIRY_HOURS: 168, // 1 week

@@ -125,7 +125,14 @@ export async function verifySessionAuth(
   // After signature verification so only holders of the session key can write
   // nonce rows. The primary-key insert is atomic, so concurrent duplicates
   // cannot both succeed, on this instance or any other.
-  const expiresAt = new Date(Date.now() + SESSION_SIG_TOLERANCE_SECONDS * 1000);
+  //
+  // The nonce must outlive the full window in which its request stays replayable.
+  // Because `iat` may be up to SESSION_SIG_TOLERANCE_SECONDS in the future, a
+  // future-dated request is accepted until iat + tolerance, which can exceed
+  // now + tolerance. Anchor the expiry on max(now, iat) so GC never drops the
+  // row while the timestamp check would still accept a replay of it.
+  const nowMs = Date.now();
+  const expiresAt = new Date(Math.max(nowMs, iat * 1000) + SESSION_SIG_TOLERANCE_SECONDS * 1000);
   if (!(await storeNonce(jti, expiresAt))) {
     return { ok: false, code: ERROR_CODES.SESSION_NONCE_USED };
   }

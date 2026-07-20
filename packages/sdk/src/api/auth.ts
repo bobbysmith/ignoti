@@ -1,5 +1,4 @@
 /**
- * @file auth.ts
  * Authentication methods for API client
  */
 
@@ -20,23 +19,14 @@ import type {
 } from '@/types';
 import { ErrorCodes, GhostIDError } from '../core/errors';
 
-import { BaseApiClient } from './base';
+import type { MakeRequest } from './core';
 import { validateString } from './validation';
 
 /**
  * Authentication methods for API client
  */
-export class AuthApiClient extends BaseApiClient {
-  constructor(
-    protected makeRequest: <T>(
-      method: string,
-      path: string,
-      data?: Record<string, unknown> | string | number | boolean,
-      headers?: Record<string, string>
-    ) => Promise<T>
-  ) {
-    super();
-  }
+export class AuthApiClient {
+  constructor(protected makeRequest: MakeRequest) {}
 
   /**
    * Registers a new user with their root public key
