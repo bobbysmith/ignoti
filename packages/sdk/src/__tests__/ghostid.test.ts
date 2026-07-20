@@ -419,6 +419,32 @@ describe('GhostID', () => {
 
       expect(mockRevokeDevice).toHaveBeenCalledWith('device-1', 'root-sig');
     });
+
+    it('clears local state and fires onSessionChange when revoking the current device', async () => {
+      const { g } = await withSession(); // session is bound to device-1
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      mockRevokeDevice.mockResolvedValue({ ok: true });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+
+      await g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id');
+
+      expect(cb).toHaveBeenCalledWith(null);
+      expect(g.getSession()).toBeNull();
+    });
+
+    it('leaves the current session intact when revoking a different device', async () => {
+      const { g, sessionId } = await withSession(); // session is bound to device-1
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      mockRevokeDevice.mockResolvedValue({ ok: true });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+
+      await g.revokeDevice('device-2', MNEMONIC, 'user-1', 'cred-id');
+
+      expect(cb).not.toHaveBeenCalled();
+      expect(g.getSession()?.sessionId).toBe(sessionId);
+    });
   });
 
   describe('getSessions', () => {

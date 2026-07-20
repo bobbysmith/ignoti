@@ -50,7 +50,7 @@ ghost.onSessionChange(session => {
 });
 ```
 
-Fires on: `login()`, `logout()`, `restoreSession()`, and `revokeSession()` when the current session is revoked.
+Fires on: `login()`, `logout()`, `restoreSession()`, the silent-refresh interceptor, and `revokeSession()`/`revokeDevice()` when the current session or its device is revoked.
 
 **Parameters**
 
