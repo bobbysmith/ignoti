@@ -94,7 +94,9 @@ export async function rotateSessionOnRestore(
 ): Promise<RotateRow | undefined> {
   const [row] = await sql<RotateRow[]>`
     update sessions s
-    set session_public_key = ${newPublicKey}, restore_token_hash = ${newHash}
+    set session_public_key = ${newPublicKey},
+        prev_restore_token_hash = s.restore_token_hash,
+        restore_token_hash = ${newHash}
     from devices d
     where s.id = ${sessionId}
       and s.device_id = d.id
@@ -107,10 +109,30 @@ export async function rotateSessionOnRestore(
 }
 
 /**
- * Revokes a single active session by id, independent of ownership. Used by the
- * restore path when token reuse is detected. Returns true if a live session was
- * revoked (i.e. the reuse hit an active session), false if it was already
- * inactive.
+ * Restore-token reuse detection (single-generation: tracks the immediately-prior
+ * hash, not a full token family). Revokes only when the presented secret matches
+ * the superseded hash. A secret matching neither hash must not revoke: session ids
+ * are not secret, so that would be a remote DoS.
+ */
+export async function revokeSessionOnRestoreReuse(
+  sessionId: string,
+  presentedHash: string
+): Promise<boolean> {
+  const [row] = await sql<{ id: string }[]>`
+    update sessions set revoked_at = now()
+    where id = ${sessionId}
+      and revoked_at is null
+      and expires_at > now()
+      and prev_restore_token_hash = ${presentedHash}
+    returning id
+  `;
+  return row !== undefined;
+}
+
+/**
+ * Revokes a session by id without authorizing the caller. Not for the restore
+ * mismatch path (that needs revokeSessionOnRestoreReuse); session ids are not
+ * secret, so unconditional revoke-by-id there is a DoS.
  */
 export async function revokeSessionById(sessionId: string): Promise<boolean> {
   const [row] = await sql<{ id: string }[]>`

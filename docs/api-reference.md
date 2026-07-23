@@ -38,7 +38,7 @@ Returns: `void`
 
 ### `ghost.onSessionChange(callback)`
 
-Registers a callback that fires on every session transition. Call before `init()` so you do not miss the initial state.
+Registers a callback that fires on every session transition. The callback is **not** invoked on registration with the current state - it only fires on subsequent transitions. Register it before your first `restoreSession()`/`login()` call so you do not miss that first transition.
 
 ```ts
 ghost.onSessionChange(session => {
@@ -77,7 +77,8 @@ Returns: `Promise<CreateIdentityResult>`
 
 Throws:
 - `NOT_INITIALIZED` - `init()` was not called
-- `INVALID_INPUT` - WebAuthn is not supported in this browser
+- `INVALID_INPUT` - WebAuthn is not supported, or the user cancelled the passkey prompt
+- `CRYPTOGRAPHY_ERROR` - passkey creation failed
 - `API_ERROR` - server error (check `httpStatus`)
 
 ---
@@ -101,7 +102,8 @@ Returns: `Promise<RecoverIdentityResult>`
 
 Throws:
 - `NOT_INITIALIZED`
-- `INVALID_INPUT` - WebAuthn is not supported
+- `INVALID_INPUT` - invalid mnemonic phrase, WebAuthn is not supported, or the user cancelled the passkey prompt
+- `CRYPTOGRAPHY_ERROR` - passkey creation failed
 - `API_ERROR` - mnemonic does not match any account, or server error
 
 ---
@@ -136,6 +138,8 @@ Returns: `Promise<SessionInfo>`
 
 Throws:
 - `NOT_INITIALIZED`
+- `INVALID_INPUT` - WebAuthn is not supported, or the user cancelled the passkey prompt
+- `CRYPTOGRAPHY_ERROR` - passkey assertion failed
 - `API_ERROR` - challenge request or login request failed
 
 ---
@@ -270,6 +274,7 @@ Returns: `Promise<void>`
 
 Throws:
 - `NOT_INITIALIZED`
+- `INVALID_INPUT` - invalid mnemonic phrase
 - `API_ERROR` - mnemonic does not match, device not found, or server error
 
 ---

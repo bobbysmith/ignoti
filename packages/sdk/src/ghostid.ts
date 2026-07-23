@@ -397,9 +397,8 @@ export class GhostID {
     );
     await this.apiClient.devices.revokeDevice(deviceId, rootSignature);
 
-    // Revoking a device also revokes its sessions server-side, so if we just
-    // revoked the device backing the current session, that session is now dead.
-    // Clear local state and notify, mirroring revokeSession's current-session path.
+    // Revoking a device also revokes its sessions server-side; if it backed the
+    // current session, that session is now dead, so clear local state.
     if (this.session?.deviceId === deviceId) {
       this.session = null;
       this.notifySessionChange();

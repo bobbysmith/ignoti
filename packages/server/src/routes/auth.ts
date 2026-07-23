@@ -29,7 +29,7 @@ import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../db/quer
 import { incrementSignCountWithChallenge } from '../db/queries/login.js';
 import {
   insertSession,
-  revokeSessionById,
+  revokeSessionOnRestoreReuse,
   rotateSessionOnRestore,
 } from '../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
@@ -52,18 +52,14 @@ import {
   sessionBody,
 } from '../schemas/auth.js';
 
-// Cookie lifetime is pinned to the session's own expiry, not a fixed TTL:
-// /session/restore rebinds without extending expires_at, so a full-TTL cookie
-// would outlive the session and guarantee a doomed restore near end-of-life.
-function sessionCookieOptions(expiresAt: Date) {
+function sessionCookieOptions() {
   const secure = config.COOKIE_SECURE;
-  const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
   return {
     httpOnly: true,
     secure,
     sameSite: secure ? ('none' as const) : ('lax' as const),
     path: '/',
-    maxAge,
+    maxAge: config.SESSION_TTL_SECONDS,
   };
 }
 
@@ -372,7 +368,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.setCookie(
         SESSION_COOKIE_NAME,
         buildSessionCookie(session.id, secret),
-        sessionCookieOptions(session.expires_at)
+        sessionCookieOptions()
       );
 
       return reply.send({
@@ -435,19 +431,20 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
+      const presentedHash = hashRestoreToken(secret);
       const rotated = generateRestoreToken();
       const session = await rotateSessionOnRestore(
         sessionId,
-        hashRestoreToken(secret),
+        presentedHash,
         rotated.hash,
         verified.sessionPublicKey
       );
 
       if (!session) {
-        // No active session matched this secret. If the session is still active,
-        // the presented cookie was a stale/replayed one — revoke it as reuse.
-        const wasActive = await revokeSessionById(sessionId);
-        if (wasActive) {
+        // Revoke only on a replayed superseded secret. Session ids are not secret,
+        // so revoking on any mismatch would be a remote DoS.
+        const reuseDetected = await revokeSessionOnRestoreReuse(sessionId, presentedHash);
+        if (reuseDetected) {
           req.log.warn({ sessionId }, 'session restore token reuse detected; session revoked');
         }
         reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
@@ -457,7 +454,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       reply.setCookie(
         SESSION_COOKIE_NAME,
         buildSessionCookie(sessionId, rotated.secret),
-        sessionCookieOptions(session.expires_at)
+        sessionCookieOptions()
       );
 
       return reply.send({

@@ -23,7 +23,7 @@ import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../../db/q
 import { incrementSignCountWithChallenge } from '../../db/queries/login.js';
 import {
   insertSession,
-  revokeSessionById,
+  revokeSessionOnRestoreReuse,
   rotateSessionOnRestore,
 } from '../../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../../db/queries/users.js';
@@ -951,20 +951,34 @@ describe('auth', () => {
       });
 
       it('returns 401 SESSION_NOT_FOUND when rotateSessionOnRestore returns undefined', async () => {
-        vi.mocked(revokeSessionById).mockResolvedValue(false);
+        vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(false);
         const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
-      it('revokes the session when the secret does not match (reuse detection)', async () => {
-        vi.mocked(revokeSessionById).mockResolvedValue(true);
+      it('checks for reuse with the presented secret hash, not the bare session id', async () => {
+        vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(true);
         await postRestore(undefined, VALID_SESSION_COOKIE);
-        expect(revokeSessionById).toHaveBeenCalledWith(VALID_SESSION_ID);
+        // Reuse detection is gated on the presented secret's hash matching the
+        // superseded hash — never on the session id alone.
+        expect(revokeSessionOnRestoreReuse).toHaveBeenCalledWith(
+          VALID_SESSION_ID,
+          expect.any(String)
+        );
+      });
+
+      it('does NOT revoke on a garbage secret for a known session id (DoS guard)', async () => {
+        // rotate fails (wrong current hash) AND reuse check finds no superseded
+        // match — the endpoint must reject without revoking.
+        vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(false);
+        const res = await postRestore(undefined, `${VALID_SESSION_ID}.not-the-real-secret`);
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
       it('clears the session cookie on rotation failure', async () => {
-        vi.mocked(revokeSessionById).mockResolvedValue(true);
+        vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(true);
         const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);

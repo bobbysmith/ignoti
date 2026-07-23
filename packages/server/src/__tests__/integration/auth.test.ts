@@ -120,6 +120,23 @@ async function registerAndLogin(app: FastifyInstance, credId = CRED_ID) {
   };
 }
 
+// Posts /session/restore with a fresh, valid session-binding JWS over any keypair.
+async function restoreWithCookie(app: FastifyInstance, cookie: string) {
+  const { privateKey, publicKey } = await generateSessionKeypair();
+  const sessionBinding = await signSessionBindingJWS(crypto.randomUUID(), privateKey, publicKey);
+  return app.inject({
+    method: 'POST',
+    url: '/api/auth/session/restore',
+    headers: { cookie },
+    payload: { sessionBinding },
+  });
+}
+
+function setCookieHeader(res: Awaited<ReturnType<FastifyInstance['inject']>>): string {
+  const raw = res.headers['set-cookie'];
+  return Array.isArray(raw) ? (raw[0] as string) : (raw as string);
+}
+
 describe('Integration: auth happy paths', () => {
   let app: FastifyInstance;
 
@@ -251,6 +268,34 @@ describe('Integration: auth happy paths', () => {
         payload: { sessionBinding },
       });
       expect(res.statusCode).toBe(401);
+    });
+
+    it('revokes the session when a superseded (already-rotated) secret is replayed', async () => {
+      const { sessionCookie } = await registerAndLogin(app);
+
+      const first = await restoreWithCookie(app, sessionCookie);
+      expect(first.statusCode).toBe(200);
+      const rotatedCookie = setCookieHeader(first);
+
+      // Replaying the original (now-superseded) cookie is reuse: revoke.
+      const replay = await restoreWithCookie(app, sessionCookie);
+      expect(replay.statusCode).toBe(401);
+
+      // The rotated secret no longer restores, confirming the session was revoked.
+      const afterReuse = await restoreWithCookie(app, rotatedCookie);
+      expect(afterReuse.statusCode).toBe(401);
+    });
+
+    it('does NOT revoke on a garbage secret for a known session id (revocation DoS guard)', async () => {
+      const { sessionCookie, sessionId } = await registerAndLogin(app);
+
+      const garbageCookie = `ghostid_session=${sessionId}.not-the-real-secret-000000000000`;
+      const attack = await restoreWithCookie(app, garbageCookie);
+      expect(attack.statusCode).toBe(401);
+
+      // The live session survives the garbage attempt: the real cookie still restores.
+      const legit = await restoreWithCookie(app, sessionCookie);
+      expect(legit.statusCode).toBe(200);
     });
   });
 

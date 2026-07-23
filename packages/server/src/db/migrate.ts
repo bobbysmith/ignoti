@@ -5,11 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 import { sql } from './client.js';
 
-// Resolved relative to this source file, so the same code works from both
-// supported entry points: `pnpm db:migrate` (tsx, reads src/db/migrations) and
-// the Docker image (node dist/db/migrate.js, where the Dockerfile copies the
-// .sql files to dist/db/migrations). tsc does not copy .sql files, so a plain
-// `tsc && node dist/...` without that copy step would find no migrations.
+// Resolved relative to this source file so it works both under tsx
+// (src/db/migrations) and in the Docker image, where the Dockerfile copies the
+// .sql files next to the compiled output (tsc does not copy them).
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'migrations');
 
 async function bootstrap(): Promise<void> {

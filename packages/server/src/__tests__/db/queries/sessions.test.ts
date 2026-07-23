@@ -7,6 +7,7 @@ import {
   revokeAllSessionsForUser,
   revokeSessionById,
   revokeSessionForUser,
+  revokeSessionOnRestoreReuse,
   rotateSessionOnRestore,
   touchSession,
 } from '../../../db/queries/sessions.js';
@@ -199,6 +200,38 @@ describe('sessions db queries', () => {
       const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
       expect(query).toContain('revoked_at is null');
       expect(query).toContain('expires_at > now()');
+    });
+
+    it('records the superseded hash into prev_restore_token_hash on rotation', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
+      await rotateSessionOnRestore(SESSION_ID, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY);
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      expect(query).toContain('prev_restore_token_hash = s.restore_token_hash');
+    });
+  });
+
+  describe('revokeSessionOnRestoreReuse', () => {
+    const PRESENTED_HASH = 'superseded-hash-b64';
+
+    it('returns true when the presented hash matches the superseded hash (reuse)', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([{ id: SESSION_ID }] as never);
+      await expect(revokeSessionOnRestoreReuse(SESSION_ID, PRESENTED_HASH)).resolves.toBe(true);
+    });
+
+    it('returns false when the presented hash matches no superseded hash (not reuse)', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await expect(revokeSessionOnRestoreReuse(SESSION_ID, PRESENTED_HASH)).resolves.toBe(false);
+    });
+
+    it('gates revocation on prev_restore_token_hash, not the session id alone', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await revokeSessionOnRestoreReuse(SESSION_ID, PRESENTED_HASH);
+      const args = vi.mocked(sql).mock.calls[0];
+      const query = (args[0] as readonly string[]).join('');
+      expect(query).toContain('prev_restore_token_hash =');
+      expect(query).toContain('revoked_at is null');
+      expect(query).toContain('expires_at > now()');
+      expect(args).toEqual(expect.arrayContaining([SESSION_ID, PRESENTED_HASH]));
     });
   });
 

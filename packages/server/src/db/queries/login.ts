@@ -8,10 +8,9 @@ export async function incrementSignCountWithChallenge(
   expiresAt: Date
 ): Promise<boolean> {
   return sql.begin(async tx => {
-    // The `${newCounter} = 0` branch permits authenticators that always report a
-    // zero counter (Touch ID, Face ID, Windows Hello — the spec allows this).
-    // Clone detection via strict monotonicity is therefore disabled for them by
-    // design; do not "fix" this into rejecting zero counters.
+    // newCounter = 0 is allowed: platform authenticators (Touch ID, Face ID,
+    // Windows Hello) always report zero, which the spec permits. Clone detection
+    // via strict monotonicity does not apply to them.
     const [updated] = await tx<{ id: string }[]>`
       update devices set sign_count = ${newCounter}, last_used_at = now()
       where id = ${deviceId}

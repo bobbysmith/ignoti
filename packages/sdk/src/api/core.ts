@@ -249,11 +249,9 @@ export class CoreApiClient {
             );
           }
 
-          // Browsers reject with TypeError for transient network failures
-          // (offline, DNS, connection reset) as well as for non-retryable ones
-          // (CORS, bad request config). We cannot reliably distinguish them from
-          // the error alone, so we retry: transient failures recover, and the
-          // non-retryable ones simply fail after the bounded attempt count.
+          // Browsers surface every network failure as TypeError — transient
+          // (offline, DNS, reset) and permanent (CORS, bad config) alike, and are
+          // indistinguishable here, so both fall through to the bounded retry loop.
           if (attempt < this.retryAttempts) {
             await retryDelay(attempt);
           }
