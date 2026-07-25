@@ -170,8 +170,12 @@ The server image is published to Docker Hub as `ghostid/server`. You can also bu
 
 **Database maintenance:**
 
-GhostID includes a `ghostid_gc()` function that deletes expired challenges and old sessions. Schedule it to run at 
-least daily using your database's job scheduler.
+The server prunes expired challenges, nonces, and old sessions itself, running the `ghostid_gc()` function 
+in-process every `GC_INTERVAL_SECONDS` (default 3600). Only one instance sweeps at a time, coordinated by a Postgres 
+advisory lock, so this is safe to run with multiple replicas. No setup is required.
+
+If you would rather drive cleanup from an external scheduler, set `GC_INTERVAL_SECONDS=0` to disable the in-process 
+timer and call the function on a schedule your database supports:
 
 ```sql
 select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');

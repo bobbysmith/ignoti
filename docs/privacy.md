@@ -50,7 +50,7 @@ The `userId` stored in your database is a random UUID generated at registration.
 
 ## Stale data is deleted automatically
 
-Sessions and challenges are automatically garbage collected. Expired challenges are deleted immediately. Sessions are deleted seven days after they expire or are revoked. The database does not accumulate years of login history by default. What was not collected cannot be subpoenaed, breached, or sold.
+Sessions and challenges are garbage collected on a schedule. The server runs the cleanup in-process every hour by default (`GC_INTERVAL_SECONDS`), so a stock deployment prunes itself with no extra setup; you can disable it and drive `ghostid_gc()` from an external scheduler instead. Expired challenges and nonces are removed on the next sweep; sessions are removed seven days after they expire or are revoked. The database does not accumulate years of login history by default. What was not collected cannot be subpoenaed, breached, or sold.
 
 ## GDPR and data minimization
 

@@ -8,6 +8,9 @@ const SESSION_TTL_MIN_SECONDS = 60; // 1 minute
 const SESSION_TTL_MAX_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const SESSION_TTL_DEFAULT_SECONDS = 60 * 60 * 24; // 24 hours
 
+const GC_INTERVAL_MAX_SECONDS = 60 * 60 * 24; // 1 day
+const GC_INTERVAL_DEFAULT_SECONDS = 60 * 60; // 1 hour
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(8787),
   HOST: z.string().default('0.0.0.0'),
@@ -49,6 +52,14 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform(v => v.toLowerCase() === 'true'),
+  // Interval for the in-process garbage collector that prunes expired
+  // challenges, nonces, and old sessions/devices. Set to 0 to disable when an
+  // external scheduler (pg_cron, Supabase Cron) already calls ghostid_gc().
+  GC_INTERVAL_SECONDS: z.coerce
+    .number()
+    .min(0)
+    .max(GC_INTERVAL_MAX_SECONDS)
+    .default(GC_INTERVAL_DEFAULT_SECONDS),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

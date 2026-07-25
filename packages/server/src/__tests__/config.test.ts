@@ -180,6 +180,25 @@ describe('config', () => {
     });
   });
 
+  describe('GC_INTERVAL_SECONDS', () => {
+    it('defaults to 3600 (1 hour) when GC_INTERVAL_SECONDS is not set', async () => {
+      stubEnv();
+      const config = await loadConfig();
+      expect(config.GC_INTERVAL_SECONDS).toBe(3600);
+    });
+
+    it('accepts 0 to disable in-process GC', async () => {
+      stubEnv({ GC_INTERVAL_SECONDS: '0' });
+      const config = await loadConfig();
+      expect(config.GC_INTERVAL_SECONDS).toBe(0);
+    });
+
+    it('throws when GC_INTERVAL_SECONDS exceeds one day', async () => {
+      stubEnv({ GC_INTERVAL_SECONDS: String(60 * 60 * 24 + 1) });
+      await expect(loadConfig()).rejects.toThrow();
+    });
+  });
+
   describe('LOG_LEVEL', () => {
     it('defaults to "info" when LOG_LEVEL is not set', async () => {
       stubEnv();

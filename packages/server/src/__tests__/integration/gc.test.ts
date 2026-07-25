@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sql } from '../../db/client.js';
+import { runGc } from '../../db/queries/gc.js';
 import { cleanDatabase, runMigrations } from './helpers.js';
 
 function first<T>(rows: readonly T[]): T {
@@ -70,5 +71,34 @@ describe('Integration: ghostid_gc', () => {
     const remaining = (await sql`select jti from session_nonces`).map(r => r.jti);
     expect(remaining).not.toContain(expired);
     expect(remaining).toContain(live);
+  });
+
+  it('runGc() acquires the advisory lock and purges expired challenges', async () => {
+    const expired = 'gc-runner-expired';
+    const live = 'gc-runner-live';
+    await sql`
+      insert into challenges (value, purpose, expires_at)
+      values
+        (${expired}, 'login', now() - interval '1 minute'),
+        (${live}, 'login', now() + interval '1 minute')
+    `;
+
+    const ran = await runGc();
+    expect(ran).toBe(true);
+
+    const remaining = (await sql`select value from challenges`).map(r => r.value);
+    expect(remaining).not.toContain(expired);
+    expect(remaining).toContain(live);
+  });
+
+  it('runGc() reports false and does not block when the lock is already held', async () => {
+    await sql.begin(async tx => {
+      const [row] = await tx<{ locked: boolean }[]>`
+        select pg_try_advisory_xact_lock(4927001) as locked
+      `;
+      expect(row?.locked).toBe(true);
+      // A concurrent sweep on a different pooled connection cannot get the lock.
+      expect(await runGc()).toBe(false);
+    });
   });
 });

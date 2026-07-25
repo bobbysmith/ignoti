@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import { config } from './config.js';
 import { RATE_LIMITS } from './constants.js';
 import { sql } from './db/client.js';
+import { runGc } from './db/queries/gc.js';
 import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
@@ -63,8 +64,26 @@ async function start() {
   const app = await buildServer();
   await app.listen({ port: config.PORT, host: config.HOST });
 
+  // In-process garbage collection. Disabled (GC_INTERVAL_SECONDS=0) when an
+  // external scheduler already calls ghostid_gc(). unref() so the timer never
+  // keeps the process alive on its own.
+  let gcTimer: NodeJS.Timeout | undefined;
+  if (config.GC_INTERVAL_SECONDS > 0) {
+    const sweep = () => {
+      runGc()
+        .then(ran => {
+          if (ran) app.log.debug('gc sweep complete');
+        })
+        .catch(err => app.log.error({ err }, 'gc sweep failed'));
+    };
+    sweep();
+    gcTimer = setInterval(sweep, config.GC_INTERVAL_SECONDS * 1000);
+    gcTimer.unref();
+  }
+
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
+    if (gcTimer) clearInterval(gcTimer);
     try {
       await app.close();
       await sql.end();
