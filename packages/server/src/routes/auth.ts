@@ -40,7 +40,6 @@ import {
   generateRestoreToken,
   hashRestoreToken,
   parseSessionCookie,
-  restoreRateLimitKey,
 } from '../lib/restore-token.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../lib/root-jws.js';
 import { verifySessionBindingJWS } from '../lib/session-jws.js';
@@ -400,14 +399,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    */
   app.post(
     ROUTES.AUTH.SESSION_RESTORE,
-    {
-      config: {
-        rateLimit: {
-          ...RATE_LIMITS.SESSION_RESTORE,
-          keyGenerator: restoreRateLimitKey,
-        },
-      },
-    },
+    { config: { rateLimit: RATE_LIMITS.SESSION_RESTORE } },
     async (req, reply) => {
       const cookie = req.cookies[SESSION_COOKIE_NAME];
       const parsedCookie = cookie ? parseSessionCookie(cookie) : null;

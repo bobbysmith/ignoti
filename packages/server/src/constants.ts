@@ -23,9 +23,12 @@ export const RATE_LIMITS = {
   // biometric retries without giving an attacker meaningful credential-stuffing
   // bandwidth.
   LOGIN: { max: 20, timeWindow: '15 minutes' },
-  // Keyed per session rather than per IP so a compromised session can't be
-  // hammered from many addresses. Legitimate use is one restore per page load.
-  SESSION_RESTORE: { max: 10, timeWindow: '15 minutes' },
+  // Per IP. Do not key on the cookie's sessionId: session ids are not secret,
+  // so attacker-chosen ids would mint unlimited fresh buckets, and garbage
+  // requests against a known id would exhaust the victim's bucket and block
+  // their restores. Legitimate use is one restore per page load; the budget
+  // leaves headroom for heavy reloading behind a shared IP.
+  SESSION_RESTORE: { max: 30, timeWindow: '15 minutes' },
 } as const;
 
 export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
