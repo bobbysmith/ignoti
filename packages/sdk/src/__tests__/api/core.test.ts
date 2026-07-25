@@ -385,8 +385,8 @@ describe('code api', () => {
         });
       vi.stubGlobal('fetch', fetchMock);
 
-      const result = await client.makeRequest('GET', API_TEST_PATH);
-      expect(onUnauthorized).toHaveBeenCalledWith('GET', API_TEST_PATH);
+      const result = await client.makeRequest('GET', '/api/devices');
+      expect(onUnauthorized).toHaveBeenCalledWith('GET', '/api/devices');
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ data: 'ok' });
 
@@ -399,7 +399,7 @@ describe('code api', () => {
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'session_timestamp_out_of_range' }));
 
-      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
+      const err = (await client.makeRequest('GET', '/api/devices').catch(e => e)) as GhostIDError;
       expect(err.code).toBe('CLOCK_SKEW');
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
@@ -433,12 +433,46 @@ describe('code api', () => {
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
 
+    it('does not intercept 401 on device registration (root-signature failure is terminal)', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({});
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'invalid_root_signature' }));
+
+      const err = (await client
+        .makeRequest('POST', '/api/auth/register/device', {})
+        .catch(e => e)) as GhostIDError;
+      expect(err.message).toBe('invalid_root_signature');
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('does not intercept 401 on device revocation (authorized by root JWS, not session)', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({});
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'invalid_root_signature' }));
+
+      await expect(
+        client.makeRequest('DELETE', '/api/devices/00000000-0000-0000-0000-000000000000', {})
+      ).rejects.toThrow(GhostIDError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('intercepts 401 on session revocation by id', async () => {
+      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'GhostID-Session new' });
+      const client = makeClientWithInterceptor(onUnauthorized);
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
+
+      await expect(
+        client.makeRequest('DELETE', '/api/sessions/00000000-0000-0000-0000-000000000000')
+      ).rejects.toThrow(GhostIDError);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    });
+
     it('propagates onUnauthorized error when the callback throws', async () => {
       const onUnauthorized = vi.fn().mockRejectedValue(new Error('restore failed'));
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow('restore failed');
+      await expect(client.makeRequest('GET', '/api/devices')).rejects.toThrow('restore failed');
     });
 
     it('does not retry a second time if the retried request also returns 401', async () => {
@@ -446,7 +480,7 @@ describe('code api', () => {
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', '/api/devices')).rejects.toThrow(GhostIDError);
       expect(onUnauthorized).toHaveBeenCalledTimes(1);
       expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2);
     });

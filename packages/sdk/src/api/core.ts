@@ -46,11 +46,20 @@ export class CoreApiClient {
     path: string
   ) => Promise<Record<string, string>>;
 
-  // Paths where a 401 must not trigger the interceptor, prevents infinite loops.
-  private static readonly SKIP_UNAUTHORIZED_RETRY = new Set<string>([
-    API_ENDPOINTS.AUTH.SESSION_RESTORE,
-    API_ENDPOINTS.AUTH.LOGIN,
-  ]);
+  /**
+   * A 401 means "stale session, restore and re-sign" only on routes that
+   * authenticate via session headers. Everywhere else (login, restore,
+   * register/device, root-JWS device revoke) a 401 is a terminal verification
+   * failure. Intercepting it would mask the real error with a pointless
+   * restore attempt and burn the restore-failure budget.
+   */
+  private static isSessionAuthedPath(path: string): boolean {
+    return (
+      path === API_ENDPOINTS.DEVICES.LIST ||
+      path === API_ENDPOINTS.SESSIONS.LIST ||
+      path.startsWith(`${API_ENDPOINTS.SESSIONS.REVOKE}/`)
+    );
+  }
 
   constructor(options: ApiClientOptions) {
     if (!options.baseUrl) {
@@ -295,7 +304,7 @@ export class CoreApiClient {
             status === HTTP_STATUS.UNAUTHORIZED &&
             allowUnauthorizedRetry &&
             this.onUnauthorized &&
-            !CoreApiClient.SKIP_UNAUTHORIZED_RETRY.has(validatedPath)
+            CoreApiClient.isSessionAuthedPath(validatedPath)
           ) {
             const freshHeaders = await this.onUnauthorized(method, validatedPath);
             return this.executeRequest<T>(method, path, data, freshHeaders, false);
