@@ -10,7 +10,6 @@ import {
   insertLoginChallenge,
   insertRecoverChallenge,
   insertRegisterChallenge,
-  insertSessionChallenge,
 } from '../../../db/queries/challenges.js';
 
 vi.mock('../../../db/client.js', () => ({ sql: vi.fn() }));
@@ -76,25 +75,6 @@ describe('challenges db queries', () => {
     it('resolves to void on success', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(insertLoginChallenge(CHALLENGE_VALUE, new Date())).resolves.toBeUndefined();
-    });
-  });
-
-  describe('insertSessionChallenge', () => {
-    it('executes INSERT with correct value, purpose=session, deviceId, and expiresAt', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await insertSessionChallenge(CHALLENGE_VALUE, DEVICE_ID, EXPIRES_AT);
-      const args = vi.mocked(sql).mock.calls[0];
-      expect(args[1]).toBe(CHALLENGE_VALUE);
-      expect(args[2]).toBe(CHALLENGE_PURPOSE.SESSION);
-      expect(args[3]).toBe(DEVICE_ID);
-      expect(args[4]).toBe(EXPIRES_AT);
-    });
-
-    it('resolves to void on success', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(
-        insertSessionChallenge(CHALLENGE_VALUE, DEVICE_ID, new Date())
-      ).resolves.toBeUndefined();
     });
   });
 

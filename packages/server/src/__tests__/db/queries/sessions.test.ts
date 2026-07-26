@@ -5,7 +5,6 @@ import {
   getSessionWithUser,
   insertSession,
   revokeAllSessionsForUser,
-  revokeSessionById,
   revokeSessionForUser,
   revokeSessionOnRestoreReuse,
   rotateSessionOnRestore,
@@ -232,26 +231,6 @@ describe('sessions db queries', () => {
       expect(query).toContain('revoked_at is null');
       expect(query).toContain('expires_at > now()');
       expect(args).toEqual(expect.arrayContaining([SESSION_ID, PRESENTED_HASH]));
-    });
-  });
-
-  describe('revokeSessionById', () => {
-    it('returns true when an active session was revoked', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([{ id: SESSION_ID }] as never);
-      await expect(revokeSessionById(SESSION_ID)).resolves.toBe(true);
-    });
-
-    it('returns false when no active session matched', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await expect(revokeSessionById(SESSION_ID)).resolves.toBe(false);
-    });
-
-    it('only revokes sessions that are still active', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await revokeSessionById(SESSION_ID);
-      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
-      expect(query).toContain('revoked_at is null');
-      expect(query).toContain('expires_at > now()');
     });
   });
 

@@ -38,17 +38,6 @@ export async function insertRegisterChallenge(
   `;
 }
 
-export async function insertSessionChallenge(
-  value: string,
-  deviceId: string,
-  expiresAt: Date
-): Promise<void> {
-  await sql`
-    insert into challenges (value, purpose, device_id, expires_at)
-    values (${value}, ${CHALLENGE_PURPOSE.SESSION}, ${deviceId}, ${expiresAt})
-  `;
-}
-
 export async function consumeLoginChallenge(value: string): Promise<boolean> {
   const [row] = await sql<ChallengeValue[]>`
     update challenges

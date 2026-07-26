@@ -129,22 +129,6 @@ export async function revokeSessionOnRestoreReuse(
   return row !== undefined;
 }
 
-/**
- * Revokes a session by id without authorizing the caller. Not for the restore
- * mismatch path (that needs revokeSessionOnRestoreReuse); session ids are not
- * secret, so unconditional revoke-by-id there is a DoS.
- */
-export async function revokeSessionById(sessionId: string): Promise<boolean> {
-  const [row] = await sql<{ id: string }[]>`
-    update sessions set revoked_at = now()
-    where id = ${sessionId}
-      and revoked_at is null
-      and expires_at > now()
-    returning id
-  `;
-  return row !== undefined;
-}
-
 export async function revokeSessionForUser(sessionId: string, userId: string): Promise<boolean> {
   const [row] = await sql<{ id: string }[]>`
     update sessions set revoked_at = now()
