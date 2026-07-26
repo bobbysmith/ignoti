@@ -303,6 +303,25 @@ describe('GhostID', () => {
       expect(info).not.toHaveProperty('sessionPrivateKey');
       expect(info).toMatchObject({ sessionId: 'sess-1', userId: 'user-1', deviceId: 'device-1' });
     });
+
+    it('returns null once the session has passed its expiry', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      expect(g.getSession()).toBeNull();
+    });
+
+    it('fires onSessionChange(null) the first time an expired session is observed', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+
+      expect(g.getSession()).toBeNull();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(null);
+
+      // Session is already cleared: a second read neither returns it nor re-fires.
+      expect(g.getSession()).toBeNull();
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('isSessionExpired', () => {

@@ -51,7 +51,7 @@ ghost.onSessionChange(session => {
 ```
 
 Fires on: `login()` (on success), `logout()`, `restoreSession()` (on success only - a failed restore throws 
-`NO_KEYS` and does not fire), `revokeAllSessions()`, the silent session refresh after a 401 (which runs `restoreSession()` internally), and `revokeSession()`/`revokeDevice()` when the revoked session or device is the current one.
+`NO_KEYS` and does not fire), `revokeAllSessions()`, the silent session refresh after a 401 (which runs `restoreSession()` internally), `revokeSession()`/`revokeDevice()` when the revoked session or device is the current one, and lazily with `null` the first time `getSession()` is called after the in-memory session has passed its expiry.
 
 **Parameters**
 
@@ -194,7 +194,7 @@ Throws:
 
 ### `ghost.getSession()`
 
-Returns the current session info, or `null` if not authenticated. Synchronous.
+Returns the current session info, or `null` if not authenticated. Synchronous. If the in-memory session has passed its expiry, it is cleared on this call: `getSession()` returns `null` and `onSessionChange` fires once with `null`.
 
 ```ts
 const session = ghost.getSession();

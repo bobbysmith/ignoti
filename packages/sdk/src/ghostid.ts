@@ -488,10 +488,12 @@ export class GhostID {
   }
 
   /**
-   * Returns information about the active session, or null if logged out.
-   * The session private key is intentionally not exposed.
+   * Returns information about the active session, or null if logged out or the
+   * session has passed its expiry. The session private key is intentionally not
+   * exposed.
    */
   getSession(): SessionInfo | null {
+    this.clearIfExpired();
     if (!this.session) return null;
     return {
       sessionId: this.session.sessionId,
@@ -506,6 +508,18 @@ export class GhostID {
       return true;
     }
     return Date.now() > this.session.expiresAt;
+  }
+
+  /**
+   * Drops the in-memory session once it is past expiry and notifies subscribers.
+   * Clears before notifying so the re-entrant getSession() inside
+   * notifySessionChange() observes the null state and does not recurse.
+   */
+  private clearIfExpired(): void {
+    if (this.session && Date.now() > this.session.expiresAt) {
+      this.session = null;
+      this.notifySessionChange();
+    }
   }
 
   private guessDeviceName(): string {
