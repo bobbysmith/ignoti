@@ -39,6 +39,12 @@ docker compose up -d
 
 The server starts on port `8787`. Database migrations run automatically on first boot.
 
+> **WebAuthn requires a secure context.** Your frontend must be served over HTTPS (the sole
+> exception is `localhost` during development). Over plain HTTP on any other host the browser
+> refuses to create or use passkeys. For the same reason the session cookie is `Secure` by
+> default; if you are developing over plain `http://localhost`, set `COOKIE_SECURE=false` so the
+> browser will send the cookie, and never do this in a deployed environment.
+
 > For a full list of configuration options see the [environment variable reference](https://github.com/dipsettheory/ghostid#self-hosting).
 
 ---

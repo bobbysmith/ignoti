@@ -95,7 +95,7 @@ be used to revoke a device.
 This is enforced at the protocol level, not just by convention. The `purpose` field is embedded in the signed 
 payload and verified by the server on every request. An attacker who captures a valid signature from one flow 
 cannot repurpose it for another.
-Ï
+
 ## Account enumeration is blocked
 
 `/register` returns an identical response whether or not the mnemonic was seen before, so it never reveals prior 
@@ -174,8 +174,13 @@ session after revocation has been issued.
 
 ## Sensitive endpoints are rate limited
 
-Registration, login, and recovery endpoints are rate limited. An attacker cannot make unlimited attempts to probe 
-the system, enumerate accounts, or brute-force challenges.
+Registration, login, recovery, and session-restore endpoints are rate limited. An attacker cannot make unlimited 
+attempts to probe the system, enumerate accounts, or brute-force challenges.
+
+The one deliberate exception is `POST /api/sessions/verify`, the introspection endpoint your backend calls to 
+validate signed session headers. It is intentionally not rate limited, because it sits on your backend's hot path 
+(one call per authenticated request) and forging a positive result already requires a valid Ed25519 signature over 
+a server-issued session, so there is nothing for an unauthenticated caller to brute-force.
 
 ## What GhostID cannot protect against
 

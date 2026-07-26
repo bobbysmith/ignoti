@@ -186,6 +186,7 @@ Returns: `Promise<void>`
 Throws:
 - `NOT_INITIALIZED`
 - `NO_KEYS` - no active session cookie, or session was expired or revoked
+- `API_ERROR` - network failure or non-401 server error
 
 ---
 
@@ -238,7 +239,8 @@ Returns: `Promise<Record<string, string>>`
 
 Throws:
 - `NOT_INITIALIZED`
-- `NO_KEYS` - no active session
+- `NO_KEYS` - no active session (also if the automatic restore of an expired session fails)
+- `API_ERROR` - network failure or server error during the automatic restore of an expired session
 
 ---
 
@@ -253,12 +255,14 @@ Returns: `Promise<DeviceInfo[]>`
 Throws:
 - `NOT_INITIALIZED`
 - `NO_KEYS` - not logged in
+- `CLOCK_SKEW` - device clock is too far off the server's
+- `API_ERROR` - network failure or server error
 
 ---
 
 ### `ghost.revokeDevice(deviceId, mnemonic, userId, credentialId)`
 
-Revokes a device and all its active sessions atomically. Requires the recovery mnemonic to authorize the operation. Revoking the current device clears local state and fires `onSessionChange`.
+Revokes a device and all its active sessions atomically. Authorized entirely by the recovery mnemonic (a root-key signature), so it does **not** require an active session - a user who has lost access to all their sessions can still revoke a device. Revoking the current device clears local state and fires `onSessionChange`.
 
 ```ts
 await ghost.revokeDevice(device.id, mnemonic, session.userId, device.credentialId);
@@ -293,6 +297,8 @@ Returns: `Promise<SessionListItem[]>`
 Throws:
 - `NOT_INITIALIZED`
 - `NO_KEYS` - not logged in
+- `CLOCK_SKEW` - device clock is too far off the server's
+- `API_ERROR` - network failure or server error
 
 ---
 
@@ -311,6 +317,8 @@ Returns: `Promise<void>`
 Throws:
 - `NOT_INITIALIZED`
 - `NO_KEYS` - not logged in
+- `CLOCK_SKEW` - device clock is too far off the server's
+- `API_ERROR` - network failure or server error
 
 ---
 
@@ -327,6 +335,8 @@ Returns: `Promise<void>`
 Throws:
 - `NOT_INITIALIZED`
 - `NO_KEYS` - not logged in
+- `CLOCK_SKEW` - device clock is too far off the server's
+- `API_ERROR` - network failure or server error
 
 ---
 
@@ -424,7 +434,7 @@ class GhostIDError extends Error {
 | Code                 | When it is thrown                                                                                                           |
 |----------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `NOT_INITIALIZED`    | Any method called before `init()`                                                                                           |
-| `INVALID_INPUT`      | WebAuthn is not supported in this browser                                                                                   |
+| `INVALID_INPUT`      | Invalid argument: unsupported WebAuthn, invalid mnemonic, no account matches the mnemonic, or a cancelled passkey prompt    |
 | `CRYPTOGRAPHY_ERROR` | Key generation or signing failed                                                                                            |
 | `NO_KEYS`            | No active session - not logged in, session expired, or revoked                                                              |
 | `INVALID_SIGNATURE`  | Signature verification failed                                                                                               |

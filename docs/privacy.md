@@ -24,9 +24,10 @@ Here is the complete list of what ends up in the database.
 
 **Per session:**
 - A random UUID
+- The ID of the device it belongs to
 - The ephemeral session public key
-- The SHA-256 hash of a rotating restore-cookie secret (never the secret itself)
-- Expiry and last-used timestamps
+- The SHA-256 hash of the current rotating restore-cookie secret, and of the immediately-prior one (never the secrets themselves)
+- Created, expiry, last-used, and revoked timestamps
 
 **Operational tables (not per-user data):**
 - `challenges` - single-use login/register/recover nonces with an expiry, deleted once expired

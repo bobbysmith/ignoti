@@ -189,7 +189,7 @@ These are not optional. A deployment that violates them is not implementing the 
    flag means browsers will not send it over plain HTTP - but the server must enforce HTTPS at the infrastructure 
    level too.
 2. **No PII in logs.** Never log signatures, public keys, IPs joined to user IDs, or request bodies near auth code.
-3. **Tight CORS.** `RP_ORIGIN` is the only allowed origin.
+3. **Tight CORS.** Only the origins listed in `RP_ORIGIN` are allowed (it is a comma-separated list; every entry must be a subdomain of `RP_ID`).
 4. **Constant-time comparisons** for any signature/public-key check.
 5. **Challenge GC.** Expired challenges must be deleted, not just marked consumed.
 6. **No silent migrations.** Schema changes that could leak data require a documented migration path.
