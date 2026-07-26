@@ -156,7 +156,7 @@ export interface RegisterDeviceRequest extends Record<string, unknown> {
   userId: string;
   /** RegistrationResponseJSON shape returned by `createPasskey`. */
   registrationResponse: FormattedCreatePasskeyResponse;
-  /** Ed25519 signature over canonical `register-device|{userId}|{credentialId}|{challenge}`. */
+  /** Root-key JWS (EdDSA) with claims purpose=register-device, userId, credentialId, challenge. */
   rootSignature: string;
   deviceName?: string;
 }

@@ -93,10 +93,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   /**
    * POST /api/auth/register/device
    * Verifies (a) the WebAuthn attestation against the stored challenge, and
-   * (b) the root-key signature over the canonical
-   *     `register-device|{userId}|{credentialId}|{challenge}`.
-   * Both must pass before we persist the device. The challenge row is
-   * marked consumed atomically so a captured request can't be replayed.
+   * (b) the root-key JWS whose claims (purpose, userId, credentialId, challenge)
+   * must match. Both must pass before we persist the device. The challenge row
+   * is marked consumed atomically so a captured request can't be replayed.
    */
   app.post(
     ROUTES.AUTH.REGISTER_DEVICE,

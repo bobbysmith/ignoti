@@ -206,12 +206,9 @@ export class CoreApiClient {
     const url = `${this.baseUrl}${validatedPath}`;
     const requestHeaders: Record<string, string> = { ...validatedHeaders };
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
     const requestOptions: RequestInit = {
       method,
       headers: requestHeaders,
-      signal: controller.signal,
       credentials: 'include',
     };
 
@@ -242,102 +239,31 @@ export class CoreApiClient {
 
     let lastError: Error | null = null;
 
-    try {
-      for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
-        let response: Response;
+    for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
+      const outcome = await this.attemptRequest<T>(url, requestOptions);
 
-        try {
-          response = await fetch(url, requestOptions);
-        } catch (fetchError) {
-          lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            throw new GhostIDError(
-              ERROR_MESSAGES.REQUEST_TIMED_OUT,
-              ErrorCodes.API_ERROR,
-              fetchError
-            );
-          }
-
-          // Browsers surface every network failure as TypeError - transient
-          // (offline, DNS, reset) and permanent (CORS, bad config) alike, and are
-          // indistinguishable here, so both fall through to the bounded retry loop.
-          if (attempt < this.retryAttempts) {
-            await retryDelay(attempt);
-          }
-
-          continue;
-        }
-
-        if (!response.ok) {
-          const errorData = await this.parseErrorResponse(response);
-
-          // A skewed device clock fails the server's signature timestamp check;
-          // restoring the session re-signs with the same clock, so don't retry.
-          if (
-            response.status === HTTP_STATUS.UNAUTHORIZED &&
-            errorData.error === SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE
-          ) {
-            throw new GhostIDError(
-              ERROR_MESSAGES.CLOCK_SKEW,
-              ErrorCodes.CLOCK_SKEW,
-              new Error(`HTTP ${response.status}`),
-              response.status
-            );
-          }
-
-          const message = this.capErrorMessage(
-            errorData.error ||
-              errorData.message ||
-              `HTTP ${response.status}: ${response.statusText}`
-          );
-          const ghostError = new GhostIDError(
-            message,
-            ErrorCodes.API_ERROR,
-            new Error(`HTTP ${response.status}`),
-            response.status
-          );
-          lastError = ghostError;
-          const { httpStatus: status } = ghostError;
-
-          // 401: call the interceptor to restore the session and re-sign, then retry once.
-          if (
-            status === HTTP_STATUS.UNAUTHORIZED &&
-            allowUnauthorizedRetry &&
-            this.onUnauthorized &&
-            CoreApiClient.isSessionAuthedPath(validatedPath)
-          ) {
-            const freshHeaders = await this.onUnauthorized(method, validatedPath);
-            return this.executeRequest<T>(method, path, data, freshHeaders, false);
-          }
-
-          // 4xx (not handled above) and 501: retrying won't change the outcome.
-          if (
-            (status &&
-              status >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
-              status <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
-            status === HTTP_STATUS.NOT_IMPLEMENTED
-          ) {
-            throw ghostError;
-          }
-
-          if (attempt < this.retryAttempts) {
-            await retryDelay(attempt);
-          }
-          continue;
-        }
-
-        try {
-          return await response.json();
-        } catch (parseError) {
-          throw new GhostIDError(
-            ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE,
-            ErrorCodes.API_ERROR,
-            parseError
-          );
-        }
+      if (outcome.kind === 'value') {
+        return outcome.value;
       }
-    } finally {
-      clearTimeout(timeoutId);
+
+      // 401 on a session-authed route: restore the session and re-sign, then
+      // retry once. Any other 401 is terminal.
+      if (outcome.kind === 'unauthorized') {
+        if (
+          allowUnauthorizedRetry &&
+          this.onUnauthorized &&
+          CoreApiClient.isSessionAuthedPath(validatedPath)
+        ) {
+          const freshHeaders = await this.onUnauthorized(method, validatedPath);
+          return this.executeRequest<T>(method, path, data, freshHeaders, false);
+        }
+        throw outcome.error;
+      }
+
+      lastError = outcome.error;
+      if (attempt < this.retryAttempts) {
+        await retryDelay(attempt);
+      }
     }
 
     throw new GhostIDError(
@@ -345,6 +271,96 @@ export class CoreApiClient {
       ErrorCodes.API_ERROR,
       lastError
     );
+  }
+
+  /**
+   * One request attempt with its own timeout, so each retry gets the full
+   * budget and the backoff sleeps between attempts are not counted against it.
+   * Returns a value or a retryable failure, or a 401 for the caller to decide
+   * whether to intercept; throws terminal errors (timeout, 4xx/501, clock
+   * skew, unparseable body).
+   */
+  private async attemptRequest<T>(
+    url: string,
+    requestOptions: RequestInit
+  ): Promise<
+    | { kind: 'value'; value: T }
+    | { kind: 'unauthorized'; error: GhostIDError }
+    | { kind: 'retry'; error: Error }
+  > {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    try {
+      let response: Response;
+      try {
+        response = await fetch(url, { ...requestOptions, signal: controller.signal });
+      } catch (fetchError) {
+        const err = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
+        if (err.name === 'AbortError') {
+          throw new GhostIDError(ERROR_MESSAGES.REQUEST_TIMED_OUT, ErrorCodes.API_ERROR, err);
+        }
+        // Browsers surface every network failure as TypeError - transient
+        // (offline, DNS, reset) and permanent (CORS, bad config) alike, and are
+        // indistinguishable here, so both are retried by the caller.
+        return { kind: 'retry', error: err };
+      }
+
+      if (!response.ok) {
+        const errorData = await this.parseErrorResponse(response);
+
+        // A skewed device clock fails the server's signature timestamp check;
+        // restoring the session re-signs with the same clock, so don't retry.
+        if (
+          response.status === HTTP_STATUS.UNAUTHORIZED &&
+          errorData.error === SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE
+        ) {
+          throw new GhostIDError(
+            ERROR_MESSAGES.CLOCK_SKEW,
+            ErrorCodes.CLOCK_SKEW,
+            new Error(`HTTP ${response.status}`),
+            response.status
+          );
+        }
+
+        const message = this.capErrorMessage(
+          errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`
+        );
+        const ghostError = new GhostIDError(
+          message,
+          ErrorCodes.API_ERROR,
+          new Error(`HTTP ${response.status}`),
+          response.status
+        );
+
+        if (ghostError.httpStatus === HTTP_STATUS.UNAUTHORIZED) {
+          return { kind: 'unauthorized', error: ghostError };
+        }
+
+        // 4xx (not handled above) and 501: retrying won't change the outcome.
+        if (
+          (ghostError.httpStatus &&
+            ghostError.httpStatus >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
+            ghostError.httpStatus <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
+          ghostError.httpStatus === HTTP_STATUS.NOT_IMPLEMENTED
+        ) {
+          throw ghostError;
+        }
+
+        return { kind: 'retry', error: ghostError };
+      }
+
+      try {
+        return { kind: 'value', value: (await response.json()) as T };
+      } catch (parseError) {
+        throw new GhostIDError(
+          ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE,
+          ErrorCodes.API_ERROR,
+          parseError
+        );
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   private async parseErrorResponse(response: Response): Promise<Partial<ServerErrorResponse>> {

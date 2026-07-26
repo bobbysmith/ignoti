@@ -40,6 +40,8 @@ Returns: `void`
 
 Registers a callback that fires on every session transition. The callback is **not** invoked on registration with the current state - it only fires on subsequent transitions. Register it before your first `restoreSession()`/`login()` call so you do not miss that first transition.
 
+Only one callback is held: calling `onSessionChange` again replaces the previous callback rather than adding a second subscriber. Register it once.
+
 ```ts
 ghost.onSessionChange(session => {
   if (session) {
