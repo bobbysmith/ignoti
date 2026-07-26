@@ -188,7 +188,7 @@ These are not optional. A deployment that violates them is not implementing the 
 1. **TLS everywhere.** WebAuthn refuses non-HTTPS origins outside `localhost`. The session cookie's `Secure` 
    flag means browsers will not send it over plain HTTP - but the server must enforce HTTPS at the infrastructure 
    level too.
-2. **No PII in logs.** Never log signatures, public keys, IPs joined to user IDs, or request bodies near auth code.
+2. **No PII in logs.** The server's request logger is configured to omit the client IP (custom `req` serializer), so the default logs carry method and path but no address. Keep it that way: never log signatures, public keys, IPs joined to user IDs, or request bodies near auth code. Note a reverse proxy in front of the server may keep its own IP access logs — configure that layer accordingly.
 3. **Tight CORS.** Only the origins listed in `RP_ORIGIN` are allowed (it is a comma-separated list; every entry must be a subdomain of `RP_ID`).
 4. **Constant-time comparisons** for any signature/public-key check.
 5. **Challenge GC.** Expired challenges must be deleted, not just marked consumed.

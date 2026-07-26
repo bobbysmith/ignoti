@@ -65,6 +65,8 @@ The server does record when a device was last used and how many times it has aut
 
 The transports field reveals something minor about the user's authenticator type (whether it is a platform authenticator like Face ID or a roaming key like a USB security key). This is a WebAuthn technical requirement, not a tracking mechanism, but it is worth knowing it is there.
 
+Server logs record the method and path of each request but not the client IP: GhostID overrides the framework's default request-log serializer, which would otherwise include the remote address. Nothing in the database or the default logs ties a request to an IP. If you place a reverse proxy or load balancer in front of the server, that layer may keep its own access logs with client IPs — that is outside GhostID's control, so configure it in line with your privacy posture.
+
 ## No device fingerprinting via attestation
 
 WebAuthn supports attestation: a mechanism where the authenticator cryptographically proves what kind of device it is, including manufacturer, model, and firmware version. Many auth systems collect this to enforce hardware policies, but it is also a detailed device fingerprint.

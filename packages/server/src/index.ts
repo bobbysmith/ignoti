@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { RATE_LIMITS } from './constants.js';
 import { sql } from './db/client.js';
 import { runGc } from './db/queries/gc.js';
+import { reqLogSerializer } from './lib/logging.js';
 import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
@@ -22,7 +23,7 @@ export async function buildServer() {
   }
 
   const app = Fastify({
-    logger: { level: config.LOG_LEVEL },
+    logger: { level: config.LOG_LEVEL, serializers: { req: reqLogSerializer } },
     // How much of X-Forwarded-For to trust when deriving the client IP for rate
     // limiting. Defaults to one proxy hop; see TRUST_PROXY in config.ts. Trusting
     // more hops than you actually run lets clients spoof their IP by prepending
