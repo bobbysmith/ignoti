@@ -35,6 +35,7 @@ export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
   [SERVER_ERROR_CODES.INVALID_INPUT]: 'Request validation failed',
   [SERVER_ERROR_CODES.USER_NOT_FOUND]: 'User not found',
   [SERVER_ERROR_CODES.DEVICE_NOT_FOUND]: 'Device not found',
+  [SERVER_ERROR_CODES.CREDENTIAL_ALREADY_REGISTERED]: 'Credential is already registered',
   [SERVER_ERROR_CODES.INVALID_OR_EXPIRED_CHALLENGE]: 'Challenge is invalid or has expired',
   [SERVER_ERROR_CODES.INVALID_ROOT_SIGNATURE]: 'Root key signature verification failed',
   [SERVER_ERROR_CODES.ATTESTATION_VERIFICATION_FAILED]: 'WebAuthn attestation verification failed',

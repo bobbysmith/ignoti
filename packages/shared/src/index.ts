@@ -66,6 +66,7 @@ export const PROTOCOL_VALIDATION = {
 export const SERVER_ERROR_CODES = {
   ASSERTION_VERIFICATION_FAILED: 'assertion_verification_failed',
   ATTESTATION_VERIFICATION_FAILED: 'attestation_verification_failed',
+  CREDENTIAL_ALREADY_REGISTERED: 'credential_already_registered',
   DEVICE_NOT_FOUND: 'device_not_found',
   INVALID_AUTHORIZATION_SCHEME: 'invalid_authorization_scheme',
   INVALID_INPUT: 'invalid_input',

@@ -197,7 +197,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         if ((err as Record<string, unknown>).code === '23505') {
           // unique violation
           req.log.warn({ err }, 'credential already registered');
-          return sendError(reply, 409, ERROR_CODES.ATTESTATION_VERIFICATION_FAILED);
+          return sendError(reply, 409, ERROR_CODES.CREDENTIAL_ALREADY_REGISTERED);
         }
         throw err;
       }
