@@ -18,6 +18,7 @@ interface SessionAuthRow {
   user_id: string;
   device_id: string;
   expires_at: Date;
+  revoked_at: Date | null;
 }
 
 interface SessionListRow {
@@ -48,14 +49,15 @@ export async function insertSession(params: InsertSessionParams): Promise<Sessio
   return session;
 }
 
+// Returns the row regardless of revoked/expired state; the caller verifies the
+// signature first, then classifies (revoked vs expired vs active), so only the
+// session-key holder learns the granular state.
 export async function getSessionWithUser(sessionId: string): Promise<SessionAuthRow | undefined> {
   const [row] = await sql<SessionAuthRow[]>`
-    select s.session_public_key, s.device_id, s.expires_at, d.user_id
+    select s.session_public_key, s.device_id, s.expires_at, s.revoked_at, d.user_id
     from sessions s
     join devices d on d.id = s.device_id
     where s.id = ${sessionId}
-      and s.revoked_at is null
-      and s.expires_at > now()
   `;
   return row;
 }

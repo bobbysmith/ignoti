@@ -490,6 +490,7 @@ describe('Integration: auth happy paths', () => {
       );
       const res = await app.inject({ method: 'GET', url: '/api/sessions', headers: getHeaders });
       expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'session_revoked' });
     });
   });
 

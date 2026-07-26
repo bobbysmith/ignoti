@@ -122,6 +122,15 @@ export async function verifySessionAuth(
     return { ok: false, code: ERROR_CODES.INVALID_SESSION_SIGNATURE };
   }
 
+  // Classify revoked/expired only after the signature verifies, so the granular
+  // state reaches only the session-key holder; a keyless caller sees invalid_signature.
+  if (session.revoked_at) {
+    return { ok: false, code: ERROR_CODES.SESSION_REVOKED };
+  }
+  if (session.expires_at.getTime() <= Date.now()) {
+    return { ok: false, code: ERROR_CODES.SESSION_EXPIRED };
+  }
+
   // After signature verification so only holders of the session key can write
   // nonce rows. The primary-key insert is atomic, so concurrent duplicates
   // cannot both succeed, on this instance or any other.

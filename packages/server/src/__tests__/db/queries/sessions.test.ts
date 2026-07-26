@@ -81,18 +81,14 @@ describe('sessions db queries', () => {
       await expect(getSessionWithUser(SESSION_ID)).resolves.toBeUndefined();
     });
 
-    it('query filters out revoked sessions', async () => {
+    it('selects revoked_at and does not filter by state (caller classifies after verifying)', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await getSessionWithUser(SESSION_ID);
       const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('revoked_at is null');
-    });
-
-    it('query filters out expired sessions', async () => {
-      vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await getSessionWithUser(SESSION_ID);
-      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('expires_at > now()');
+      const joined = query.join('');
+      expect(joined).toContain('s.revoked_at');
+      expect(joined).not.toContain('revoked_at is null');
+      expect(joined).not.toContain('expires_at > now()');
     });
 
     it('passes sessionId to the query', async () => {
