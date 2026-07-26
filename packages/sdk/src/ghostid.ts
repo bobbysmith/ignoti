@@ -74,17 +74,29 @@ export class GhostID {
   }
 
   /**
-   * Deduplicated restore for automatic recovery paths: concurrent callers
-   * share one attempt, and the failure count increments once per attempt,
-   * not once per caller. After RETRY.MAX_RESTORE_FAILURES consecutive
-   * failures no new attempt is started until a restore or login succeeds.
+   * Automatic-recovery restore. Applies the failure gate: after
+   * RETRY.MAX_RESTORE_FAILURES consecutive failures no new attempt starts
+   * until a restore or login succeeds. Joins an in-flight attempt if one exists.
    */
   private async restoreOnce(): Promise<void> {
+    if (!this.restorePromise && this.restoreFailures >= RETRY.MAX_RESTORE_FAILURES) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    await this.dedupedRestore();
+  }
+
+  /**
+   * Single-flights the restore so concurrent callers — multiple tabs, a
+   * StrictMode double-invoke, or an automatic recovery overlapping an explicit
+   * restoreSession() — share one attempt and one keypair, and cannot race to
+   * bind mismatched keys. Failure count increments once per attempt.
+   */
+  private dedupedRestore(): Promise<void> {
     if (!this.restorePromise) {
-      if (this.restoreFailures >= RETRY.MAX_RESTORE_FAILURES) {
-        throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
-      }
-      this.restorePromise = this.restoreSession()
+      this.restorePromise = this.performRestore()
+        .then(() => {
+          this.restoreFailures = 0;
+        })
         .catch(error => {
           this.restoreFailures++;
           throw error;
@@ -93,7 +105,7 @@ export class GhostID {
           this.restorePromise = null;
         });
     }
-    await this.restorePromise;
+    return this.restorePromise;
   }
 
   private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
@@ -134,6 +146,10 @@ export class GhostID {
 
   async restoreSession(): Promise<void> {
     this.ensureInitialized();
+    await this.dedupedRestore();
+  }
+
+  private async performRestore(): Promise<void> {
     const sessionKeyPair = await generateSessionSigningKeypair();
     try {
       const nonce = crypto.randomUUID();
@@ -150,7 +166,6 @@ export class GhostID {
         expiresAt: response.expiresAt,
         sessionPrivateKey: sessionKeyPair.privateKey,
       };
-      this.restoreFailures = 0;
       this.notifySessionChange();
     } catch (error) {
       if (error instanceof GhostIDError && error.httpStatus === 401) {

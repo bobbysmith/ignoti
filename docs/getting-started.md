@@ -131,7 +131,7 @@ if (session) {
 }
 ```
 
-Call `restoreSession()` only once per page load. Each call rebinds a fresh keypair to the server, so two concurrent calls race and can leave the server holding a public key that no longer matches the stored session, causing `invalid_session_signature` on subsequent requests. In React, StrictMode double-invokes effects in development, so guard with a `useRef`:
+Concurrent `restoreSession()` calls within a page are single-flighted by the SDK: they share one attempt and one keypair, so a React StrictMode double-invoke cannot race two bindings against each other. The `useRef` guard below is therefore optional — it just avoids issuing a second, redundant call. (Separate tabs are separate SDK instances and do not share this latch; two tabs restoring the same session at the same instant can still trip cookie-rotation reuse detection and force a re-login, which fails safe.)
 
 ```tsx
 const restored = useRef(false);

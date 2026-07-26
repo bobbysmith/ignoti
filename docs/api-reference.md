@@ -167,9 +167,9 @@ Throws:
 
 ### `ghost.restoreSession()`
 
-Restores a session after a page reload using the httpOnly session cookie. Generates a fresh ephemeral keypair and binds it to the server. Must be called once per page load.
+Restores a session after a page reload using the httpOnly session cookie. Generates a fresh ephemeral keypair and binds it to the server. Concurrent calls within a page are single-flighted (they share one attempt), so calling it more than once is safe.
 
-In React, use a `useRef` guard to prevent double-invocation from Strict Mode:
+In React, a `useRef` guard is optional — it avoids a redundant second call under Strict Mode double-invocation:
 
 ```ts
 const restored = useRef(false);

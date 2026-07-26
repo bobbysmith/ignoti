@@ -399,6 +399,35 @@ describe('GhostID', () => {
     });
   });
 
+  describe('restoreSession single-flight', () => {
+    it('deduplicates concurrent restoreSession() calls into one attempt', async () => {
+      const g = initializedSdk();
+      mockGenerateSessionKeypair.mockClear();
+      mockRestoreSession.mockClear();
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockResolvedValue({
+        sessionId: 'sess-restored',
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+      const cb = vi.fn();
+      g.onSessionChange(cb);
+
+      await Promise.all([g.restoreSession(), g.restoreSession(), g.restoreSession()]);
+
+      // One shared attempt: one keypair, one network call, one notification —
+      // so concurrent callers cannot bind mismatched keys.
+      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(1);
+      expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('getDevices', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
