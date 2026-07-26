@@ -23,10 +23,11 @@ export async function buildServer() {
 
   const app = Fastify({
     logger: { level: config.LOG_LEVEL },
-    // Trust exactly one proxy hop (the load balancer / reverse proxy in front of
-    // this server). `true` trusts the entire X-Forwarded-For chain, which lets
-    // any client spoof its IP and bypass rate limiting by prepending fake entries.
-    trustProxy: 1,
+    // How much of X-Forwarded-For to trust when deriving the client IP for rate
+    // limiting. Defaults to one proxy hop; see TRUST_PROXY in config.ts. Trusting
+    // more hops than you actually run lets clients spoof their IP by prepending
+    // fake XFF entries; trusting too few collapses everyone into one bucket.
+    trustProxy: config.TRUST_PROXY,
   });
 
   await app.register(cookie);

@@ -125,20 +125,22 @@ your infrastructure. GhostID never has access to it.
 
 **Environment variables:**
 
-| Variable                | Required | Default                 | Description                                                                                                           |
-|-------------------------|----------|-------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                           |
-| `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                         |
-| `RP_NAME`               | No       | `GhostID`               | Display name shown to users in passkey dialogs.                                                                       |
-| `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins. |
-| `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                        |
-| `SESSION_TTL_SECONDS`   | No       | `86400` (24 hr)         | How long a session token stays valid. Min: 60, max: 2592000 (30 days).                                                |
-| `DB_PREPARE`            | No       | `true`                  | Set to `false` when using a transaction pooler that does not support prepared statements.                             |
-| `PORT`                  | No       | `8787`                  | Port the server listens on.                                                                                           |
-| `HOST`                  | No       | `0.0.0.0`               | Network interface to bind to.                                                                                         |
-| `LOG_LEVEL`             | No       | `info`                  | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`.                                            |
-| `COOKIE_SECURE`         | No       | `true`                  | Set to `false` in local development when not using HTTPS.                                                             |
-| `RATE_LIMIT_DISABLED`   | No       | `false`                 | Set to `true` to disable rate limiting. For testing only, never disable in production.                                |
+| Variable                | Required | Default                 | Description                                                                                                                                                   |
+|-------------------------|----------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                                                                   |
+| `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                                                                 |
+| `RP_NAME`               | No       | `GhostID`               | Display name shown to users in passkey dialogs.                                                                                                               |
+| `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins.                                         |
+| `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                                                                |
+| `SESSION_TTL_SECONDS`   | No       | `86400` (24 hr)         | How long a session token stays valid. Min: 60, max: 2592000 (30 days).                                                                                        |
+| `DB_PREPARE`            | No       | `true`                  | Set to `false` when using a transaction pooler that does not support prepared statements.                                                                     |
+| `PORT`                  | No       | `8787`                  | Port the server listens on.                                                                                                                                   |
+| `HOST`                  | No       | `0.0.0.0`               | Network interface to bind to.                                                                                                                                 |
+| `LOG_LEVEL`             | No       | `info`                  | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`.                                                                                    |
+| `COOKIE_SECURE`         | No       | `true`                  | Set to `false` in local development when not using HTTPS.                                                                                                     |
+| `GC_INTERVAL_SECONDS`   | No       | `3600` (1 hr)           | Interval for the in-process cleanup of expired challenges, nonces, and old sessions. `0` disables it (use an external scheduler instead). Max: 86400.         |
+| `TRUST_PROXY`           | No       | `1`                     | X-Forwarded-For hops to trust for client-IP rate limiting. Integer hop count, `false` (no proxy), `true` (trust all), or a comma-separated IP/CIDR allowlist. |
+| `RATE_LIMIT_DISABLED`   | No       | `false`                 | Set to `true` to disable rate limiting. For testing only, never disable in production.                                                                        |
 
 **Cross-subdomain auth:**
 

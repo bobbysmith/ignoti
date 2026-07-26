@@ -199,6 +199,38 @@ describe('config', () => {
     });
   });
 
+  describe('TRUST_PROXY', () => {
+    it('defaults to 1 (one proxy hop) when TRUST_PROXY is not set', async () => {
+      stubEnv();
+      const config = await loadConfig();
+      expect(config.TRUST_PROXY).toBe(1);
+    });
+
+    it('parses an integer hop count', async () => {
+      stubEnv({ TRUST_PROXY: '2' });
+      const config = await loadConfig();
+      expect(config.TRUST_PROXY).toBe(2);
+    });
+
+    it('parses "false" as boolean false (no proxy)', async () => {
+      stubEnv({ TRUST_PROXY: 'false' });
+      const config = await loadConfig();
+      expect(config.TRUST_PROXY).toBe(false);
+    });
+
+    it('parses "true" as boolean true', async () => {
+      stubEnv({ TRUST_PROXY: 'true' });
+      const config = await loadConfig();
+      expect(config.TRUST_PROXY).toBe(true);
+    });
+
+    it('passes a comma-separated IP/CIDR list through as a string', async () => {
+      stubEnv({ TRUST_PROXY: '10.0.0.0/8,127.0.0.1' });
+      const config = await loadConfig();
+      expect(config.TRUST_PROXY).toBe('10.0.0.0/8,127.0.0.1');
+    });
+  });
+
   describe('LOG_LEVEL', () => {
     it('defaults to "info" when LOG_LEVEL is not set', async () => {
       stubEnv();

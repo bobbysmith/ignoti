@@ -60,6 +60,26 @@ const envSchema = z.object({
     .min(0)
     .max(GC_INTERVAL_MAX_SECONDS)
     .default(GC_INTERVAL_DEFAULT_SECONDS),
+  // How much of the X-Forwarded-For chain to trust when deriving the client IP
+  // (used for rate limiting). Match this to your infrastructure:
+  //   - a number N: trust N proxy hops (default 1, one load balancer / reverse proxy)
+  //   - 'false':    no proxy in front; use the socket address and ignore XFF
+  //   - 'true':     trust the entire XFF chain (only behind a proxy that strips
+  //                 client-supplied XFF — otherwise any client can spoof its IP)
+  //   - a comma-separated list of trusted proxy IPs/CIDRs
+  // Getting this wrong lets clients spoof their IP (too trusting) or collapses
+  // every client behind the proxy into one rate-limit bucket (not trusting enough).
+  TRUST_PROXY: z
+    .string()
+    .default('1')
+    .transform(v => {
+      const t = v.trim();
+      const lower = t.toLowerCase();
+      if (lower === 'false') return false;
+      if (lower === 'true') return true;
+      if (/^\d+$/.test(t)) return Number(t);
+      return t;
+    }),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
