@@ -136,6 +136,7 @@ export async function revokeSessionForUser(sessionId: string, userId: string): P
     update sessions set revoked_at = now()
     where id = ${sessionId}
       and revoked_at is null
+      and expires_at > now()
       and device_id in (
         select id from devices where user_id = ${userId} and revoked_at is null
       )

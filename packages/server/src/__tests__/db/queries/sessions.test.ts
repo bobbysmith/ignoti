@@ -248,11 +248,12 @@ describe('sessions db queries', () => {
       expect(args).toEqual(expect.arrayContaining([SESSION_ID, USER_ID]));
     });
 
-    it('query includes revoked_at is null guard', async () => {
+    it('query includes revoked_at is null and expires_at guards', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await revokeSessionForUser(SESSION_ID, USER_ID);
-      const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
-      expect(query.join('')).toContain('revoked_at is null');
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      expect(query).toContain('revoked_at is null');
+      expect(query).toContain('expires_at > now()');
     });
   });
 
