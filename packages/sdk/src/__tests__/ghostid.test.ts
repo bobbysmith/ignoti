@@ -397,6 +397,36 @@ describe('GhostID', () => {
       expect(headers.Authorization).toBe('GhostID-Session sess-restored');
       expect(headers['X-GhostID-Signature']).toBe('sig-abc');
     });
+
+    it('throws NO_KEYS if a concurrent logout clears the session during the restore', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
+      mockRestoreSession.mockResolvedValue({
+        sessionId: 'sess-restored',
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+      mockRevokeSession.mockResolvedValue({ ok: true });
+
+      // The restore's success notification lands in the gap before
+      // getSessionHeaders reads the session back; logout() nulls it synchronously.
+      let loggedOut = false;
+      g.onSessionChange(session => {
+        if (session && !loggedOut) {
+          loggedOut = true;
+          void g.logout();
+        }
+      });
+
+      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as GhostIDError;
+      expect(err).toBeInstanceOf(GhostIDError);
+      expect(err.code).toBe(ErrorCodes.NO_KEYS);
+    });
   });
 
   describe('restoreSession single-flight', () => {
@@ -626,6 +656,17 @@ describe('GhostID', () => {
 
       expect(err).toBeInstanceOf(GhostIDError);
       expect(err.code).toBe(ErrorCodes.INVALID_INPUT);
+      expect(mockCreatePasskey).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a non-404 recover error unchanged and never prompts for a passkey', async () => {
+      mockIsWebAuthnSupported.mockReturnValue(true);
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      const serverError = new GhostIDError('boom', ErrorCodes.API_ERROR, undefined, 500);
+      mockRecoverAccount.mockRejectedValue(serverError);
+
+      const g = initializedSdk();
+      await expect(g.recoverIdentity('word '.repeat(12).trim())).rejects.toBe(serverError);
       expect(mockCreatePasskey).not.toHaveBeenCalled();
     });
   });

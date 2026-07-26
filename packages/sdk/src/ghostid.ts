@@ -110,7 +110,7 @@ export class GhostID {
 
   private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
     await this.restoreOnce();
-    const { sessionId } = this.session as ActiveSession;
+    const { sessionId } = this.requireActiveSession();
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const signature = await this.signWithSessionKey({
@@ -332,9 +332,20 @@ export class GhostID {
     return this.login();
   }
 
+  /**
+   * Reads the active session, throwing NO_KEYS if it is absent. Used after an
+   * await, where a concurrent logout/revoke may have cleared it in the gap.
+   */
+  private requireActiveSession(): ActiveSession {
+    if (!this.session) {
+      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
+    return this.session;
+  }
+
   private async signWithSessionKey(payload: Record<string, unknown>): Promise<string> {
     this.ensureInitialized();
-    return ApiClient.signRequest(payload, (this.session as ActiveSession).sessionPrivateKey);
+    return ApiClient.signRequest(payload, this.requireActiveSession().sessionPrivateKey);
   }
 
   /**
@@ -353,7 +364,7 @@ export class GhostID {
     if (this.isSessionExpired()) {
       await this.restoreOnce();
     }
-    const { sessionId } = this.session as ActiveSession;
+    const { sessionId } = this.requireActiveSession();
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htm = method.toUpperCase();
