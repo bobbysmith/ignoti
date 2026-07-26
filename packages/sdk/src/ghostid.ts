@@ -9,7 +9,7 @@
  * call restoreSession() to rebind a fresh keypair to the existing session.
  *
  * Session identity: ephemeral Ed25519 keypair generated via WebCrypto. The
- * private key is non-extractable — its bytes never enter the JS heap. Root key
+ * private key is non-extractable - its bytes never enter the JS heap. Root key
  * bytes are zeroed after use as a best-effort measure; JavaScript cannot
  * guarantee secure erasure (GC may copy buffers before they are zeroed).
  */
@@ -275,7 +275,18 @@ export class GhostID {
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
     const rootPublicKey = toBase64(rootKeySet.signing.publicKey);
 
-    const recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
+    // Resolve the account before prompting for a passkey. A 404 means the
+    // mnemonic matches no account; surfacing it here avoids minting an orphan
+    // credential in the authenticator for a wrong recovery phrase.
+    let recoverResponse: Awaited<ReturnType<typeof this.apiClient.auth.recoverAccount>>;
+    try {
+      recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
+    } catch (error) {
+      if (error instanceof GhostIDError && error.httpStatus === 404) {
+        throw new GhostIDError(ERROR_MESSAGES.NO_ACCOUNT_FOR_MNEMONIC, ErrorCodes.INVALID_INPUT);
+      }
+      throw error;
+    }
     const { userId, options } = recoverResponse;
 
     const passkeyOptions = creationOptionsFromServer(options);

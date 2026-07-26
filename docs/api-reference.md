@@ -50,7 +50,8 @@ ghost.onSessionChange(session => {
 });
 ```
 
-Fires on: `login()` (on success), `logout()`, `restoreSession()` (on success only — a failed restore throws `NO_KEYS` and does not fire), `revokeAllSessions()`, the silent session refresh after a 401 (which runs `restoreSession()` internally), and `revokeSession()`/`revokeDevice()` when the revoked session or device is the current one.
+Fires on: `login()` (on success), `logout()`, `restoreSession()` (on success only - a failed restore throws 
+`NO_KEYS` and does not fire), `revokeAllSessions()`, the silent session refresh after a 401 (which runs `restoreSession()` internally), and `revokeSession()`/`revokeDevice()` when the revoked session or device is the current one.
 
 **Parameters**
 
@@ -102,9 +103,11 @@ Returns: `Promise<RecoverIdentityResult>`
 
 Throws:
 - `NOT_INITIALIZED`
-- `INVALID_INPUT` - invalid mnemonic phrase, WebAuthn is not supported, or the user cancelled the passkey prompt
+- `INVALID_INPUT` - invalid mnemonic phrase, no account matches the mnemonic, WebAuthn is not supported, or the user cancelled the passkey prompt
 - `CRYPTOGRAPHY_ERROR` - passkey creation failed
-- `API_ERROR` - mnemonic does not match any account, or server error
+- `API_ERROR` - server error
+
+A wrong or unknown recovery phrase throws `INVALID_INPUT` before any passkey prompt, so no orphan credential is created in the authenticator.
 
 ---
 

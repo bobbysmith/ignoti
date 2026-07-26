@@ -563,6 +563,23 @@ describe('GhostID', () => {
       expect(result.userId).toBe('user-1');
       expect(result.deviceId).toBe('device-2');
     });
+
+    it('maps a 404 to INVALID_INPUT and never prompts for a passkey', async () => {
+      mockIsWebAuthnSupported.mockReturnValue(true);
+      mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
+      mockRecoverAccount.mockRejectedValue(
+        new GhostIDError('user_not_found', ErrorCodes.API_ERROR, undefined, 404)
+      );
+
+      const g = initializedSdk();
+      const err = (await g
+        .recoverIdentity('word '.repeat(12).trim())
+        .catch(e => e)) as GhostIDError;
+
+      expect(err).toBeInstanceOf(GhostIDError);
+      expect(err.code).toBe(ErrorCodes.INVALID_INPUT);
+      expect(mockCreatePasskey).not.toHaveBeenCalled();
+    });
   });
 
   describe('onSessionChange', () => {

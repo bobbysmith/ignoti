@@ -78,7 +78,7 @@ session cookie was sent.
 
 In production, the session cookie is `SameSite=None; Secure`, which is required for cross-origin deployments where 
 your frontend and GhostID server are on different domains. The SameSite attribute alone is not the CSRF protection 
-— the per-request signature is.
+- the per-request signature is.
 
 ## Replay attacks are blocked
 
@@ -95,12 +95,17 @@ be used to revoke a device.
 This is enforced at the protocol level, not just by convention. The `purpose` field is embedded in the signed 
 payload and verified by the server on every request. An attacker who captures a valid signature from one flow 
 cannot repurpose it for another.
-
+Ï
 ## Account enumeration is blocked
 
-`/register` and `/recover` return identical responses whether an account exists or not, and the server equalizes 
-timing so there is no measurable difference between the two code paths. An attacker cannot use your auth endpoints 
-to determine which accounts exist.
+`/register` returns an identical response whether or not the mnemonic was seen before, so it never reveals prior 
+existence. `/recover` does tell the caller whether an account exists - but only a caller who already submitted that 
+account's root public key, which is derivable only from the 12-word mnemonic and is never exposed by the server. In 
+other words, the only way to learn that an account exists is to prove you are its owner. An attacker who does not 
+hold the mnemonic cannot produce a registered root public key (guessing a 32-byte Ed25519 key is infeasible), so 
+they cannot enumerate accounts. `/recover` returns a distinct "no account" response by design: it lets the SDK 
+reject a wrong recovery phrase before prompting for a passkey, rather than minting an orphan credential in the 
+authenticator on every mistyped phrase.
 
 ## There is no support team to social-engineer
 

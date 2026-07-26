@@ -79,7 +79,7 @@ export function sign(message: Uint8Array, privateKey: Uint8Array): Uint8Array {
 
 /**
  * Generates a session signing keypair using WebCrypto.
- * The private key is non-extractable — its bytes never enter the JS heap.
+ * The private key is non-extractable - its bytes never enter the JS heap.
  * The public key is exportable (public keys carry no secret).
  */
 export async function generateSessionSigningKeypair(): Promise<CryptoKeyPair> {

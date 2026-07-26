@@ -258,7 +258,7 @@ export class CoreApiClient {
             );
           }
 
-          // Browsers surface every network failure as TypeError — transient
+          // Browsers surface every network failure as TypeError - transient
           // (offline, DNS, reset) and permanent (CORS, bad config) alike, and are
           // indistinguishable here, so both fall through to the bounded retry loop.
           if (attempt < this.retryAttempts) {

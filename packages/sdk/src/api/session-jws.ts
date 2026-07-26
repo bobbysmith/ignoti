@@ -22,7 +22,7 @@ export interface SessionBindingClaims {
 }
 
 /**
- * `sessionPrivateKey` is a non-extractable WebCrypto Ed25519 private key —
+ * `sessionPrivateKey` is a non-extractable WebCrypto Ed25519 private key -
  * its bytes never enter the JS heap. `sessionPublicKey` is always extractable.
  */
 export async function signSessionBindingJWS(

@@ -137,10 +137,18 @@ Out of scope, we trust the WebAuthn substrate.
 A user forced to authenticate is indistinguishable from a willing one. Consider duress mnemonics in a future major 
 version.
 
-### Account enumeration via timing
-A naive `register`/`recover` implementation can leak whether a `userId` exists by timing differences. The backend 
-issues identical responses and equalizes timing regardless of existence: the not-found path runs the same
-registration-options work and inserts a throwaway NULL-user challenge so both branches take the same time
+### Account enumeration
+`register` returns an identical response whether or not the root public key was seen before (it upserts and echoes
+the same shape either way), so it never signals prior existence.
+
+`recover` deliberately does not hide existence from the caller: an unknown root public key returns `404
+user_not_found` rather than an equalized success. This is a considered trade-off. Preventing enumeration here would
+require returning success for a non-existent account, which forces the SDK to prompt for a passkey it cannot use and
+mints an orphan credential in the authenticator on every wrong recovery phrase - a compounding UX and security
+problem (orphan credentials then surface in the login picker and fail later logins). The enumeration exposure is
+narrow: the root public key is derivable only from the mnemonic and is never exposed by the server, so the positive
+response is reachable only by someone who can already prove ownership of the account. An attacker without the
+mnemonic cannot produce a registered root public key and learns nothing. `RECOVER` remains rate limited
 (`routes/auth.ts`).
 
 ### Denial of service

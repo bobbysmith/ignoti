@@ -17,7 +17,6 @@ import {
   insertLoginChallenge,
   insertRecoverChallenge,
   insertRegisterChallenge,
-  insertTimingRecoverChallenge,
 } from '../../db/queries/challenges.js';
 import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../../db/queries/devices.js';
 import { incrementSignCountWithChallenge } from '../../db/queries/login.js';
@@ -1067,29 +1066,25 @@ describe('auth', () => {
         vi.mocked(buildRegistrationOptions).mockResolvedValue({
           challenge: VALID_CHALLENGE,
         } as never);
-        vi.mocked(insertTimingRecoverChallenge).mockResolvedValue(undefined);
       });
 
-      it('returns 200 with the same shape as a successful recover (no enumeration)', async () => {
+      it('returns 404 USER_NOT_FOUND so the SDK can reject before minting a passkey', async () => {
         const res = await app.inject({
           method: 'POST',
           url: RECOVER_URL,
           body: { rootPublicKey: VALID_ROOT_PUBLIC_KEY },
         });
-        expect(res.statusCode).toBe(200);
-        const body = res.json();
-        expect(Object.keys(body).sort()).toEqual(['options', 'userId'].sort());
-        expect(typeof body.userId).toBe('string');
+        expect(res.statusCode).toBe(404);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.USER_NOT_FOUND });
       });
 
-      it('stores a timing challenge but not a real recover challenge when user does not exist', async () => {
+      it('does not issue a recover challenge when the user does not exist', async () => {
         await app.inject({
           method: 'POST',
           url: RECOVER_URL,
           body: { rootPublicKey: VALID_ROOT_PUBLIC_KEY },
         });
         expect(insertRecoverChallenge).not.toHaveBeenCalled();
-        expect(insertTimingRecoverChallenge).toHaveBeenCalledOnce();
       });
     });
 

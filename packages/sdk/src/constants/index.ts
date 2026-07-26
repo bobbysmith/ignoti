@@ -196,6 +196,7 @@ export const ERROR_MESSAGES = {
 
   // Crypto / keys
   INVALID_MNEMONIC: 'Invalid BIP39 mnemonic phrase provided',
+  NO_ACCOUNT_FOR_MNEMONIC: 'No account matches this recovery phrase',
   KEY_DERIVATION_FAILED: 'Failed to derive root keys from BIP39 mnemonic',
   SIGNING_FAILED: 'Failed to sign request payload',
   INVALID_SIGNING_PAYLOAD: 'Invalid payload for signing',

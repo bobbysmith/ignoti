@@ -447,6 +447,17 @@ describe('Integration: auth happy paths', () => {
       const { deviceId: recoveredDeviceId } = deviceRes.json<{ deviceId: string }>();
       expect(typeof recoveredDeviceId).toBe('string');
     });
+
+    it('returns 404 for a root key that matches no account', async () => {
+      const { publicKeyB64: unknownRootKey } = await generateRootKeypair();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/recover',
+        payload: { rootPublicKey: unknownRootKey },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toMatchObject({ error: 'user_not_found' });
+    });
   });
 
   describe('session auth middleware', () => {

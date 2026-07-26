@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
@@ -23,7 +23,6 @@ import {
   insertLoginChallenge,
   insertRecoverChallenge,
   insertRegisterChallenge,
-  insertTimingRecoverChallenge,
 } from '../db/queries/challenges.js';
 import { getDeviceByCredentialId, getDeviceById, insertDevice } from '../db/queries/devices.js';
 import { incrementSignCountWithChallenge } from '../db/queries/login.js';
@@ -462,11 +461,19 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    * POST /api/auth/recover
    * Body: { rootPublicKey }
    * Returns: { userId, options }  (same shape as /register)
+   *        | 404 user_not_found  when no account matches the root public key
    *
-   * Looks up the existing user by root public key (only derivable from the
+   * Looks up the existing user by root public key (derivable only from the
    * mnemonic) and returns WebAuthn registration options for a new device.
    * The actual root-key proof is submitted in the subsequent /register/device
    * call via a JWS with purpose='recover-device'.
+   *
+   * An unknown key returns 404 rather than an equalized 200 so the SDK can
+   * reject a wrong recovery phrase BEFORE prompting for a passkey — otherwise
+   * a wrong phrase mints an orphan credential in the authenticator. This
+   * reveals account existence only to a caller who already submitted the root
+   * public key, which is derivable only from the mnemonic and is never exposed
+   * by the server, so only the account owner can trigger the positive.
    */
   app.post(
     ROUTES.AUTH.RECOVER,
@@ -478,29 +485,13 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       }
       const { rootPublicKey } = parsed.data;
 
-      // Always run both operations in parallel regardless of whether the user
-      // exists. This prevents timing-based enumeration: a missing key must not
-      // return faster than a found one. The placeholder UUID is used only to
-      // make buildRegistrationOptions do equivalent work; its output is discarded
-      // when the user is not found.
-      const [user, timingOptions] = await Promise.all([
-        getUserByRootPublicKey(rootPublicKey),
-        buildRegistrationOptions(randomUUID()),
-      ]);
-
-      const expiresAt = new Date(Date.now() + config.CHALLENGE_TTL_SECONDS * 1000);
-
-      // Mirror the found user path's two serial operations so both branches
-      // take the same time and can't be distinguished by response latency.
-      // insertTimingRecoverChallenge uses user_id = NULL and expires_at = now(),
-      // so the row is never consumable and is swept by the next GC run.
+      const user = await getUserByRootPublicKey(rootPublicKey);
       if (!user) {
-        const fakeOptions = await buildRegistrationOptions(randomUUID());
-        await insertTimingRecoverChallenge(fakeOptions.challenge);
-        return reply.send({ userId: randomUUID(), options: timingOptions });
+        return sendError(reply, 404, ERROR_CODES.USER_NOT_FOUND);
       }
 
       const options = await buildRegistrationOptions(user.id);
+      const expiresAt = new Date(Date.now() + config.CHALLENGE_TTL_SECONDS * 1000);
       await insertRecoverChallenge(options.challenge, user.id, expiresAt);
 
       return reply.send({ userId: user.id, options });
