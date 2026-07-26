@@ -295,11 +295,19 @@ Revoking the current session is equivalent to logging out - the in-memory sessio
 ## 11. Logout
 
 ```ts
-await ghost.logout();
+try {
+  await ghost.logout();
+  renderLoginScreen();
+} catch (err) {
+  // logout did not complete — the user is still logged in
+  showLogoutFailed(); // your UI: surface it, let them retry
+}
 ```
 
-The session is revoked server-side (clearing the httpOnly cookie) and the in-memory key is wiped. If the server call 
-fails, the local key is still wiped but the error is rethrown, the server session remains active. The user will need to authenticate again on success.
+The session is revoked server-side (which clears the httpOnly cookie), and only then is the in-memory key wiped and 
+`onSessionChange(null)` fired. If the server call fails, the error is thrown and the session is left intact — the 
+user stays logged in. GhostID does not hide the failure or clear state optimistically; handle the error and retry if 
+you want. Only treat the user as logged out after `logout()` resolves.
 
 ---
 

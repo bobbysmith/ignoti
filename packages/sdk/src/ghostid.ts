@@ -383,8 +383,6 @@ export class GhostID {
       return;
     }
     const { sessionId, sessionPrivateKey } = this.session;
-    this.session = null;
-    this.notifySessionChange();
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
@@ -392,7 +390,12 @@ export class GhostID {
       { htm: 'DELETE', htu, iat, jti, sessionId },
       sessionPrivateKey
     );
+    // Clear local state only after the server confirms revocation. If the call
+    // throws, the session stays intact (the user is still logged in) and the
+    // error propagates so the caller can surface it and retry.
     await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature, jti);
+    this.session = null;
+    this.notifySessionChange();
   }
 
   async getDevices(): Promise<DeviceInfo[]> {

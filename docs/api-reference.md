@@ -151,19 +151,24 @@ Throws:
 
 ### `ghost.logout()`
 
-Revokes the current session on the server and clears local state. If the server call fails, local state is still cleared and the error is rethrown - the server session remains active but the user must authenticate again locally.
+Revokes the current session on the server, then clears local state and fires `onSessionChange(null)`. Local state is cleared **only after** the server confirms revocation. If the server call fails, the error is thrown and the session is left intact — the user stays logged in. Nothing is hidden: handle the error and decide whether to retry (calling `logout()` again). Await success before showing a logged-out UI.
 
 No-op if not logged in.
 
 ```ts
-await ghost.logout();
+try {
+  await ghost.logout();
+  // logged out — server session revoked, cookie cleared
+} catch (err) {
+  // still logged in — revocation did not complete; surface and offer retry
+}
 ```
 
 Returns: `Promise<void>`
 
 Throws:
 - `NOT_INITIALIZED`
-- `API_ERROR` - server revocation failed (local state is still cleared)
+- `API_ERROR` - server revocation failed; the session is unchanged (still logged in)
 
 ---
 

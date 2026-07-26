@@ -278,11 +278,17 @@ describe('GhostID', () => {
       expect(g.getSession()).toBeNull();
     });
 
-    it('clears local session before network call so state is clean even if server revocation fails', async () => {
-      const { g } = await withSession();
+    it('keeps the session and rethrows when server revocation fails', async () => {
+      const { g, sessionId } = await withSession();
+      const cb = vi.fn();
+      g.onSessionChange(cb);
       mockRevokeSession.mockRejectedValue(new Error('network'));
+
       await expect(g.logout()).rejects.toThrow('network');
-      expect(g.getSession()).toBeNull();
+
+      // Still logged in: server never confirmed revocation, so nothing is hidden.
+      expect(g.getSession()).toMatchObject({ sessionId });
+      expect(cb).not.toHaveBeenCalled();
     });
 
     it('is a no-op when no session is active', async () => {
