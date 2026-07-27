@@ -10,6 +10,7 @@ export function Account() {
     null
   );
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<{
     deviceId: string;
@@ -77,8 +78,11 @@ export function Account() {
 
   async function handleLogout() {
     setLoggingOut(true);
+    setLogoutError(null);
     try {
       await ghost.logout();
+    } catch (e) {
+      setLogoutError((e as Error).message);
     } finally {
       setLoggingOut(false);
     }
@@ -129,9 +133,12 @@ export function Account() {
             disabled={loggingOut}
             style={{ marginLeft: 'auto' }}
           >
-            {loggingOut ? 'leaving...' : '→ leave'}
+            {loggingOut ? 'leaving...' : logoutError ? '→ retry leave' : '→ leave'}
           </button>
         </div>
+        {logoutError && (
+          <p style={{ color: 'var(--error-color)' }}>logout did not complete: {logoutError}</p>
+        )}
         <div className="dashboard-section">
           <h2>session</h2>
           <table>
