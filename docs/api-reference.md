@@ -289,7 +289,8 @@ Returns: `Promise<void>`
 Throws:
 - `NOT_INITIALIZED`
 - `INVALID_INPUT` - invalid mnemonic phrase
-- `API_ERROR` - mnemonic does not match, device not found, or server error
+- `INVALID_SIGNATURE` - the mnemonic does not match this account (root signature rejected)
+- `API_ERROR` - device not found or other server error
 
 ---
 
@@ -444,10 +445,7 @@ class GhostIDError extends Error {
 | `INVALID_INPUT`      | Invalid argument: unsupported WebAuthn, invalid mnemonic, no account matches the mnemonic, or a cancelled passkey prompt    |
 | `CRYPTOGRAPHY_ERROR` | Key generation or signing failed                                                                                            |
 | `NO_KEYS`            | No active session - not logged in, session expired, or revoked                                                              |
-| `INVALID_SIGNATURE`  | Signature verification failed                                                                                               |
-| `INVALID_CHALLENGE`  | Challenge was invalid or already consumed                                                                                   |
-| `EXPIRED_CHALLENGE`  | Challenge has expired                                                                                                       |
-| `API_ERROR`          | Server returned an error - check `httpStatus` for the HTTP status code                                                      |
-| `INVALID_STATE`      | SDK is in an unexpected internal state                                                                                      |
-| `STORAGE_ERROR`      | Storage operation failed                                                                                                    |
+| `INVALID_SIGNATURE`  | The server rejected a signature: session, root-key (e.g. a mnemonic that does not match the account), or session binding    |
+| `INVALID_CHALLENGE`  | The server rejected a challenge as invalid, expired, or already consumed                                                    |
+| `API_ERROR`          | Server returned an error not covered by a more specific code - check `httpStatus`                                           |
 | `CLOCK_SKEW`         | Device clock is more than 60s off the server's - signed requests are rejected until the user fixes their date/time settings |

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CoreApiClient } from '@/api/core.ts';
-import { GhostIDError } from '@/core/errors.ts';
+import { ErrorCodes, GhostIDError } from '@/core/errors.ts';
 
 const BASE_URL = 'http://localhost:3000';
 const API_TEST_PATH = '/api/test';
@@ -87,6 +87,34 @@ describe('code api', () => {
       vi.stubGlobal('fetch', fetch);
       await expect(client.makeRequest('POST', API_TEST_PATH, {})).rejects.toThrow(GhostIDError);
       expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps a challenge error to INVALID_CHALLENGE', async () => {
+      const client = makeClient();
+      vi.stubGlobal('fetch', mockFetch(400, { error: 'invalid_or_expired_challenge' }));
+      const err = (await client
+        .makeRequest('POST', API_TEST_PATH, {})
+        .catch(e => e)) as GhostIDError;
+      expect(err.code).toBe(ErrorCodes.INVALID_CHALLENGE);
+      expect(err.httpStatus).toBe(400);
+    });
+
+    it('maps a signature error to INVALID_SIGNATURE', async () => {
+      const client = makeClient();
+      vi.stubGlobal('fetch', mockFetch(401, { error: 'invalid_root_signature' }));
+      const err = (await client
+        .makeRequest('DELETE', '/api/devices/abc', {})
+        .catch(e => e)) as GhostIDError;
+      expect(err.code).toBe(ErrorCodes.INVALID_SIGNATURE);
+    });
+
+    it('leaves an unmapped server error as API_ERROR', async () => {
+      const client = makeClient();
+      vi.stubGlobal('fetch', mockFetch(400, { error: 'invalid_input' }));
+      const err = (await client
+        .makeRequest('POST', API_TEST_PATH, {})
+        .catch(e => e)) as GhostIDError;
+      expect(err.code).toBe(ErrorCodes.API_ERROR);
     });
 
     it('throws GhostIDError on 5xx and retries', async () => {

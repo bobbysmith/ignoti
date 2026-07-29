@@ -18,7 +18,19 @@ import {
   TIMEOUTS,
 } from '@/constants';
 import type { ApiClientOptions } from '@/types';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { type ErrorCode, ErrorCodes, GhostIDError } from '../core/errors';
+
+// Maps server error codes to SDK ErrorCodes so consumers can branch on them.
+// Unmapped server errors surface as API_ERROR (with httpStatus). The server
+// does not distinguish invalid from expired challenges, so both fold into
+// INVALID_CHALLENGE.
+const SERVER_ERROR_TO_CODE: Partial<Record<string, ErrorCode>> = {
+  [SERVER_ERROR_CODES.INVALID_SESSION_SIGNATURE]: ErrorCodes.INVALID_SIGNATURE,
+  [SERVER_ERROR_CODES.INVALID_ROOT_SIGNATURE]: ErrorCodes.INVALID_SIGNATURE,
+  [SERVER_ERROR_CODES.INVALID_SESSION_BINDING]: ErrorCodes.INVALID_SIGNATURE,
+  [SERVER_ERROR_CODES.INVALID_OR_EXPIRED_CHALLENGE]: ErrorCodes.INVALID_CHALLENGE,
+  [SERVER_ERROR_CODES.INVALID_OR_EXPIRED_SESSION_CHALLENGE]: ErrorCodes.INVALID_CHALLENGE,
+};
 
 /** RFC 3986 path subset we accept (alphanum || unreserved || slash). */
 const PATH_RE = /^\/[A-Za-z0-9\-._~/]*$/;
@@ -325,9 +337,11 @@ export class CoreApiClient {
         const message = this.capErrorMessage(
           errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`
         );
+        const code =
+          (errorData.error && SERVER_ERROR_TO_CODE[errorData.error]) ?? ErrorCodes.API_ERROR;
         const ghostError = new GhostIDError(
           message,
-          ErrorCodes.API_ERROR,
+          code,
           new Error(`HTTP ${response.status}`),
           response.status
         );
