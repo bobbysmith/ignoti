@@ -12,7 +12,6 @@ export {
   SESSION,
   TIMEOUTS,
   VALIDATION,
-  WEBAUTHN,
 } from './constants';
 export {
   base64UrlToBuffer,

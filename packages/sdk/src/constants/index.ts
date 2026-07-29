@@ -147,18 +147,6 @@ export const CRYPTO = {
 } as const;
 
 // ============================================================================
-// WebAuthn Constants
-// ============================================================================
-
-export const WEBAUTHN = {
-  ALGORITHM: -7, // ES256
-  ATTESTATION: 'none',
-  CREDENTIAL_TYPE: 'public-key',
-  TIMEOUT: 60000, // 60 seconds
-  USER_VERIFICATION: 'required',
-} as const;
-
-// ============================================================================
 // Session Constants
 // ============================================================================
 
@@ -308,4 +296,3 @@ export type RetryConfig = (typeof RETRY)[keyof typeof RETRY];
 export type SessionConfig = (typeof SESSION)[keyof typeof SESSION];
 export type Timeout = (typeof TIMEOUTS)[keyof typeof TIMEOUTS];
 export type ValidationRule = (typeof VALIDATION)[keyof typeof VALIDATION];
-export type WebAuthnConfig = (typeof WEBAUTHN)[keyof typeof WEBAUTHN];
