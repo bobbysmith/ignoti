@@ -34,7 +34,7 @@ import { registerAuthRoutes } from '../../routes/auth.js';
 vi.mock('../../config.js', () => ({
   config: {
     RP_ID: 'localhost',
-    RP_NAME: 'GhostID',
+    RP_NAME: 'Ignoti',
     RP_ORIGIN: ['http://localhost:5173'],
     CHALLENGE_TTL_SECONDS: 300,
     SESSION_TTL_SECONDS: 86400,
@@ -847,7 +847,7 @@ describe('auth', () => {
         const res = await postSession();
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toContain(`ghostid_session=${session.id}.`);
+        expect(cookieStr).toContain(`ignoti_session=${session.id}.`);
         expect(cookieStr).toContain('HttpOnly');
         expect(cookieStr).toContain('SameSite=Lax');
         expect(cookieStr).toContain('Path=/');
@@ -883,7 +883,7 @@ describe('auth', () => {
         method: 'POST',
         url: SESSION_RESTORE_URL,
         body,
-        cookies: sessionCookie !== undefined ? { ghostid_session: sessionCookie } : undefined,
+        cookies: sessionCookie !== undefined ? { ignoti_session: sessionCookie } : undefined,
       });
     }
 
@@ -981,7 +981,7 @@ describe('auth', () => {
         const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toMatch(/ghostid_session=;|ghostid_session=(?:;| |$)/);
+        expect(cookieStr).toMatch(/ignoti_session=;|ignoti_session=(?:;| |$)/);
       });
     });
 
@@ -1014,7 +1014,7 @@ describe('auth', () => {
         const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toContain(`ghostid_session=${VALID_SESSION_ID}.`);
+        expect(cookieStr).toContain(`ignoti_session=${VALID_SESSION_ID}.`);
         expect(cookieStr).not.toContain(VALID_RESTORE_SECRET);
       });
 

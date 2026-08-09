@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const GITHUB_URL = 'https://github.com/dipsettheory/ghostid';
+const GITHUB_URL = 'https://github.com/dipsettheory/ignoti';
 
 export function Header({ slug, actions }: { slug?: string; actions?: React.ReactNode }) {
   const [docsOpen, setDocsOpen] = useState(false);
@@ -10,7 +10,7 @@ export function Header({ slug, actions }: { slug?: string; actions?: React.React
   return (
     <header className="app-header">
       <Link to="/" className="app-header-logo" style={{ textDecoration: 'none' }}>
-        ghostid://{slug && <span className="header-slug">{slug}</span>}
+        ignoti://{slug && <span className="header-slug">{slug}</span>}
       </Link>
       <nav className="app-header-actions" onMouseLeave={() => setDocsOpen(false)}>
         <div className="dropdown">

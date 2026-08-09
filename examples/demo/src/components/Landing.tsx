@@ -7,8 +7,8 @@ export function Landing() {
       <Header />
 
       <section>
-        <h1>GhostID</h1>
-        <p>Your users are ghosts, not profiles.</p>
+        <h1>Ignoti</h1>
+        <p>The unknown.</p>
         <p>
           <Link to="/demo">→ try it</Link>
         </p>

@@ -1,7 +1,7 @@
 {
-  "name": "@ghostid/shared",
+  "name": "@ignoti/shared",
   "version": "0.0.1",
-  "description": "Shared protocol constants and types for GhostID server and SDK.",
+  "description": "Shared protocol constants and types for Ignoti server and SDK.",
   "type": "module",
   "private": true,
   "main": "./dist/index.js",

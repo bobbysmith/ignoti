@@ -24,5 +24,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghostid/server:latest
-            ghostid/server:${{ github.ref_name }}
+            ignoti/server:latest
+            ignoti/server:${{ github.ref_name }}

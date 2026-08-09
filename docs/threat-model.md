@@ -1,14 +1,14 @@
-# GhostID Threat Model
+# Ignoti Threat Model
 
-This document defines what GhostID protects against, what it explicitly does **not** protect against, and the assumptions the design relies on. Anyone evaluating, integrating, or auditing GhostID should read this first.
+This document defines what Ignoti protects against, what it explicitly does **not** protect against, and the assumptions the design relies on. Anyone evaluating, integrating, or auditing Ignoti should read this first.
 
 > Status: living document. Updates require a PR with reviewer sign-off.
 
 ## 1. System overview
 
-GhostID is a free, open-source, self-hosted authentication platform - a privacy-first alternative to Sign in with Google/Apple. Builders deploy a pre-built backend server they own and control, and integrate the client SDK into their app. Their users get passkey-based auth without surrendering their identity to any third party.
+Ignoti is a free, open-source, self-hosted authentication platform - a privacy-first alternative to Sign in with Google/Apple. Builders deploy a pre-built backend server they own and control, and integrate the client SDK into their app. Their users get passkey-based auth without surrendering their identity to any third party.
 
-GhostID uses a self-sovereign identity protocol with three layers:
+Ignoti uses a self-sovereign identity protocol with three layers:
 
 - **Root identity** - Ed25519 keypair derived from a 12-word BIP39 mnemonic. Used only for account recovery and 
   high-stakes operations, ex. revoking devices. Never stored.
@@ -42,17 +42,17 @@ in the DB but is never echoed back to clients or included in tokens.
 
 We consider the following attacker capabilities:
 
-- **A1 - Network attacker.** Can observe and modify traffic between the client and the GhostID server. Cannot break TLS.
+- **A1 - Network attacker.** Can observe and modify traffic between the client and the Ignoti server. Cannot break TLS.
 - **A2 - Server compromise.** Can read the entire database and tamper with server code. Cannot retroactively 
   compromise material the server never possessed (mnemonics, private keys).
 - **A3 - Phishing site.** Can host a convincing UI on a different origin and trick the user into visiting it.
-- **A4 - Browser extension / supply chain.** Has script-level access to the GhostID origin's page (XSS, malicious 
+- **A4 - Browser extension / supply chain.** Has script-level access to the Ignoti origin's page (XSS, malicious 
   extension, compromised dependency).
 - **A5 - Device thief.** Has physical possession of an unlocked device.
 - **A6 - Mnemonic theft.** Has obtained the user's 12-word mnemonic.
 - **A7 - Mass surveillance.** Operates at backbone scale, correlates traffic, and subpoenas providers.
 
-## 4. What GhostID protects against
+## 4. What Ignoti protects against
 
 ### Phishing (A1, A3)
 WebAuthn binds the credential to the **origin** at registration. A passkey created for `app.example` cannot be used 
@@ -88,7 +88,7 @@ exfiltration, not in-page use).
 
 Outside of restore, a stolen session ID cannot be used to forge signed API requests: every request also requires a 
 live Ed25519 signature from the session private key, which exists only in memory on the original page. The SameSite 
-policy is `None` in production (required for cross-origin deployments where the frontend and the GhostID server run 
+policy is `None` in production (required for cross-origin deployments where the frontend and the Ignoti server run 
 on different domains) and `Lax` in local development. CSRF protection comes from the per-request signature, not the 
 SameSite attribute; a forged request without a valid signature is rejected regardless of whether the cookie was 
 sent. **Mitigation: signed-request sessions with ephemeral keys; httpOnly restore cookie with refresh-token 
@@ -105,7 +105,7 @@ Every challenge is single-use, scoped to a purpose (`register`, `login`, `recove
 TTL and consumed-at marker.**
 
 ### Backend identity correlation (A2, A7)
-GhostID stores no email, phone, social account, or any third-party identifier. User IDs are random UUIDs. The 
+Ignoti stores no email, phone, social account, or any third-party identifier. User IDs are random UUIDs. The 
 protocol carries no PII (personally identifiable information). A breached or subpoenaed database cannot link `userId` 
 to a real-world identity without out-of-band data. **Mitigation: PII-free schema.**
 
@@ -114,7 +114,7 @@ A lost device retains its passkey, but: (a) the authenticator requires user veri
 signing, and (b) the rightful owner can recover via mnemonic on a new device and revoke the lost device. 
 **Mitigation: WebAuthn user verification, mnemonic recovery, and revocation.**
 
-## 5. What GhostID does NOT protect against
+## 5. What Ignoti does NOT protect against
 
 These are explicit non-goals. Documenting them is a feature, not a regression.
 
@@ -124,7 +124,7 @@ mnemonic, adding one would reintroduce a centralized authority. Users must store
 like a private key.
 
 ### Active XSS on the integrating site (A4)
-If an attacker injects script into a page that hosts the GhostID SDK, they can read the in-memory session key while 
+If an attacker injects script into a page that hosts the Ignoti SDK, they can read the in-memory session key while 
 the user is logged in and forge requests for the lifetime of that session. **They cannot exfiltrate the passkey 
 private key or the mnemonic.** Mitigations are the integrator's responsibility: strict content security policy, 
 dependency review, Subresource Integrity, no `dangerouslySetInnerHTML` near auth surfaces.
@@ -175,10 +175,10 @@ We do not roll our own crypto. Any change to this table requires explicit securi
 ## 7. Security boundaries (what each party trusts)
 
 - **The user** trusts: their authenticator, their browser, the integrating site's origin, and transitively the 
-  GhostID SDK shipped to that origin.
-- **The integrator** trusts: the SDK source they audit, the GhostID server they self-host or the Cloud they pay, the 
+  Ignoti SDK shipped to that origin.
+- **The integrator** trusts: the SDK source they audit, the Ignoti server they self-host or the Cloud they pay, the 
   user's authenticator.
-- **The GhostID server** trusts: nothing about the client. Every request is verified by signature. The server treats 
+- **The Ignoti server** trusts: nothing about the client. Every request is verified by signature. The server treats 
   client input as adversarial.
 
 ## 8. Operational requirements (for self-hosters)

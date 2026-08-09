@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { signRequest, verifyRequest } from '@/api/signing.ts';
 import { generateSessionSigningKeypair } from '@/core/crypto.ts';
-import { GhostIDError } from '@/core/errors.ts';
+import { IgnotiError } from '@/core/errors.ts';
 
 describe('signing', () => {
   describe('signRequest / verifyRequest', () => {
@@ -43,10 +43,10 @@ describe('signing', () => {
       ).rejects.toThrow();
     });
 
-    it('wraps unexpected sign errors as GhostIDError (catch branch)', async () => {
+    it('wraps unexpected sign errors as IgnotiError (catch branch)', async () => {
       const { privateKey } = await generateSessionSigningKeypair();
       vi.spyOn(crypto.subtle, 'sign').mockRejectedValueOnce(new Error('hw failure'));
-      await expect(signRequest({ x: 1 }, privateKey)).rejects.toBeInstanceOf(GhostIDError);
+      await expect(signRequest({ x: 1 }, privateKey)).rejects.toBeInstanceOf(IgnotiError);
     });
   });
 

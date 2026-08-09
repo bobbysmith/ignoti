@@ -1,4 +1,4 @@
--- GhostID server schema
+-- Ignoti server schema
 -- Apply on Supabase: paste into the SQL editor, OR run `pnpm db:migrate` against DATABASE_URL.
 -- All identifiers are opaque; no PII is stored.
 --
@@ -100,11 +100,11 @@ alter table sessions enable row level security;
 --             expired challenges accumulate faster and the 24h window
 --             means more dead rows sitting in the table between runs.
 -- pg_cron (self-hosted):
---   select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
+--   select cron.schedule('ignoti-gc', '0 3 * * *', 'select ignoti_gc()');
 -- Supabase Cron (dashboard → Database → Cron Jobs):
---   Function: ghostid_gc   Schedule: 0 3 * * *
+--   Function: ignoti_gc   Schedule: 0 3 * * *
 -- ---------------------------------------------------------------------------
-create or replace function ghostid_gc() returns void
+create or replace function ignoti_gc() returns void
 language sql
 set search_path = ''
 as $$

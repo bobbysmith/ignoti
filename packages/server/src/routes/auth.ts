@@ -378,7 +378,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
   /**
    * POST /api/auth/session/restore
-   * Cookie: ghostid_session=<sessionId>.<secret>
+   * Cookie: ignoti_session=<sessionId>.<secret>
    * Body: { sessionBinding }  (compact JWS, EdDSA — same shape as /session)
    * Returns: { sessionId, userId, deviceId, expiresAt }
    *

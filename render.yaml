@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: ghostid-server
+    name: ignoti-server
     runtime: docker
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: ghostid-db
+          name: ignoti-db
           property: connectionString
       - key: RP_ID
         sync: false
@@ -19,6 +19,6 @@ services:
         value: false
 
 databases:
-  - name: ghostid-db
-    databaseName: ghostid
-    user: ghostid
+  - name: ignoti-db
+    databaseName: ignoti
+    user: ignoti

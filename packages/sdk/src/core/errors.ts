@@ -2,7 +2,7 @@ import { type ErrorCode, ErrorCodes } from '@/types';
 
 export { type ErrorCode, ErrorCodes };
 
-export class GhostIDError extends Error {
+export class IgnotiError extends Error {
   constructor(
     message: string,
     public readonly code: ErrorCode,
@@ -11,6 +11,6 @@ export class GhostIDError extends Error {
     public readonly httpStatus?: number
   ) {
     super(message, cause ? { cause } : undefined);
-    this.name = 'GhostIDError';
+    this.name = 'IgnotiError';
   }
 }

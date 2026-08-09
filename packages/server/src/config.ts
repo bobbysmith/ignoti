@@ -20,7 +20,7 @@ const envSchema = z.object({
     .default('true')
     .transform(v => v.toLowerCase() !== 'false'),
   RP_ID: z.string().default('localhost'),
-  RP_NAME: z.string().default('GhostID'),
+  RP_NAME: z.string().default('Ignoti'),
   // Comma-separated list of allowed origins, e.g.
   // RP_ORIGIN=https://app.example.com,https://staging.app.example.com
   // A single value works as-is for backwards compatibility.
@@ -54,7 +54,7 @@ const envSchema = z.object({
     .transform(v => v.toLowerCase() === 'true'),
   // Interval for the in-process garbage collector that prunes expired
   // challenges, nonces, and old sessions/devices. Set to 0 to disable when an
-  // external scheduler (pg_cron, Supabase Cron) already calls ghostid_gc().
+  // external scheduler (pg_cron, Supabase Cron) already calls ignoti_gc().
   GC_INTERVAL_SECONDS: z.coerce
     .number()
     .min(0)

@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ghostid
-      POSTGRES_USER: ghostid
-      POSTGRES_PASSWORD: ghostid
+      POSTGRES_DB: ignoti
+      POSTGRES_USER: ignoti
+      POSTGRES_PASSWORD: ignoti
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ghostid -d ghostid"]
+      test: ["CMD-SHELL", "pg_isready -U ignoti -d ignoti"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -18,7 +18,7 @@ services:
     build: .
     command: ["node", "dist/db/migrate.js"]
     environment:
-      DATABASE_URL: postgres://ghostid:ghostid@db:5432/ghostid
+      DATABASE_URL: postgres://ignoti:ignoti@db:5432/ignoti
     depends_on:
       db:
         condition: service_healthy
@@ -30,9 +30,9 @@ services:
     ports:
       - "8787:8787"
     environment:
-      DATABASE_URL: postgres://ghostid:ghostid@db:5432/ghostid
+      DATABASE_URL: postgres://ignoti:ignoti@db:5432/ignoti
       RP_ID: ${RP_ID:-localhost}
-      RP_NAME: ${RP_NAME:-GhostID}
+      RP_NAME: ${RP_NAME:-Ignoti}
       RP_ORIGIN: ${RP_ORIGIN:-http://localhost:5173}
       CHALLENGE_TTL_SECONDS: ${CHALLENGE_TTL_SECONDS:-300}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}

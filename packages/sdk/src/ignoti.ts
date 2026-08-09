@@ -1,5 +1,5 @@
 /**
- * Main GhostID SDK class. Three-layer identity model:
+ * Main Ignoti SDK class. Three-layer identity model:
  *   1. Root identity (BIP39 mnemonic and Ed25519) - recovery and high-stakes ops.
  *   2. Device identity (WebAuthn passkey) - daily auth.
  *   3. Session identity (ephemeral Ed25519) - silent request signing.
@@ -37,11 +37,11 @@ import {
   generateSessionSigningKeypair,
   toBase64,
 } from './core/crypto';
-import { ErrorCodes, GhostIDError } from './core/errors';
+import { ErrorCodes, IgnotiError } from './core/errors';
 import type {
   CreateIdentityResult,
   DeviceInfo,
-  GhostIDOptions,
+  IgnotiOptions,
   RecoverIdentityResult,
   SessionInfo,
   SessionListItem,
@@ -55,7 +55,7 @@ interface ActiveSession {
   sessionPrivateKey: CryptoKey;
 }
 
-export class GhostID {
+export class Ignoti {
   private readonly apiClient: ApiClient;
   private readonly defaultDeviceName?: string;
   private initialized = false;
@@ -64,7 +64,7 @@ export class GhostID {
   private restoreFailures = 0;
   private sessionChangeCallback: ((session: SessionInfo | null) => void) | null = null;
 
-  constructor(options: GhostIDOptions) {
+  constructor(options: IgnotiOptions) {
     this.apiClient = createApiClient({
       baseUrl: options.backendUrl,
       ...options.apiClientOptions,
@@ -80,7 +80,7 @@ export class GhostID {
    */
   private async restoreOnce(): Promise<void> {
     if (!this.restorePromise && this.restoreFailures >= RETRY.MAX_RESTORE_FAILURES) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     await this.dedupedRestore();
   }
@@ -168,8 +168,8 @@ export class GhostID {
       };
       this.notifySessionChange();
     } catch (error) {
-      if (error instanceof GhostIDError && error.httpStatus === 401) {
-        throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      if (error instanceof IgnotiError && error.httpStatus === 401) {
+        throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
       }
       throw error;
     }
@@ -177,7 +177,7 @@ export class GhostID {
 
   private ensureInitialized(): void {
     if (!this.initialized) {
-      throw new GhostIDError(ERROR_MESSAGES.NOT_INITIALIZED, ErrorCodes.NOT_INITIALIZED);
+      throw new IgnotiError(ERROR_MESSAGES.NOT_INITIALIZED, ErrorCodes.NOT_INITIALIZED);
     }
   }
 
@@ -194,7 +194,7 @@ export class GhostID {
   async createIdentity(): Promise<CreateIdentityResult> {
     this.ensureInitialized();
     if (!isWebAuthnSupported()) {
-      throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
     }
 
     const mnemonic = generateMnemonic();
@@ -284,7 +284,7 @@ export class GhostID {
   async recoverIdentity(mnemonic: string): Promise<RecoverIdentityResult> {
     this.ensureInitialized();
     if (!isWebAuthnSupported()) {
-      throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
     }
 
     const rootKeySet = await deriveRootKeysFromMnemonic(mnemonic);
@@ -297,8 +297,8 @@ export class GhostID {
     try {
       recoverResponse = await this.apiClient.auth.recoverAccount({ rootPublicKey });
     } catch (error) {
-      if (error instanceof GhostIDError && error.httpStatus === 404) {
-        throw new GhostIDError(ERROR_MESSAGES.NO_ACCOUNT_FOR_MNEMONIC, ErrorCodes.INVALID_INPUT);
+      if (error instanceof IgnotiError && error.httpStatus === 404) {
+        throw new IgnotiError(ERROR_MESSAGES.NO_ACCOUNT_FOR_MNEMONIC, ErrorCodes.INVALID_INPUT);
       }
       throw error;
     }
@@ -338,7 +338,7 @@ export class GhostID {
    */
   private requireActiveSession(): ActiveSession {
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     return this.session;
   }
@@ -350,7 +350,7 @@ export class GhostID {
 
   /**
    * Returns headers that authenticate a specific request to the integrator's own backend.
-   * The backend validates them by forwarding to the GhostID server's
+   * The backend validates them by forwarding to the Ignoti server's
    * POST /api/sessions/verify endpoint.
    *
    * Every call generates a fresh nonce and signature, do not cache or reuse the result.
@@ -359,7 +359,7 @@ export class GhostID {
   async getSessionHeaders(method: string, path: string): Promise<Record<string, string>> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     if (this.isSessionExpired()) {
       await this.restoreOnce();
@@ -401,7 +401,7 @@ export class GhostID {
   async getDevices(): Promise<DeviceInfo[]> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
@@ -448,7 +448,7 @@ export class GhostID {
   async getSessions(): Promise<SessionListItem[]> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
@@ -476,7 +476,7 @@ export class GhostID {
   async revokeSession(targetSessionId: string): Promise<void> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
@@ -499,7 +499,7 @@ export class GhostID {
   async revokeAllSessions(): Promise<void> {
     this.ensureInitialized();
     if (!this.session) {
-      throw new GhostIDError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);

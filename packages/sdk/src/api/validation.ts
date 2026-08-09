@@ -3,7 +3,7 @@
  */
 
 import { VALIDATION } from '@/constants';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { ErrorCodes, IgnotiError } from '../core/errors';
 
 /**
  * Validates a string input with length constraints
@@ -11,7 +11,7 @@ import { ErrorCodes, GhostIDError } from '../core/errors';
  * @param fieldName - Name of the field for error messages
  * @param maxLength - Maximum allowed length
  * @returns Trimmed string if valid
- * @throws GhostIDError if validation fails
+ * @throws IgnotiError if validation fails
  */
 export function validateString(
   value: unknown,
@@ -19,16 +19,16 @@ export function validateString(
   maxLength: number = VALIDATION.MAX_STRING_LENGTH
 ): string {
   if (!value || typeof value !== 'string') {
-    throw new GhostIDError(`Invalid ${fieldName} provided`, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(`Invalid ${fieldName} provided`, ErrorCodes.INVALID_INPUT);
   }
 
   const trimmed = value.trim();
   if (trimmed.length === 0) {
-    throw new GhostIDError(`${fieldName} cannot be empty`, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(`${fieldName} cannot be empty`, ErrorCodes.INVALID_INPUT);
   }
 
   if (trimmed.length > maxLength) {
-    throw new GhostIDError(
+    throw new IgnotiError(
       `${fieldName} exceeds maximum length of ${maxLength}`,
       ErrorCodes.INVALID_INPUT
     );

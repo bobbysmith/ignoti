@@ -1,8 +1,8 @@
 {
-  "name": "@ghostid/example-api",
+  "name": "@ignoti/example-api",
   "version": "0.0.0",
   "private": true,
-  "description": "Example integrator backend: protects its routes with @ghostid/verify.",
+  "description": "Example integrator backend: protects its routes with @ignoti/verify.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
-    "@ghostid/verify": "workspace:*",
+    "@ignoti/verify": "workspace:*",
     "fastify": "^5.1.0"
   },
   "devDependencies": {

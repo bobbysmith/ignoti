@@ -1,6 +1,6 @@
 import { ERROR_MESSAGES } from '@/constants';
 import { base64UrlToBuffer, bufferToBase64Url } from '../core/crypto';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { ErrorCodes, IgnotiError } from '../core/errors';
 
 export function creationOptionsFromServer(
   optsJson: Record<string, unknown>
@@ -35,7 +35,7 @@ export function creationOptionsFromServer(
       })),
     };
   } catch {
-    throw new GhostIDError(ERROR_MESSAGES.INVALID_WEBAUTHN_OPTIONS, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.INVALID_WEBAUTHN_OPTIONS, ErrorCodes.INVALID_INPUT);
   }
 }
 
@@ -66,6 +66,6 @@ export function requestOptionsFromServer(
       })),
     };
   } catch {
-    throw new GhostIDError(ERROR_MESSAGES.INVALID_WEBAUTHN_OPTIONS, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.INVALID_WEBAUTHN_OPTIONS, ErrorCodes.INVALID_INPUT);
   }
 }

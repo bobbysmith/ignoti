@@ -7,7 +7,7 @@ export function NotFound() {
       <Header />
       <main className="app-main app-main--centered">
         <div style={{ textAlign: 'center' }}>
-          <p>nothing here but us ghosts</p>
+          <p>nothing here</p>
           <Link to="/">← back home</Link>
         </div>
       </main>

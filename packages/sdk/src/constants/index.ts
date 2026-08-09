@@ -1,8 +1,8 @@
 /**
- * Central constants for GhostID
+ * Central constants for Ignoti
  */
 
-import { PROTOCOL_VALIDATION, SESSION_AUTH_SCHEME } from '@ghostid/shared';
+import { PROTOCOL_VALIDATION, SESSION_AUTH_SCHEME } from '@ignoti/shared';
 
 export { SESSION_AUTH_SCHEME };
 
@@ -22,9 +22,9 @@ export const HTTP_HEADERS = {
   APPLICATION_JSON: 'application/json',
   AUTHORIZATION: 'Authorization',
   CONTENT_TYPE: 'Content-Type',
-  SESSION_NONCE: 'X-GhostID-Nonce',
-  SESSION_SIGNATURE: 'X-GhostID-Signature',
-  SESSION_TIMESTAMP: 'X-GhostID-Timestamp',
+  SESSION_NONCE: 'X-Ignoti-Nonce',
+  SESSION_SIGNATURE: 'X-Ignoti-Signature',
+  SESSION_TIMESTAMP: 'X-Ignoti-Timestamp',
 } as const;
 
 export const HTTP_STATUS = {
@@ -135,7 +135,7 @@ export const RETRY = {
 
 export const CRYPTO = {
   // Key derivation context for root keys
-  ROOT_KEY_CONTEXT: 'ghostid-root-sign',
+  ROOT_KEY_CONTEXT: 'ignoti-root-sign',
 
   // Key sizes
   NONCE_SIZE: 32,
@@ -176,7 +176,7 @@ export const UA_HINTS: Array<[string, string]> = [
 
 export const ERROR_MESSAGES = {
   // Core / lifecycle
-  NOT_INITIALIZED: 'GhostID not initialized: call init() first',
+  NOT_INITIALIZED: 'Ignoti not initialized: call init() first',
   NO_ACTIVE_SESSION: 'No active session: login() first',
   SESSION_EXPIRED: 'Session expired: please login again',
   CLOCK_SKEW:
@@ -252,7 +252,7 @@ export const VALIDATION = {
   // Aliases kept for existing callers (root public key and root JWS)
   MAX_PUBLIC_KEY_LENGTH: PROTOCOL_VALIDATION.MAX_ROOT_PUBLIC_KEY_LENGTH,
   MAX_SIGNATURE_LENGTH: PROTOCOL_VALIDATION.MAX_ROOT_SIGNATURE_LENGTH,
-  // Protocol-shared limits (from @ghostid/shared — single source of truth)
+  // Protocol-shared limits (from @ignoti/shared — single source of truth)
   ...PROTOCOL_VALIDATION,
 } as const;
 

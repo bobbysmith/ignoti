@@ -20,7 +20,7 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0
-      '@ghostid/verify':
+      '@ignoti/verify':
         specifier: workspace:*
         version: link:../../packages/verify
       fastify:
@@ -39,7 +39,7 @@ importers:
 
   examples/demo:
     dependencies:
-      '@ghostid/sdk':
+      '@ignoti/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       highlight.js:
@@ -85,7 +85,7 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@ghostid/shared':
+      '@ignoti/shared':
         specifier: workspace:*
         version: link:../shared
       '@noble/curves':
@@ -128,7 +128,7 @@ importers:
       '@fastify/rate-limit':
         specifier: ^10.1.1
         version: 10.3.0
-      '@ghostid/shared':
+      '@ignoti/shared':
         specifier: workspace:*
         version: link:../shared
       '@simplewebauthn/server':
@@ -174,7 +174,7 @@ importers:
 
   packages/verify:
     dependencies:
-      '@ghostid/shared':
+      '@ignoti/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:

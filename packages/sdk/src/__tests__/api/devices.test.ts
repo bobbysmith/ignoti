@@ -25,8 +25,8 @@ describe('DevicesApiClient', () => {
         undefined,
         expect.objectContaining({
           Authorization: expect.stringContaining(SESSION_ID),
-          'X-GhostID-Timestamp': String(IAT),
-          'X-GhostID-Signature': SIGNATURE,
+          'X-Ignoti-Timestamp': String(IAT),
+          'X-Ignoti-Signature': SIGNATURE,
         })
       );
     });

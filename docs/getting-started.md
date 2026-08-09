@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks through deploying the GhostID server and integrating the client SDK into a web app. By the end you 
+This guide walks through deploying the Ignoti server and integrating the client SDK into a web app. By the end you 
 will have working registration, login, and account recovery.
 
 ## Prerequisites
@@ -16,8 +16,8 @@ will have working registration, login, and account recovery.
 Download the Docker Compose file and configure it for your domain:
 
 ```bash
-curl -O https://raw.githubusercontent.com/dipsettheory/ghostid/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/dipsettheory/ghostid/main/packages/server/.env.example
+curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/packages/server/.env.example
 mv .env.example .env
 ```
 
@@ -45,30 +45,30 @@ The server starts on port `8787`. Database migrations run automatically on first
 > default; if you are developing over plain `http://localhost`, set `COOKIE_SECURE=false` so the
 > browser will send the cookie, and never do this in a deployed environment.
 
-> For a full list of configuration options see the [environment variable reference](https://github.com/dipsettheory/ghostid#self-hosting).
+> For a full list of configuration options see the [environment variable reference](https://github.com/dipsettheory/ignoti#self-hosting).
 
 ---
 
 ## 2. Install the SDK
 
 ```bash
-npm install ghostid
+npm install @ignoti/sdk
 ```
 
 ---
 
 ## 3. Initialize
 
-Create a single `GhostID` instance for your app and call `init()` before using any other method.
+Create a single `Ignoti` instance for your app and call `init()` before using any other method.
 
 ```ts
-import { GhostID } from 'ghostid';
+import { Ignoti } from '@ignoti/sdk';
 
-export const ghost = new GhostID({
+export const ignoti = new Ignoti({
   backendUrl: 'https://myapp.com:8787',
 });
 
-ghost.init();
+ignoti.init();
 ```
 
 `init()` is synchronous. The session private key stays in memory only, nothing is written to disk or localStorage.
@@ -81,11 +81,11 @@ ghost.init();
 to create a passkey.
 
 ```ts
-const { userId, deviceId, mnemonic } = await ghost.createIdentity();
+const { userId, deviceId, mnemonic } = await ignoti.createIdentity();
 ```
 
 **The mnemonic is the user's only recovery path.** Present it to the user immediately and prompt them to store it 
-somewhere safe. GhostID never stores it - once this screen is dismissed, it cannot be retrieved.
+somewhere safe. Ignoti never stores it - once this screen is dismissed, it cannot be retrieved.
 
 ```ts
 // Example: show the mnemonic to the user before continuing
@@ -100,7 +100,7 @@ showMnemonicScreen(mnemonic); // your UI
 establishes an in-memory session.
 
 ```ts
-const { sessionId, expiresAt } = await ghost.login();
+const { sessionId, expiresAt } = await ignoti.login();
 ```
 
 The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from 
@@ -114,15 +114,15 @@ On page load, call `restoreSession()` before rendering any authenticated UI. It 
 server, which validates the session cookie and re-establishes the in-memory session, no passkey prompt needed.
 
 ```ts
-ghost.init();
+ignoti.init();
 
 try {
-  await ghost.restoreSession();
+  await ignoti.restoreSession();
 } catch {
   // no active session cookie, or session expired/revoked
 }
 
-const session = ghost.getSession();
+const session = ignoti.getSession();
 
 if (session) {
   renderApp(session.userId);
@@ -139,7 +139,7 @@ const restored = useRef(false);
 useEffect(() => {
   if (restored.current) return;
   restored.current = true;
-  ghost.restoreSession().catch(() => {});
+  ignoti.restoreSession().catch(() => {});
 }, []);
 ```
 
@@ -157,9 +157,9 @@ mnemonic needed unless they've lost the device entirely.
 
 ```ts
 try {
-  await ghost.restoreSession();
+  await ignoti.restoreSession();
 } catch (err) {
-  if (err instanceof GhostIDError && err.code === ErrorCodes.NO_KEYS) {
+  if (err instanceof IgnotiError && err.code === ErrorCodes.NO_KEYS) {
     // session cookie missing or invalid, prompt for passkey
     renderLoginScreen();
     return;
@@ -176,7 +176,7 @@ All requests to your backend that require authentication must include a session 
 to get pre-built headers to attach to each request.
 
 ```ts
-const headers = await ghost.getSessionHeaders('GET', '/api/protected');
+const headers = await ignoti.getSessionHeaders('GET', '/api/protected');
 
 const response = await fetch('https://myapp.com/api/protected', {
   headers,
@@ -191,27 +191,27 @@ backend forwards for verification below, character for character.
 
 ### Verify on your backend
 
-Your backend validates the headers with the `@ghostid/verify` package, which forwards them to your GhostID
-server's verification endpoint. GhostID runs the full check - signature, session state, timestamp window, and
+Your backend validates the headers with the `@ignoti/verify` package, which forwards them to your Ignoti
+server's verification endpoint. Ignoti runs the full check - signature, session state, timestamp window, and
 nonce replay - and tells you who the request came from.
 
 ```bash
-npm install @ghostid/verify
+npm install @ignoti/verify
 ```
 
 ```ts
-import { GhostIDVerifier } from '@ghostid/verify';
+import { IgnotiVerifier } from '@ignoti/verify';
 
-const verifier = new GhostIDVerifier({
-  serverUrl: 'https://your-ghostid-server.example.com',
+const verifier = new IgnotiVerifier({
+  serverUrl: 'https://your-ignoti-server.example.com',
 });
 
 // Express: protect routes with one line
 app.use('/api', verifier.expressMiddleware());
 
 app.get('/api/feed', (req, res) => {
-  // req.ghostid = { sessionId, userId, deviceId, expiresAt }
-  res.json({ feed: loadFeedFor(req.ghostid.userId) });
+  // req.ignoti = { sessionId, userId, deviceId, expiresAt }
+  res.json({ feed: loadFeedFor(req.ignoti.userId) });
 });
 ```
 
@@ -219,14 +219,14 @@ Fastify users get a preHandler instead:
 
 ```ts
 app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, async req => {
-  return { feed: await loadFeedFor(req.ghostid.userId) };
+  return { feed: await loadFeedFor(req.ignoti.userId) };
 });
 ```
 
 For other frameworks, call `verifier.verify({ method, path, headers })` directly - it returns
 `{ valid: true, userId, deviceId, sessionId, expiresAt }` or `{ valid: false, error }`.
 
-Under the hood this is one POST to your GhostID server's `POST /api/sessions/verify` endpoint
+Under the hood this is one POST to your Ignoti server's `POST /api/sessions/verify` endpoint
 (RFC 7662-style introspection), so it works from any language - forward `{ method, path, authorization,
 nonce, timestamp, signature }` and read the same JSON back.
 
@@ -246,7 +246,7 @@ If a user loses access to their device, they can register a new one using their 
 ```ts
 const mnemonic = promptUserForMnemonic(); // your UI
 
-const { userId, deviceId } = await ghost.recoverIdentity(mnemonic);
+const { userId, deviceId } = await ignoti.recoverIdentity(mnemonic);
 ```
 
 Recovery registers a new passkey for the existing account. The `userId` returned is the same as the original - the 
@@ -259,14 +259,14 @@ account is preserved.
 List all active devices for the authenticated user:
 
 ```ts
-const devices = await ghost.getDevices();
+const devices = await ignoti.getDevices();
 // [{ id, credentialId, deviceName, createdAt, lastUsedAt }, ...]
 ```
 
 Revoke a device using the mnemonic. This immediately invalidates all sessions on that device:
 
 ```ts
-await ghost.revokeDevice(deviceId, mnemonic, userId, credentialId);
+await ignoti.revokeDevice(deviceId, mnemonic, userId, credentialId);
 ```
 
 `userId` and `credentialId` are available from `createIdentity()`, `recoverIdentity()`, or a prior `getDevices()` call.
@@ -278,14 +278,14 @@ await ghost.revokeDevice(deviceId, mnemonic, userId, credentialId);
 List all active sessions for the authenticated user:
 
 ```ts
-const sessions = await ghost.getSessions();
+const sessions = await ignoti.getSessions();
 // [{ id, deviceId, createdAt, lastUsedAt, expiresAt, isCurrent }, ...]
 ```
 
 Revoke a specific session without revoking the device:
 
 ```ts
-await ghost.revokeSession(targetSessionId);
+await ignoti.revokeSession(targetSessionId);
 ```
 
 Revoking the current session is equivalent to logging out - the in-memory session is cleared automatically.
@@ -296,7 +296,7 @@ Revoking the current session is equivalent to logging out - the in-memory sessio
 
 ```ts
 try {
-  await ghost.logout();
+  await ignoti.logout();
   renderLoginScreen();
 } catch (err) {
   // logout did not complete — the user is still logged in
@@ -306,22 +306,22 @@ try {
 
 The session is revoked server-side (which clears the httpOnly cookie), and only then is the in-memory key wiped and 
 `onSessionChange(null)` fired. If the server call fails, the error is thrown and the session is left intact — the 
-user stays logged in. GhostID does not hide the failure or clear state optimistically; handle the error and retry if 
+user stays logged in. Ignoti does not hide the failure or clear state optimistically; handle the error and retry if 
 you want. Only treat the user as logged out after `logout()` resolves.
 
 ---
 
 ## Error handling
 
-All SDK methods throw a `GhostIDError` on failure. Each error has a `code` property for programmatic handling.
+All SDK methods throw a `IgnotiError` on failure. Each error has a `code` property for programmatic handling.
 
 ```ts
-import { GhostIDError, ErrorCodes } from 'ghostid';
+import { IgnotiError, ErrorCodes } from '@ignoti/sdk';
 
 try {
-  await ghost.login();
+  await ignoti.login();
 } catch (err) {
-  if (err instanceof GhostIDError) {
+  if (err instanceof IgnotiError) {
     switch (err.code) {
       case ErrorCodes.NO_KEYS:
         // no active session

@@ -1,5 +1,5 @@
 /**
- * Central type definitions for GhostID
+ * Central type definitions for Ignoti
  */
 
 // ============================================================================
@@ -236,10 +236,10 @@ export interface RestoreSessionResponse extends Record<string, unknown> {
 }
 
 // ============================================================================
-// GhostID SDK Types
+// Ignoti SDK Types
 // ============================================================================
 
-export interface GhostIDOptions {
+export interface IgnotiOptions {
   backendUrl: string;
   /** Human-readable name for newly registered devices. */
   defaultDeviceName?: string;

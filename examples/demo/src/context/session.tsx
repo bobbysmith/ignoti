@@ -1,9 +1,9 @@
 import type React from 'react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { ghost } from '../ghost';
+import { ignoti } from '../ignoti';
 import type { SessionInfo } from '../types';
 
-const STORAGE_KEY = 'ghostid_userId';
+const STORAGE_KEY = 'ignoti_userId';
 
 interface SessionContextValue {
   session: SessionInfo | null;
@@ -37,11 +37,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
     restored.current = true;
 
-    ghost.onSessionChange(setSession);
+    ignoti.onSessionChange(setSession);
 
     async function restore() {
       try {
-        await ghost.restoreSession();
+        await ignoti.restoreSession();
       } catch {
         // no session to restore
       } finally {

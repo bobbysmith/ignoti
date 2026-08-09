@@ -1,6 +1,6 @@
-# @ghostid/server
+# @ignoti/server
 
-Reference backend for the GhostID protocol. Stateless and PII-free. Stores only opaque public keys, opaque IDs, and 
+Reference backend for the Ignoti protocol. Stateless and PII-free. Stores only opaque public keys, opaque IDs, and 
 ephemeral challenges/sessions.
 
 ## Quickstart

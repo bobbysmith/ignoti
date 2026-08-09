@@ -1,4 +1,4 @@
-create or replace function ghostid_gc() returns void
+create or replace function ignoti_gc() returns void
 language sql
 set search_path = ''
 as $$

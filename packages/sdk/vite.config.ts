@@ -14,8 +14,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'GhostID',
-      fileName: 'ghostid',
+      name: 'Ignoti',
+      fileName: 'ignoti',
       formats: ['es', 'umd'],
     },
     rollupOptions: {},

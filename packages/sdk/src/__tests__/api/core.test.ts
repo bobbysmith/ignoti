@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CoreApiClient } from '@/api/core.ts';
-import { ErrorCodes, GhostIDError } from '@/core/errors.ts';
+import { ErrorCodes, IgnotiError } from '@/core/errors.ts';
 
 const BASE_URL = 'http://localhost:3000';
 const API_TEST_PATH = '/api/test';
@@ -36,32 +36,32 @@ describe('code api', () => {
     });
 
     it('rejects plain http on non-localhost', () => {
-      expect(() => makeClient({ baseUrl: 'http://api.example.com' })).toThrow(GhostIDError);
+      expect(() => makeClient({ baseUrl: 'http://api.example.com' })).toThrow(IgnotiError);
     });
 
     it('rejects missing baseUrl', () => {
-      expect(() => makeClient({ baseUrl: '' })).toThrow(GhostIDError);
+      expect(() => makeClient({ baseUrl: '' })).toThrow(IgnotiError);
     });
 
     it('rejects invalid URL format', () => {
-      expect(() => makeClient({ baseUrl: 'not-a-url' })).toThrow(GhostIDError);
+      expect(() => makeClient({ baseUrl: 'not-a-url' })).toThrow(IgnotiError);
     });
 
     it('rejects timeout <= 0', () => {
-      expect(() => makeClient({ timeout: 0 })).toThrow(GhostIDError);
-      expect(() => makeClient({ timeout: -1 })).toThrow(GhostIDError);
+      expect(() => makeClient({ timeout: 0 })).toThrow(IgnotiError);
+      expect(() => makeClient({ timeout: -1 })).toThrow(IgnotiError);
     });
 
     it('rejects timeout > 300000', () => {
-      expect(() => makeClient({ timeout: 300_001 })).toThrow(GhostIDError);
+      expect(() => makeClient({ timeout: 300_001 })).toThrow(IgnotiError);
     });
 
     it('rejects retryAttempts < 1', () => {
-      expect(() => makeClient({ retryAttempts: 0 })).toThrow(GhostIDError);
+      expect(() => makeClient({ retryAttempts: 0 })).toThrow(IgnotiError);
     });
 
     it('rejects retryAttempts > 10', () => {
-      expect(() => makeClient({ retryAttempts: 11 })).toThrow(GhostIDError);
+      expect(() => makeClient({ retryAttempts: 11 })).toThrow(IgnotiError);
     });
 
     it('strips trailing slash from baseUrl', async () => {
@@ -81,11 +81,11 @@ describe('code api', () => {
       expect(result).toEqual({ userId: 'abc' });
     });
 
-    it('throws GhostIDError on 4xx without retry', async () => {
+    it('throws IgnotiError on 4xx without retry', async () => {
       const client = makeClient({ retryAttempts: 3 });
       const fetch = mockFetch(400, { error: 'invalid_input', message: 'bad' });
       vi.stubGlobal('fetch', fetch);
-      await expect(client.makeRequest('POST', API_TEST_PATH, {})).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('POST', API_TEST_PATH, {})).rejects.toThrow(IgnotiError);
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 
@@ -94,7 +94,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(400, { error: 'invalid_or_expired_challenge' }));
       const err = (await client
         .makeRequest('POST', API_TEST_PATH, {})
-        .catch(e => e)) as GhostIDError;
+        .catch(e => e)) as IgnotiError;
       expect(err.code).toBe(ErrorCodes.INVALID_CHALLENGE);
       expect(err.httpStatus).toBe(400);
     });
@@ -104,7 +104,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(401, { error: 'invalid_root_signature' }));
       const err = (await client
         .makeRequest('DELETE', '/api/devices/abc', {})
-        .catch(e => e)) as GhostIDError;
+        .catch(e => e)) as IgnotiError;
       expect(err.code).toBe(ErrorCodes.INVALID_SIGNATURE);
     });
 
@@ -113,15 +113,15 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(400, { error: 'invalid_input' }));
       const err = (await client
         .makeRequest('POST', API_TEST_PATH, {})
-        .catch(e => e)) as GhostIDError;
+        .catch(e => e)) as IgnotiError;
       expect(err.code).toBe(ErrorCodes.API_ERROR);
     });
 
-    it('throws GhostIDError on 5xx and retries', async () => {
+    it('throws IgnotiError on 5xx and retries', async () => {
       const client = makeClient({ retryAttempts: 3 });
       const fetch = mockFetch(500, { error: 'server_error', message: 'oops' });
       vi.stubGlobal('fetch', fetch);
-      await expect(client.makeRequest('POST', API_TEST_PATH, {})).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('POST', API_TEST_PATH, {})).rejects.toThrow(IgnotiError);
       expect(fetch).toHaveBeenCalledTimes(3);
     });
 
@@ -154,7 +154,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', fetchMock);
 
       const assertion = expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(
-        GhostIDError
+        IgnotiError
       );
       await vi.runAllTimersAsync();
       await assertion;
@@ -176,7 +176,7 @@ describe('code api', () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
-    it('throws GhostIDError on timeout (AbortError)', async () => {
+    it('throws IgnotiError on timeout (AbortError)', async () => {
       const client = makeClient({ timeout: 100 });
       vi.stubGlobal(
         'fetch',
@@ -188,18 +188,18 @@ describe('code api', () => {
     it('wraps non-Error fetch rejections', async () => {
       const client = makeClient({ retryAttempts: 1 });
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue('network down'));
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(IgnotiError);
     });
 
     it('throws on invalid path', async () => {
       const client = makeClient();
-      await expect(client.makeRequest('GET', '')).rejects.toThrow(GhostIDError);
-      await expect(client.makeRequest('GET', 'no-leading-slash')).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', '')).rejects.toThrow(IgnotiError);
+      await expect(client.makeRequest('GET', 'no-leading-slash')).rejects.toThrow(IgnotiError);
     });
 
     it('throws on invalid HTTP method', async () => {
       const client = makeClient();
-      await expect(client.makeRequest('CONNECT', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('CONNECT', API_TEST_PATH)).rejects.toThrow(IgnotiError);
     });
 
     it('throws on forbidden header', async () => {
@@ -207,7 +207,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(200, {}));
       await expect(
         client.makeRequest('GET', API_TEST_PATH, undefined, { host: 'evil.com' })
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
     });
 
     it('throws on header with CR/LF (injection guard)', async () => {
@@ -217,7 +217,7 @@ describe('code api', () => {
         client.makeRequest('GET', API_TEST_PATH, undefined, {
           'x-custom': 'val\r\nInjected: header',
         })
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
     });
 
     it('throws when request body exceeds size limit', async () => {
@@ -225,11 +225,11 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(200, {}));
       const bigPayload = { data: 'x'.repeat(1024 * 1024 + 1) };
       await expect(client.makeRequest('POST', API_TEST_PATH, bigPayload)).rejects.toThrow(
-        GhostIDError
+        IgnotiError
       );
     });
 
-    it('throws GhostIDError when response JSON is unparseable', async () => {
+    it('throws IgnotiError when response JSON is unparseable', async () => {
       const client = makeClient();
       vi.stubGlobal(
         'fetch',
@@ -240,7 +240,7 @@ describe('code api', () => {
           json: () => Promise.reject(new Error('bad json')),
         })
       );
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(IgnotiError);
     });
 
     it('throws when path exceeds MAX_PATH_LENGTH', async () => {
@@ -254,7 +254,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(200, {}));
       await expect(
         client.makeRequest('GET', API_TEST_PATH, undefined, { 'bad header': 'value' })
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
     });
 
     it('throws on header value exceeding max length', async () => {
@@ -262,7 +262,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(200, {}));
       await expect(
         client.makeRequest('GET', API_TEST_PATH, undefined, { 'x-custom': 'x'.repeat(4097) })
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
     });
 
     it('throws on circular reference in body (safeStringify catch)', async () => {
@@ -271,7 +271,7 @@ describe('code api', () => {
       const circular: Record<string, unknown> = {};
       circular.self = circular;
       await expect(client.makeRequest('POST', API_TEST_PATH, circular)).rejects.toThrow(
-        GhostIDError
+        IgnotiError
       );
     });
 
@@ -315,8 +315,8 @@ describe('code api', () => {
           json: () => Promise.reject(new Error('not json')),
         })
       );
-      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
-      expect(err).toBeInstanceOf(GhostIDError);
+      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as IgnotiError;
+      expect(err).toBeInstanceOf(IgnotiError);
       expect(err.message).toContain('Service Unavailable');
     });
 
@@ -332,8 +332,8 @@ describe('code api', () => {
           json: () => Promise.resolve({}),
         })
       );
-      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
-      expect(err).toBeInstanceOf(GhostIDError);
+      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as IgnotiError;
+      expect(err).toBeInstanceOf(IgnotiError);
       expect(err.message).toContain('HTTP 422');
     });
 
@@ -349,8 +349,8 @@ describe('code api', () => {
           json: () => Promise.reject(new Error('malformed')),
         })
       );
-      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
-      expect(err).toBeInstanceOf(GhostIDError);
+      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as IgnotiError;
+      expect(err).toBeInstanceOf(IgnotiError);
       expect(err.message).toContain('Internal Server Error');
     });
 
@@ -367,7 +367,7 @@ describe('code api', () => {
           json: () => Promise.resolve({ error: longMessage }),
         })
       );
-      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as GhostIDError;
+      const err = (await client.makeRequest('GET', API_TEST_PATH).catch(e => e)) as IgnotiError;
       expect(err.message).toMatch(/^x{500}\.\.\.$/);
     });
 
@@ -391,7 +391,7 @@ describe('code api', () => {
     }
 
     it('calls onUnauthorized on 401, retries with fresh headers, and returns result', async () => {
-      const freshHeaders = { Authorization: 'GhostID-Session new-sess' };
+      const freshHeaders = { Authorization: 'Ignoti-Session new-sess' };
       const onUnauthorized = vi.fn().mockResolvedValue(freshHeaders);
       const client = makeClientWithInterceptor(onUnauthorized);
 
@@ -419,7 +419,7 @@ describe('code api', () => {
       expect(result).toEqual({ data: 'ok' });
 
       const retryHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
-      expect(retryHeaders.authorization).toBe('GhostID-Session new-sess');
+      expect(retryHeaders.authorization).toBe('Ignoti-Session new-sess');
     });
 
     it('throws CLOCK_SKEW without invoking the interceptor on a timestamp-range 401', async () => {
@@ -427,7 +427,7 @@ describe('code api', () => {
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'session_timestamp_out_of_range' }));
 
-      const err = (await client.makeRequest('GET', '/api/devices').catch(e => e)) as GhostIDError;
+      const err = (await client.makeRequest('GET', '/api/devices').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('CLOCK_SKEW');
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
@@ -437,7 +437,7 @@ describe('code api', () => {
       const fetchMock = mockFetch(401, { error: 'unauthorized' });
       vi.stubGlobal('fetch', fetchMock);
 
-      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', API_TEST_PATH)).rejects.toThrow(IgnotiError);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
@@ -446,7 +446,7 @@ describe('code api', () => {
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
-      await expect(client.makeRequest('POST', '/api/auth/login', {})).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('POST', '/api/auth/login', {})).rejects.toThrow(IgnotiError);
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
 
@@ -456,7 +456,7 @@ describe('code api', () => {
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
       await expect(client.makeRequest('POST', '/api/auth/session/restore', {})).rejects.toThrow(
-        GhostIDError
+        IgnotiError
       );
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
@@ -468,7 +468,7 @@ describe('code api', () => {
 
       const err = (await client
         .makeRequest('POST', '/api/auth/register/device', {})
-        .catch(e => e)) as GhostIDError;
+        .catch(e => e)) as IgnotiError;
       expect(err.message).toBe('invalid_root_signature');
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
@@ -480,18 +480,18 @@ describe('code api', () => {
 
       await expect(
         client.makeRequest('DELETE', '/api/devices/00000000-0000-0000-0000-000000000000', {})
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
       expect(onUnauthorized).not.toHaveBeenCalled();
     });
 
     it('intercepts 401 on session revocation by id', async () => {
-      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'GhostID-Session new' });
+      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'Ignoti-Session new' });
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
       await expect(
         client.makeRequest('DELETE', '/api/sessions/00000000-0000-0000-0000-000000000000')
-      ).rejects.toThrow(GhostIDError);
+      ).rejects.toThrow(IgnotiError);
       expect(onUnauthorized).toHaveBeenCalledTimes(1);
     });
 
@@ -504,11 +504,11 @@ describe('code api', () => {
     });
 
     it('does not retry a second time if the retried request also returns 401', async () => {
-      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'GhostID-Session new' });
+      const onUnauthorized = vi.fn().mockResolvedValue({ Authorization: 'Ignoti-Session new' });
       const client = makeClientWithInterceptor(onUnauthorized);
       vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthorized' }));
 
-      await expect(client.makeRequest('GET', '/api/devices')).rejects.toThrow(GhostIDError);
+      await expect(client.makeRequest('GET', '/api/devices')).rejects.toThrow(IgnotiError);
       expect(onUnauthorized).toHaveBeenCalledTimes(1);
       expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(2);
     });

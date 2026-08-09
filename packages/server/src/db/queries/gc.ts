@@ -6,7 +6,7 @@ import { sql } from '../client.js';
 const GC_ADVISORY_LOCK_KEY = 4_927_001;
 
 /**
- * Runs ghostid_gc() under a transaction-scoped advisory lock so that at most
+ * Runs ignoti_gc() under a transaction-scoped advisory lock so that at most
  * one instance sweeps at a time; the lock releases automatically at commit.
  * Returns false without sweeping if another instance holds the lock.
  */
@@ -18,7 +18,7 @@ export async function runGc(): Promise<boolean> {
     if (!row?.locked) {
       return false;
     }
-    await tx`select ghostid_gc()`;
+    await tx`select ignoti_gc()`;
     return true;
   });
 }

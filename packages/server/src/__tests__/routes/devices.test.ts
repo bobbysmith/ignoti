@@ -16,7 +16,7 @@ import { registerDeviceRoutes } from '../../routes/devices.js';
 vi.mock('../../config.js', () => ({
   config: {
     RP_ID: 'localhost',
-    RP_NAME: 'GhostID',
+    RP_NAME: 'Ignoti',
     RP_ORIGIN: ['http://localhost:5173'],
     CHALLENGE_TTL_SECONDS: 300,
     SESSION_TTL_SECONDS: 86400,

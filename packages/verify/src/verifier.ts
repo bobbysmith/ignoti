@@ -1,25 +1,25 @@
 /**
  * Server-side session verification for integrator backends.
  *
- * The GhostID SDK signs each request with an ephemeral session key
- * (`getSessionHeaders()`). This class forwards those headers to the GhostID
+ * The Ignoti SDK signs each request with an ephemeral session key
+ * (`getSessionHeaders()`). This class forwards those headers to the Ignoti
  * server's introspection endpoint (POST /api/sessions/verify), which runs the
  * full check — signature, session state, timestamp window, and nonce replay —
  * and returns the authenticated identity.
  *
  * Sessions cannot be verified offline: revocation state and single-use nonces
- * live in the GhostID server. Verify each request exactly once and never cache
+ * live in the Ignoti server. Verify each request exactly once and never cache
  * a positive result across requests.
  */
 
-import { GHOSTID_HEADERS, SERVER_ERROR_CODES } from '@ghostid/shared';
+import { IGNOTI_HEADERS, SERVER_ERROR_CODES } from '@ignoti/shared';
 
-import { GhostIDVerifyError } from './errors.js';
+import { IgnotiVerifyError } from './errors.js';
 import type {
   AuthReply,
   AuthRequest,
   AuthResponse,
-  GhostIDVerifierOptions,
+  IgnotiVerifierOptions,
   IncomingHeaders,
   NextFunction,
   VerifyInput,
@@ -32,10 +32,10 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 // Incoming header names, lowercased once. Node lowercases incoming headers,
 // but plucking is case-insensitive anyway for non-Node runtimes.
 const HEADER_KEYS = {
-  authorization: GHOSTID_HEADERS.AUTHORIZATION.toLowerCase(),
-  nonce: GHOSTID_HEADERS.SESSION_NONCE.toLowerCase(),
-  timestamp: GHOSTID_HEADERS.SESSION_TIMESTAMP.toLowerCase(),
-  signature: GHOSTID_HEADERS.SESSION_SIGNATURE.toLowerCase(),
+  authorization: IGNOTI_HEADERS.AUTHORIZATION.toLowerCase(),
+  nonce: IGNOTI_HEADERS.SESSION_NONCE.toLowerCase(),
+  timestamp: IGNOTI_HEADERS.SESSION_TIMESTAMP.toLowerCase(),
+  signature: IGNOTI_HEADERS.SESSION_SIGNATURE.toLowerCase(),
 } as const;
 
 function pluckHeader(headers: IncomingHeaders, wantedLower: string): string | undefined {
@@ -47,16 +47,16 @@ function pluckHeader(headers: IncomingHeaders, wantedLower: string): string | un
   return undefined;
 }
 
-export class GhostIDVerifier {
+export class IgnotiVerifier {
   private readonly serverUrl: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
-  constructor(options: GhostIDVerifierOptions) {
+  constructor(options: IgnotiVerifierOptions) {
     try {
       new URL(options.serverUrl);
     } catch {
-      throw new GhostIDVerifyError(`Invalid serverUrl: ${options.serverUrl}`);
+      throw new IgnotiVerifyError(`Invalid serverUrl: ${options.serverUrl}`);
     }
     this.serverUrl = options.serverUrl.replace(/\/$/, '');
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -67,8 +67,8 @@ export class GhostIDVerifier {
    * Verifies the session headers of a request your backend received.
    *
    * Returns `{ valid: true, userId, ... }` or `{ valid: false, error }`.
-   * Throws `GhostIDVerifyError` only when introspection itself fails
-   * (GhostID server unreachable, timeout, or unexpected response).
+   * Throws `IgnotiVerifyError` only when introspection itself fails
+   * (Ignoti server unreachable, timeout, or unexpected response).
    */
   async verify(input: VerifyInput): Promise<VerifyResult> {
     const authorization = pluckHeader(input.headers, HEADER_KEYS.authorization);
@@ -100,14 +100,14 @@ export class GhostIDVerifier {
         signal: controller.signal,
       });
     } catch (err) {
-      throw new GhostIDVerifyError('GhostID session verification request failed', undefined, err);
+      throw new IgnotiVerifyError('Ignoti session verification request failed', undefined, err);
     } finally {
       clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
-      throw new GhostIDVerifyError(
-        `GhostID session verification returned HTTP ${response.status}`,
+      throw new IgnotiVerifyError(
+        `Ignoti session verification returned HTTP ${response.status}`,
         response.status
       );
     }
@@ -115,8 +115,8 @@ export class GhostIDVerifier {
     try {
       return (await response.json()) as VerifyResult;
     } catch (err) {
-      throw new GhostIDVerifyError(
-        'GhostID session verification returned malformed JSON',
+      throw new IgnotiVerifyError(
+        'Ignoti session verification returned malformed JSON',
         response.status,
         err
       );
@@ -125,11 +125,11 @@ export class GhostIDVerifier {
 
   /**
    * Express-style middleware. On success, attaches the session to
-   * `req.ghostid` and calls `next()`. On an invalid session, responds
+   * `req.ignoti` and calls `next()`. On an invalid session, responds
    * 401 `{ error }`. On introspection failure, forwards the error to `next`.
    *
    *   app.use('/api', verifier.expressMiddleware());
-   *   app.get('/api/feed', (req, res) => res.json({ userId: req.ghostid.userId }));
+   *   app.get('/api/feed', (req, res) => res.json({ userId: req.ignoti.userId }));
    */
   expressMiddleware(): (req: AuthRequest, res: AuthResponse, next: NextFunction) => void {
     return (req, res, next) => {
@@ -144,7 +144,7 @@ export class GhostIDVerifier {
             return;
           }
           const { valid: _valid, ...session } = result;
-          req.ghostid = session;
+          req.ignoti = session;
           next();
         })
         .catch(next);
@@ -152,7 +152,7 @@ export class GhostIDVerifier {
   }
 
   /**
-   * Fastify preHandler. On success, attaches the session to `req.ghostid`;
+   * Fastify preHandler. On success, attaches the session to `req.ignoti`;
    * on an invalid session, replies 401 `{ error }`. Introspection failures
    * propagate to Fastify's error handler.
    *
@@ -170,7 +170,7 @@ export class GhostIDVerifier {
         return;
       }
       const { valid: _valid, ...session } = result;
-      req.ghostid = session;
+      req.ignoti = session;
     };
   }
 }

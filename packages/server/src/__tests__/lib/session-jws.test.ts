@@ -1,4 +1,4 @@
-import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { exportJWK, generateKeyPair, importJWK, SignJWT } from 'jose';
 import { beforeAll, describe, expect, it } from 'vitest';
 

@@ -40,9 +40,9 @@ export async function buildServer() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-GhostID-Nonce',
-      'X-GhostID-Signature',
-      'X-GhostID-Timestamp',
+      'X-Ignoti-Nonce',
+      'X-Ignoti-Signature',
+      'X-Ignoti-Timestamp',
     ],
   });
 
@@ -67,7 +67,7 @@ async function start() {
   await app.listen({ port: config.PORT, host: config.HOST });
 
   // In-process garbage collection. Disabled (GC_INTERVAL_SECONDS=0) when an
-  // external scheduler already calls ghostid_gc(). unref() so the timer never
+  // external scheduler already calls ignoti_gc(). unref() so the timer never
   // keeps the process alive on its own.
   let gcTimer: NodeJS.Timeout | undefined;
   if (config.GC_INTERVAL_SECONDS > 0) {

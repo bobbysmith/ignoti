@@ -4,13 +4,13 @@
 
 ## Setup
 
-### `new GhostID(options)`
+### `new Ignoti(options)`
 
-Creates a GhostID instance. One instance per app.
+Creates a Ignoti instance. One instance per app.
 
 ```ts
-const ghost = new GhostID({
-  backendUrl: 'https://your-ghostid-server.example.com',
+const ignoti = new Ignoti({
+  backendUrl: 'https://your-ignoti-server.example.com',
 });
 ```
 
@@ -18,32 +18,32 @@ const ghost = new GhostID({
 
 | Name                | Type     | Required | Description                                                                                       |
 |---------------------|----------|----------|---------------------------------------------------------------------------------------------------|
-| `backendUrl`        | `string` | yes      | Base URL of your GhostID server                                                                   |
+| `backendUrl`        | `string` | yes      | Base URL of your Ignoti server                                                                   |
 | `defaultDeviceName` | `string` | no       | Human-readable name for newly registered devices. If omitted, the SDK guesses from the user agent |
 | `apiClientOptions`  | `object` | no       | Low-level HTTP client options: `timeout` (ms), `retryAttempts`                                    |
 
 ---
 
-### `ghost.init()`
+### `ignoti.init()`
 
 Marks the instance as initialized. Must be called before any method that touches identity or session state; those throw `NOT_INITIALIZED` if called first. The exception is `onSessionChange()`, which is designed to be registered before `init()` so you do not miss the initial session transition.
 
 ```ts
-ghost.init();
+ignoti.init();
 ```
 
 Returns: `void`
 
 ---
 
-### `ghost.onSessionChange(callback)`
+### `ignoti.onSessionChange(callback)`
 
 Registers a callback that fires on every session transition. The callback is **not** invoked on registration with the current state - it only fires on subsequent transitions. Register it before your first `restoreSession()`/`login()` call so you do not miss that first transition.
 
 Only one callback is held: calling `onSessionChange` again replaces the previous callback rather than adding a second subscriber. Register it once.
 
 ```ts
-ghost.onSessionChange(session => {
+ignoti.onSessionChange(session => {
   if (session) {
     // logged in
   } else {
@@ -67,12 +67,12 @@ Returns: `void`
 
 ## Identity
 
-### `ghost.createIdentity()`
+### `ignoti.createIdentity()`
 
 Creates a new user identity. Generates a 12-word mnemonic, derives a root keypair, and registers a passkey on the current device. Does not create a session - call `login()` afterward to authenticate.
 
 ```ts
-const { mnemonic, userId, deviceId } = await ghost.createIdentity();
+const { mnemonic, userId, deviceId } = await ignoti.createIdentity();
 // show mnemonic to user - it will not be shown again
 ```
 
@@ -86,13 +86,13 @@ Throws:
 
 ---
 
-### `ghost.recoverIdentity(mnemonic)`
+### `ignoti.recoverIdentity(mnemonic)`
 
 Recovers an existing identity on a new device using the 12-word recovery phrase. Registers the current device's passkey under the existing account. Does not create a session - call `login()` after.
 
 ```ts
-await ghost.recoverIdentity(words.join(' '));
-const session = await ghost.login();
+await ignoti.recoverIdentity(words.join(' '));
+const session = await ignoti.login();
 ```
 
 **Parameters**
@@ -113,7 +113,7 @@ A wrong or unknown recovery phrase throws `INVALID_INPUT` before any passkey pro
 
 ---
 
-### `ghost.recoverAndLogin(mnemonic)`
+### `ignoti.recoverAndLogin(mnemonic)`
 
 Convenience method that calls `recoverIdentity()` then `login()` in sequence.
 
@@ -131,12 +131,12 @@ Throws: same as `recoverIdentity()` and `login()`
 
 ## Authentication
 
-### `ghost.login()`
+### `ignoti.login()`
 
 Authenticates with the registered passkey on this device. Prompts the user to verify with biometric or PIN, generates an ephemeral session keypair, and binds it to the server.
 
 ```ts
-const session = await ghost.login();
+const session = await ignoti.login();
 ```
 
 Returns: `Promise<SessionInfo>`
@@ -149,7 +149,7 @@ Throws:
 
 ---
 
-### `ghost.logout()`
+### `ignoti.logout()`
 
 Revokes the current session on the server, then clears local state and fires `onSessionChange(null)`. Local state is cleared **only after** the server confirms revocation. If the server call fails, the error is thrown and the session is left intact — the user stays logged in. Nothing is hidden: handle the error and decide whether to retry (calling `logout()` again). Await success before showing a logged-out UI.
 
@@ -157,7 +157,7 @@ No-op if not logged in.
 
 ```ts
 try {
-  await ghost.logout();
+  await ignoti.logout();
   // logged out — server session revoked, cookie cleared
 } catch (err) {
   // still logged in — revocation did not complete; surface and offer retry
@@ -172,7 +172,7 @@ Throws:
 
 ---
 
-### `ghost.restoreSession()`
+### `ignoti.restoreSession()`
 
 Restores a session after a page reload using the httpOnly session cookie. Generates a fresh ephemeral keypair and binds it to the server. Concurrent calls within a page are single-flighted (they share one attempt), so calling it more than once is safe.
 
@@ -184,7 +184,7 @@ const restored = useRef(false);
 useEffect(() => {
   if (restored.current) return;
   restored.current = true;
-  ghost.restoreSession().catch(() => {});
+  ignoti.restoreSession().catch(() => {});
 }, []);
 ```
 
@@ -199,12 +199,12 @@ Throws:
 
 ## Session
 
-### `ghost.getSession()`
+### `ignoti.getSession()`
 
 Returns the current session info, or `null` if not authenticated. Synchronous. If the in-memory session has passed its expiry, it is cleared on this call: `getSession()` returns `null` and `onSessionChange` fires once with `null`.
 
 ```ts
-const session = ghost.getSession();
+const session = ignoti.getSession();
 if (session) {
   console.log(session.userId);
 }
@@ -214,7 +214,7 @@ Returns: `SessionInfo | null`
 
 ---
 
-### `ghost.isSessionExpired()`
+### `ignoti.isSessionExpired()`
 
 Returns `true` if the current session has passed its expiry time, or if there is no session. Synchronous.
 
@@ -222,18 +222,18 @@ Returns: `boolean`
 
 ---
 
-### `ghost.getSessionHeaders(method, path)`
+### `ignoti.getSessionHeaders(method, path)`
 
 Returns signed headers to attach to an authenticated request to your backend. The method and path must match the request exactly.
 
 ```ts
-const headers = await ghost.getSessionHeaders('GET', '/api/feed');
+const headers = await ignoti.getSessionHeaders('GET', '/api/feed');
 const res = await fetch('https://api.example.com/api/feed', { headers });
 ```
 
 If the session is expired, automatically attempts to restore it before signing. Do not cache the result - each call generates a fresh signature with a unique nonce.
 
-Your backend validates these headers by forwarding them to the GhostID server's `POST /api/sessions/verify` endpoint, which returns the authenticated `userId` on success. See [getting started, section 7](./getting-started.md#7-make-authenticated-requests) for a full example.
+Your backend validates these headers by forwarding them to the Ignoti server's `POST /api/sessions/verify` endpoint, which returns the authenticated `userId` on success. See [getting started, section 7](./getting-started.md#7-make-authenticated-requests) for a full example.
 
 **Parameters**
 
@@ -253,7 +253,7 @@ Throws:
 
 ## Devices
 
-### `ghost.getDevices()`
+### `ignoti.getDevices()`
 
 Returns the list of active devices registered to the current user.
 
@@ -267,12 +267,12 @@ Throws:
 
 ---
 
-### `ghost.revokeDevice(deviceId, mnemonic, userId, credentialId)`
+### `ignoti.revokeDevice(deviceId, mnemonic, userId, credentialId)`
 
 Revokes a device and all its active sessions atomically. Authorized entirely by the recovery mnemonic (a root-key signature), so it does **not** require an active session - a user who has lost access to all their sessions can still revoke a device. Revoking the current device clears local state and fires `onSessionChange`.
 
 ```ts
-await ghost.revokeDevice(device.id, mnemonic, session.userId, device.credentialId);
+await ignoti.revokeDevice(device.id, mnemonic, session.userId, device.credentialId);
 ```
 
 **Parameters**
@@ -296,7 +296,7 @@ Throws:
 
 ## Sessions
 
-### `ghost.getSessions()`
+### `ignoti.getSessions()`
 
 Returns the list of active sessions for the current user across all devices.
 
@@ -310,7 +310,7 @@ Throws:
 
 ---
 
-### `ghost.revokeSession(sessionId)`
+### `ignoti.revokeSession(sessionId)`
 
 Revokes a single session without affecting the device's passkey. Revoking the current session clears local state and fires `onSessionChange`.
 
@@ -330,12 +330,12 @@ Throws:
 
 ---
 
-### `ghost.revokeAllSessions()`
+### `ignoti.revokeAllSessions()`
 
 Revokes every active session for the current user across all devices, including this one. Devices remain registered so the user can log back in with any of their passkeys. Clears local state and fires `onSessionChange` with `null`.
 
 ```ts
-await ghost.revokeAllSessions();
+await ignoti.revokeAllSessions();
 ```
 
 Returns: `Promise<void>`
@@ -353,15 +353,15 @@ Throws:
 Types are exported from the main entry or the dedicated types entry:
 
 ```ts
-import type { SessionInfo, DeviceInfo, SessionListItem } from 'ghostid';
+import type { SessionInfo, DeviceInfo, SessionListItem } from '@ignoti/sdk';
 // or
-import type { SessionInfo, DeviceInfo, SessionListItem } from 'ghostid/types';
+import type { SessionInfo, DeviceInfo, SessionListItem } from 'ignoti/types';
 ```
 
-### `GhostIDOptions`
+### `IgnotiOptions`
 
 ```ts
-type GhostIDOptions = {
+type IgnotiOptions = {
   backendUrl: string;
   defaultDeviceName?: string;
   apiClientOptions?: {
@@ -426,12 +426,12 @@ type SessionListItem = {
 };
 ```
 
-### `GhostIDError`
+### `IgnotiError`
 
-All SDK methods throw `GhostIDError` on failure.
+All SDK methods throw `IgnotiError` on failure.
 
 ```ts
-class GhostIDError extends Error {
+class IgnotiError extends Error {
   code: ErrorCode;
   httpStatus?: number; // populated for API_ERROR only
 }

@@ -1,17 +1,17 @@
-# @ghostid/verify
+# @ignoti/verify
 
-Server-side session verification for [GhostID](https://github.com/dipsettheory/ghostid). Validates the signed
-session headers produced by the client SDK's `getSessionHeaders()` against your self-hosted GhostID server.
+Server-side session verification for [Ignoti](https://github.com/dipsettheory/ignoti). Validates the signed
+session headers produced by the client SDK's `getSessionHeaders()` against your self-hosted Ignoti server.
 
 Zero runtime dependencies. Node 18+.
 
 ## Usage
 
 ```ts
-import { GhostIDVerifier } from '@ghostid/verify';
+import { IgnotiVerifier } from '@ignoti/verify';
 
-const verifier = new GhostIDVerifier({
-  serverUrl: 'https://your-ghostid-server.example.com',
+const verifier = new IgnotiVerifier({
+  serverUrl: 'https://your-ignoti-server.example.com',
 });
 ```
 
@@ -21,8 +21,8 @@ const verifier = new GhostIDVerifier({
 app.use('/api', verifier.expressMiddleware());
 
 app.get('/api/feed', (req, res) => {
-  // req.ghostid = { sessionId, userId, deviceId, expiresAt }
-  res.json({ feed: loadFeedFor(req.ghostid.userId) });
+  // req.ignoti = { sessionId, userId, deviceId, expiresAt }
+  res.json({ feed: loadFeedFor(req.ignoti.userId) });
 });
 ```
 
@@ -30,7 +30,7 @@ app.get('/api/feed', (req, res) => {
 
 ```ts
 app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, async req => {
-  return { feed: await loadFeedFor(req.ghostid.userId) };
+  return { feed: await loadFeedFor(req.ignoti.userId) };
 });
 ```
 
@@ -52,11 +52,11 @@ if (result.valid) {
 
 ## How it works
 
-Each call forwards the four session headers plus the method and path to your GhostID server's
+Each call forwards the four session headers plus the method and path to your Ignoti server's
 `POST /api/sessions/verify` endpoint (RFC 7662-style introspection). The server runs the full check -
 Ed25519 signature, session revocation and expiry, timestamp window, and single-use nonce - and returns the
 authenticated identity. Verification is centralized by design: instant revocation and replay prevention
-require the GhostID server's state, so sessions cannot be verified offline.
+require the Ignoti server's state, so sessions cannot be verified offline.
 
 Rules:
 
@@ -64,7 +64,7 @@ Rules:
   twice returns `session_nonce_used`.
 - **Never cache a `valid: true` result across requests.** Every request carries a fresh signature.
 
-`verify()` only throws (`GhostIDVerifyError`) when introspection itself fails - server unreachable, timeout,
+`verify()` only throws (`IgnotiVerifyError`) when introspection itself fails - server unreachable, timeout,
 or a malformed response. An invalid session is a *successful* introspection and comes back as
 `{ valid: false, error }`.
 
@@ -72,7 +72,7 @@ or a malformed response. An invalid session is a *successful* introspection and 
 
 | Option      | Default | Description                                             |
 |-------------|---------|---------------------------------------------------------|
-| `serverUrl` | -       | Base URL of your self-hosted GhostID server. Required.  |
+| `serverUrl` | -       | Base URL of your self-hosted Ignoti server. Required.  |
 | `timeoutMs` | `5000`  | Abort the verification request after this many ms.      |
 | `fetch`     | global  | Custom fetch implementation (tests, edge runtimes).     |
 

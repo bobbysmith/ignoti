@@ -5,7 +5,7 @@ import {
   isPlatformAuthenticatorAvailable,
   isWebAuthnSupported,
 } from '@/auth/passkey.ts';
-import { GhostIDError } from '@/core/errors.ts';
+import { IgnotiError } from '@/core/errors.ts';
 
 function makeAttestationResponse(overrides = {}) {
   return {
@@ -79,15 +79,15 @@ describe('Auth passkey', () => {
   });
 
   describe('createPasskey', () => {
-    it('throws GhostIDError when window is undefined', async () => {
+    it('throws IgnotiError when window is undefined', async () => {
       vi.stubGlobal('window', undefined);
-      await expect(createPasskey({} as never)).rejects.toThrow(GhostIDError);
+      await expect(createPasskey({} as never)).rejects.toThrow(IgnotiError);
     });
 
-    it('throws GhostIDError when credentials.create returns null', async () => {
+    it('throws IgnotiError when credentials.create returns null', async () => {
       vi.stubGlobal('window', { PublicKeyCredential: class {} });
       vi.stubGlobal('navigator', { credentials: { create: vi.fn().mockResolvedValue(null) } });
-      await expect(createPasskey({} as never)).rejects.toThrow(GhostIDError);
+      await expect(createPasskey({} as never)).rejects.toThrow(IgnotiError);
     });
 
     it('returns formatted response on success', async () => {
@@ -102,12 +102,12 @@ describe('Auth passkey', () => {
       expect(result.response.transports).toEqual(['internal']);
     });
 
-    it('wraps unexpected errors as GhostIDError', async () => {
+    it('wraps unexpected errors as IgnotiError', async () => {
       vi.stubGlobal('window', { PublicKeyCredential: class {} });
       vi.stubGlobal('navigator', {
         credentials: { create: vi.fn().mockRejectedValue(new Error('hw error')) },
       });
-      await expect(createPasskey({} as never)).rejects.toThrow(GhostIDError);
+      await expect(createPasskey({} as never)).rejects.toThrow(IgnotiError);
     });
 
     it('handles missing getTransports gracefully', async () => {
@@ -130,15 +130,15 @@ describe('Auth passkey', () => {
   });
 
   describe('getPasskeyAssertion', () => {
-    it('throws GhostIDError when window is undefined', async () => {
+    it('throws IgnotiError when window is undefined', async () => {
       vi.stubGlobal('window', undefined);
-      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(GhostIDError);
+      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(IgnotiError);
     });
 
-    it('throws GhostIDError when credentials.get returns null', async () => {
+    it('throws IgnotiError when credentials.get returns null', async () => {
       vi.stubGlobal('window', { PublicKeyCredential: class {} });
       vi.stubGlobal('navigator', { credentials: { get: vi.fn().mockResolvedValue(null) } });
-      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(GhostIDError);
+      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(IgnotiError);
     });
 
     it('returns formatted response on success', async () => {
@@ -161,12 +161,12 @@ describe('Auth passkey', () => {
       expect(typeof result.response.userHandle).toBe('string');
     });
 
-    it('wraps unexpected errors as GhostIDError', async () => {
+    it('wraps unexpected errors as IgnotiError', async () => {
       vi.stubGlobal('window', { PublicKeyCredential: class {} });
       vi.stubGlobal('navigator', {
         credentials: { get: vi.fn().mockRejectedValue(new Error('cancelled')) },
       });
-      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(GhostIDError);
+      await expect(getPasskeyAssertion({} as never)).rejects.toThrow(IgnotiError);
     });
 
     it('handles missing authenticatorAttachment gracefully', async () => {

@@ -2,24 +2,24 @@
  * Request signing utilities for API client
  */
 
-import { canonicalJson } from '@ghostid/shared';
+import { canonicalJson } from '@ignoti/shared';
 import { ERROR_MESSAGES } from '@/constants';
 import { base64UrlToBuffer, bufferToBase64Url, stringToBytes } from '../core/crypto';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { ErrorCodes, IgnotiError } from '../core/errors';
 
 export async function signRequest(
   payload: Record<string, unknown>,
   privateKey: CryptoKey
 ): Promise<string> {
   if (!payload || typeof payload !== 'object') {
-    throw new GhostIDError(ERROR_MESSAGES.INVALID_SIGNING_PAYLOAD, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.INVALID_SIGNING_PAYLOAD, ErrorCodes.INVALID_INPUT);
   }
   try {
     const payloadBytes = new Uint8Array(stringToBytes(canonicalJson(payload)));
     const signatureBuffer = await crypto.subtle.sign('Ed25519', privateKey, payloadBytes);
     return bufferToBase64Url(signatureBuffer);
   } catch (error) {
-    throw new GhostIDError(
+    throw new IgnotiError(
       ERROR_MESSAGES.SIGNING_FAILED,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error

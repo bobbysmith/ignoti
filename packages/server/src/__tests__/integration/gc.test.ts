@@ -11,7 +11,7 @@ function first<T>(rows: readonly T[]): T {
   return row;
 }
 
-describe('Integration: ghostid_gc', () => {
+describe('Integration: ignoti_gc', () => {
   beforeAll(async () => {
     await runMigrations();
     await cleanDatabase();
@@ -50,7 +50,7 @@ describe('Integration: ghostid_gc', () => {
     `
     );
 
-    await sql`select ghostid_gc()`;
+    await sql`select ignoti_gc()`;
 
     const remaining = (await sql`select id from devices where user_id = ${user.id}`).map(r => r.id);
     expect(remaining).not.toContain(oldRevoked.id);
@@ -66,7 +66,7 @@ describe('Integration: ghostid_gc', () => {
       values (${expired}, now() - interval '1 minute'), (${live}, now() + interval '1 minute')
     `;
 
-    await sql`select ghostid_gc()`;
+    await sql`select ignoti_gc()`;
 
     const remaining = (await sql`select jti from session_nonces`).map(r => r.jti);
     expect(remaining).not.toContain(expired);

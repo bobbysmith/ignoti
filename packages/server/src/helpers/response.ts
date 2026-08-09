@@ -1,4 +1,4 @@
-import type { ServerErrorResponse } from '@ghostid/shared';
+import type { ServerErrorResponse } from '@ignoti/shared';
 import type { FastifyReply } from 'fastify';
 import { ERROR_MESSAGES, type ServerErrorCode } from '../constants.js';
 

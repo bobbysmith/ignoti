@@ -13,7 +13,7 @@ alter table session_nonces enable row level security;
 -- Rows only need to outlive the signature tolerance window; after that the
 -- timestamp check rejects the request before the nonce is consulted, so
 -- expired rows are dead weight until GC runs.
-create or replace function ghostid_gc() returns void
+create or replace function ignoti_gc() returns void
 language sql
 set search_path = ''
 as $$

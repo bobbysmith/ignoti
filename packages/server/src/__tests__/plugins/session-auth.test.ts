@@ -1,5 +1,5 @@
 import { sign as cryptoSign, generateKeyPairSync, type KeyObject } from 'node:crypto';
-import { canonicalJson } from '@ghostid/shared';
+import { canonicalJson } from '@ignoti/shared';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -143,7 +143,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MISSING_SESSION_HEADERS when x-ghostid-timestamp is missing', async () => {
+      it('returns 401 MISSING_SESSION_HEADERS when x-ignoti-timestamp is missing', async () => {
         const reply = makeMockReply();
         await requireSession(
           mockSessionRequest({
@@ -157,7 +157,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MISSING_SESSION_HEADERS when x-ghostid-signature is missing', async () => {
+      it('returns 401 MISSING_SESSION_HEADERS when x-ignoti-signature is missing', async () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
@@ -172,7 +172,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MISSING_SESSION_HEADERS when x-ghostid-nonce is missing', async () => {
+      it('returns 401 MISSING_SESSION_HEADERS when x-ignoti-nonce is missing', async () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
@@ -206,7 +206,7 @@ describe('session auth', () => {
     });
 
     describe('authorization scheme', () => {
-      it('returns 401 INVALID_AUTHORIZATION_SCHEME when scheme is Bearer instead of GhostID-Session', async () => {
+      it('returns 401 INVALID_AUTHORIZATION_SCHEME when scheme is Bearer instead of Ignoti-Session', async () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(
@@ -245,7 +245,7 @@ describe('session auth', () => {
         const reply = makeMockReply();
         await requireSession(
           mockSessionRequest({
-            [AUTH_HEADERS.AUTHORIZATION]: `ghostid-session ${SESSION_ID}`,
+            [AUTH_HEADERS.AUTHORIZATION]: `ignoti-session ${SESSION_ID}`,
             [AUTH_HEADERS.SESSION_NONCE]: crypto.randomUUID(),
             [AUTH_HEADERS.SESSION_TIMESTAMP]: String(iat),
             [AUTH_HEADERS.SESSION_SIGNATURE]: 'sig',
@@ -276,7 +276,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-timestamp is not a valid integer', async () => {
+      it('returns 401 MALFORMED_SESSION_HEADERS when x-ignoti-timestamp is not a valid integer', async () => {
         const reply = makeMockReply();
         await requireSession(
           mockSessionRequest({
@@ -292,7 +292,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-timestamp is empty string', async () => {
+      it('returns 401 MALFORMED_SESSION_HEADERS when x-ignoti-timestamp is empty string', async () => {
         const reply = makeMockReply();
         await requireSession(
           mockSessionRequest({
@@ -308,7 +308,7 @@ describe('session auth', () => {
         );
       });
 
-      it('returns 401 MALFORMED_SESSION_HEADERS when x-ghostid-nonce is not a valid UUID', async () => {
+      it('returns 401 MALFORMED_SESSION_HEADERS when x-ignoti-nonce is not a valid UUID', async () => {
         const iat = Math.floor(Date.now() / 1000);
         const reply = makeMockReply();
         await requireSession(

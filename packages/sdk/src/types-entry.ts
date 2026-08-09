@@ -3,7 +3,7 @@ export type {
   CreateIdentityResult,
   DeviceInfo,
   ErrorCode,
-  GhostIDOptions,
+  IgnotiOptions,
   RecoverIdentityResult,
   SessionInfo,
   SessionListItem,

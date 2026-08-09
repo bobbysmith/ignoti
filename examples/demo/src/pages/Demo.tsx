@@ -23,7 +23,7 @@ export function Demo() {
 
       <main className="app-main app-main--centered">
         <div className="flyer">
-          <h1 className="flyer-title">GHOST</h1>
+          <h1 className="flyer-title">Ignoti</h1>
           <button type="button" onClick={() => setAuthView('signup')}>
             → enter
           </button>

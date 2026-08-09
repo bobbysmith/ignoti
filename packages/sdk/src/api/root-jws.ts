@@ -9,7 +9,7 @@
  * misread as any other JWT in the application.
  */
 
-import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS, type RootPurpose } from '@ghostid/shared';
+import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS, type RootPurpose } from '@ignoti/shared';
 import { SignJWT } from 'jose';
 
 export interface DeviceBindingClaims {

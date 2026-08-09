@@ -7,7 +7,7 @@ const MISSING_CHALLENGE = 'missing challenge in clientDataJSON';
 
 vi.mock('@simplewebauthn/server');
 vi.mock('../../config.js', () => ({
-  config: { RP_NAME: 'GhostID', RP_ID: 'localhost' },
+  config: { RP_NAME: 'Ignoti', RP_ID: 'localhost' },
 }));
 
 function encodeClientDataJSON(payload: unknown): string {
@@ -75,7 +75,7 @@ describe('auth helpers', () => {
       mockGenerate.mockResolvedValueOnce({} as never);
       await buildRegistrationOptions('test-user-id');
       expect(mockGenerate).toHaveBeenCalledWith(
-        expect.objectContaining({ rpName: 'GhostID', rpID: 'localhost' })
+        expect.objectContaining({ rpName: 'Ignoti', rpID: 'localhost' })
       );
     });
 

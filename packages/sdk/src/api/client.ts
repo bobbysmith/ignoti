@@ -11,7 +11,7 @@ import { SessionsApiClient } from './sessions';
 import { signRequest, verifyRequest } from './signing';
 
 /**
- * Main API client for GhostID backend communication
+ * Main API client for Ignoti backend communication
  * Composes authentication, device management, and core functionality
  */
 export class ApiClient {

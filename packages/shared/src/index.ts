@@ -18,8 +18,8 @@ export function canonicalJson(payload: unknown): string {
 
 // JWS type identifiers — provide cross-protocol isolation (RFC 8725 §3.11)
 // so a token minted for one purpose cannot be misread as another.
-export const ROOT_BINDING_TYP = 'ghostid-root-binding+jwt';
-export const SESSION_BINDING_TYP = 'ghostid-session-binding+jwt';
+export const ROOT_BINDING_TYP = 'ignoti-root-binding+jwt';
+export const SESSION_BINDING_TYP = 'ignoti-session-binding+jwt';
 
 // Root-key JWS purposes used in the `purpose` claim
 export type RootPurpose = 'register-device' | 'recover-device' | 'revoke-device';
@@ -38,15 +38,15 @@ export const ROOT_JWS_MAX_AGE_SECONDS = 300;
 export const SESSION_JWS_MAX_AGE_SECONDS = 60;
 
 // Authorization header scheme used for session-authenticated requests
-export const SESSION_AUTH_SCHEME = 'GhostID-Session';
+export const SESSION_AUTH_SCHEME = 'Ignoti-Session';
 
 // Canonical HTTP header names as sent by the SDK.
 // HTTP headers are case-insensitive; servers should compare lowercased.
-export const GHOSTID_HEADERS = {
+export const IGNOTI_HEADERS = {
   AUTHORIZATION: 'Authorization',
-  SESSION_NONCE: 'X-GhostID-Nonce',
-  SESSION_SIGNATURE: 'X-GhostID-Signature',
-  SESSION_TIMESTAMP: 'X-GhostID-Timestamp',
+  SESSION_NONCE: 'X-Ignoti-Nonce',
+  SESSION_SIGNATURE: 'X-Ignoti-Signature',
+  SESSION_TIMESTAMP: 'X-Ignoti-Timestamp',
 } as const;
 
 // Validation limits that both the SDK (pre-send) and server (Zod schemas) enforce.

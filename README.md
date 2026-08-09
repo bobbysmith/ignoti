@@ -1,21 +1,21 @@
-# GhostID
+# Ignoti
 
-[![CI](https://github.com/dipsettheory/ghostid/actions/workflows/ci.yml/badge.svg)](https://github.com/dipsettheory/ghostid/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![npm](https://img.shields.io/npm/v/ghostid)](https://www.npmjs.com/package/ghostid)
+[![CI](https://github.com/dipsettheory/ignoti/actions/workflows/ci.yml/badge.svg)](https://github.com/dipsettheory/ignoti/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![npm](https://img.shields.io/npm/v/@ignoti/sdk)](https://www.npmjs.com/package/@ignoti/sdk)
 
 **A free, open-source, self-hosted authentication platform. A privacy-first alternative to auth that treats your users as the product.**
 
-GhostID gives builders complete auth without writing it and gives their users complete control without surrendering 
+Ignoti gives builders complete auth without writing it and gives their users complete control without surrendering 
 their identity to a third party. No email. No phone number. No OAuth middleman. No PII stored anywhere.
 
 ---
 
 ## What it is
 
-GhostID is two things working together:
+Ignoti is two things working together:
 
 - **A backend server** - pre-built and ready to deploy. You host it, you own it. Your users' data never leaves your 
   infrastructure.
-- **A client SDK** (`ghostid`) - drop it into your app, point it at your server, and you have full auth.
+- **A client SDK** (`ignoti`) - drop it into your app, point it at your server, and you have full auth.
 
 The result is the same experience your users expect from "Sign in with Google" - one tap to register, one tap to log 
 back in, but built on passkeys and cryptographic keys instead of a social account. No passwords. No email 
@@ -25,7 +25,7 @@ verification. Nothing to phish.
 
 ## How it works
 
-GhostID uses a three-layer identity system:
+Ignoti uses a three-layer identity system:
 
 **Root identity (your mnemonic)**
 A 12-word phrase derived into an Ed25519 keypair. Never stored anywhere - not on the server, not in the SDK. Used 
@@ -49,7 +49,7 @@ The server stores only opaque public keys and UUIDs. No email, no phone, no OAut
 ## Who it's for
 
 Builders whose users care about privacy. If you're building for people who use Signal instead of WhatsApp, Proton 
-instead of Gmail, or who just don't want to hand their identity to Google to use your app, GhostID is the auth you want.
+instead of Gmail, or who just don't want to hand their identity to Google to use your app, Ignoti is the auth you want.
 
 ---
 
@@ -59,11 +59,11 @@ For a full walkthrough see [docs/getting-started.md](./docs/getting-started.md).
 
 **1. Deploy the server**
 
-GhostID ships as a Docker image. The included `docker-compose.yml` starts the server and a Postgres database 
+Ignoti ships as a Docker image. The included `docker-compose.yml` starts the server and a Postgres database 
 together and runs migrations automatically on first boot.
 
 ```bash
-curl -O https://raw.githubusercontent.com/dipsettheory/ghostid/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/docker-compose.yml
 
 # Set RP_ID and RP_ORIGIN for your domain - see Environment variables below
 cp .env.example .env
@@ -76,26 +76,26 @@ The server listens on port `8787` by default.
 **2. Install the client SDK**
 
 ```bash
-npm install ghostid
+npm install @ignoti/sdk
 ```
 
 **3. Initialize in your app**
 
 ```ts
-import { GhostID } from 'ghostid';
+import { Ignoti } from '@ignoti/sdk';
 
-const ghost = new GhostID({
-  backendUrl: 'https://your-ghostid-server.example.com',
+const ignoti = new Ignoti({
+  backendUrl: 'https://your-ignoti-server.example.com',
 });
 
 // Register a new user
-const { userId, deviceId, mnemonic } = await ghost.createIdentity();
+const { userId, deviceId, mnemonic } = await ignoti.createIdentity();
 
 // Log in
-const { sessionId, expiresAt } = await ghost.login();
+const { sessionId, expiresAt } = await ignoti.login();
 
 // Sign authenticated requests
-const headers = await ghost.getSessionHeaders('GET', '/api/feed');
+const headers = await ignoti.getSessionHeaders('GET', '/api/feed');
 ```
 
 ---
@@ -103,9 +103,9 @@ const headers = await ghost.getSessionHeaders('GET', '/api/feed');
 ## Architecture
 
 ```
-Your app (browser)      GhostID server (you host this)      Your Postgres DB
+Your app (browser)      Ignoti server (you host this)      Your Postgres DB
 ──────────────────      ──────────────────────────────      ────────────────
-ghostid SDK        -->  Fastify and auth routes        -->  users
+ignoti SDK        -->  Fastify and auth routes        -->  users
                           WebAuthn verification               devices
                           Ed25519 session signing             sessions
                           Rate limiting and CORS              challenges
@@ -118,10 +118,10 @@ management. Your database stores only public keys and opaque identifiers.
 
 ## Self-hosting
 
-GhostID is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in 
-your infrastructure. GhostID never has access to it.
+Ignoti is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in 
+your infrastructure. Ignoti never has access to it.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dipsettheory/ghostid) [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/dipsettheory/ghostid)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dipsettheory/ignoti) [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/dipsettheory/ignoti)
 
 **Environment variables:**
 
@@ -129,7 +129,7 @@ your infrastructure. GhostID never has access to it.
 |-------------------------|----------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                                                                   |
 | `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                                                                 |
-| `RP_NAME`               | No       | `GhostID`               | Display name shown to users in passkey dialogs.                                                                                                               |
+| `RP_NAME`               | No       | `Ignoti`               | Display name shown to users in passkey dialogs.                                                                                                               |
 | `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins.                                         |
 | `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                                                                |
 | `SESSION_TTL_SECONDS`   | No       | `86400` (24 hr)         | How long a session token stays valid. Min: 60, max: 2592000 (30 days).                                                                                        |
@@ -161,18 +161,18 @@ Every authenticated request includes a signed timestamp. The server accepts sign
 
 **Database:**
 
-GhostID requires Postgres 14 or later. When using Docker Compose, a Postgres container is included and migrations 
+Ignoti requires Postgres 14 or later. When using Docker Compose, a Postgres container is included and migrations 
 run automatically on startup. To run migrations manually against an external database:
 
 ```bash
-docker run --rm -e DATABASE_URL=postgres://... ghostid/server:latest node dist/db/migrate.js
+docker run --rm -e DATABASE_URL=postgres://... ignoti/server:latest node dist/db/migrate.js
 ```
 
-The server image is published to Docker Hub as `ghostid/server`. You can also build it yourself from the repo root with `docker build -t ghostid/server .`
+The server image is published to Docker Hub as `ignoti/server`. You can also build it yourself from the repo root with `docker build -t ignoti/server .`
 
 **Database maintenance:**
 
-The server prunes expired challenges, nonces, and old sessions itself, running the `ghostid_gc()` function 
+The server prunes expired challenges, nonces, and old sessions itself, running the `ignoti_gc()` function 
 in-process every `GC_INTERVAL_SECONDS` (default 3600). Only one instance sweeps at a time, coordinated by a Postgres 
 advisory lock, so this is safe to run with multiple replicas. No setup is required.
 
@@ -180,17 +180,17 @@ If you would rather drive cleanup from an external scheduler, set `GC_INTERVAL_S
 timer and call the function on a schedule your database supports:
 
 ```sql
-select cron.schedule('ghostid-gc', '0 3 * * *', 'select ghostid_gc()');
+select cron.schedule('ignoti-gc', '0 3 * * *', 'select ignoti_gc()');
 ```
 
 **Backups:**
 
-GhostID stores no PII, but losing the database means every registered user loses access to their account. The mnemonic alone is not enough to recover without a server record of the root public key. Back up regularly.
+Ignoti stores no PII, but losing the database means every registered user loses access to their account. The mnemonic alone is not enough to recover without a server record of the root public key. Back up regularly.
 
 A nightly `pg_dump` is the minimum:
 
 ```bash
-pg_dump "$DATABASE_URL" --no-owner --no-privileges -Fc -f ghostid-$(date +%F).dump
+pg_dump "$DATABASE_URL" --no-owner --no-privileges -Fc -f ignoti-$(date +%F).dump
 ```
 
 For production, use your platform's native point-in-time recovery (Supabase, RDS, and most managed Postgres 
@@ -200,7 +200,7 @@ providers include this) and verify a restore at least once before going live. Ba
 
 ## Security
 
-GhostID's cryptographic design is documented in [docs/threat-model.md](./docs/threat-model.md). Key properties:
+Ignoti's cryptographic design is documented in [docs/threat-model.md](./docs/threat-model.md). Key properties:
 
 - **No passwords** - nothing to steal from the server
 - **No PII stored** - a breached database reveals no real world identities

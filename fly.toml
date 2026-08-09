@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for ghostid on 2026-05-19T17:13:25-05:00
+# fly.toml app configuration file generated for ignoti on 2026-05-19T17:13:25-05:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'ghostid'
+app = 'ignoti'
 primary_region = 'ewr'
 
 [build]

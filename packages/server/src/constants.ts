@@ -1,5 +1,5 @@
-import type { ServerErrorCode } from '@ghostid/shared';
-import { PROTOCOL_VALIDATION, SERVER_ERROR_CODES, SESSION_AUTH_SCHEME } from '@ghostid/shared';
+import type { ServerErrorCode } from '@ignoti/shared';
+import { PROTOCOL_VALIDATION, SERVER_ERROR_CODES, SESSION_AUTH_SCHEME } from '@ignoti/shared';
 
 export type { ServerErrorCode };
 export {
@@ -91,11 +91,11 @@ export const ROUTES = {
 
 export const AUTH_HEADERS = {
   AUTHORIZATION: 'authorization',
-  SESSION_NONCE: 'x-ghostid-nonce',
-  SESSION_SIGNATURE: 'x-ghostid-signature',
-  SESSION_TIMESTAMP: 'x-ghostid-timestamp',
+  SESSION_NONCE: 'x-ignoti-nonce',
+  SESSION_SIGNATURE: 'x-ignoti-signature',
+  SESSION_TIMESTAMP: 'x-ignoti-timestamp',
 } as const;
 
 export const SESSION_SIG_TOLERANCE_SECONDS = 60;
 
-export const SESSION_COOKIE_NAME = 'ghostid_session';
+export const SESSION_COOKIE_NAME = 'ignoti_session';

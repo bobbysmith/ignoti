@@ -1,4 +1,4 @@
-import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { ROOT_BINDING_TYP, ROOT_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { decodeJwt, decodeProtectedHeader, importJWK, jwtVerify } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { signDeviceBindingJWS } from '@/api/root-jws.ts';

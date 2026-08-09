@@ -13,7 +13,7 @@
  * a valid Ed25519 keypair, and that keypair becomes the session's identity.
  */
 
-import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { decodeProtectedHeader, EmbeddedJWK, type JWTPayload, jwtVerify } from 'jose';
 
 interface VerifiedSessionBinding {

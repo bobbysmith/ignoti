@@ -1,4 +1,4 @@
-import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { decodeJwt, decodeProtectedHeader, jwtVerify } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { signSessionBindingJWS } from '@/api/session-jws.ts';

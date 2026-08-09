@@ -1,5 +1,5 @@
 import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
-import { canonicalJson } from '@ghostid/shared';
+import { canonicalJson } from '@ignoti/shared';
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
@@ -51,7 +51,7 @@ export function registerSessionAuthPlugin(app: FastifyInstance): void {
 
 /**
  * Verifies a per-request Ed25519 session signature and returns the session
- * context. Shared by `requireSession` (GhostID's own protected routes) and
+ * context. Shared by `requireSession` (Ignoti's own protected routes) and
  * POST /api/sessions/verify (integrator backends validating forwarded headers).
  *
  * Implements DPoP-style replay prevention (RFC 9449): the client signs

@@ -5,7 +5,7 @@
  * corrupt our payloads.
  */
 
-import { SERVER_ERROR_CODES, type ServerErrorResponse } from '@ghostid/shared';
+import { SERVER_ERROR_CODES, type ServerErrorResponse } from '@ignoti/shared';
 import {
   API_ENDPOINTS,
   ERROR_MESSAGES,
@@ -18,7 +18,7 @@ import {
   TIMEOUTS,
 } from '@/constants';
 import type { ApiClientOptions } from '@/types';
-import { type ErrorCode, ErrorCodes, GhostIDError } from '../core/errors';
+import { type ErrorCode, ErrorCodes, IgnotiError } from '../core/errors';
 
 // Maps server error codes to SDK ErrorCodes so consumers can branch on them.
 // Unmapped server errors surface as API_ERROR (with httpStatus). The server
@@ -75,30 +75,30 @@ export class CoreApiClient {
 
   constructor(options: ApiClientOptions) {
     if (!options.baseUrl) {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_BASE_URL, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_BASE_URL, ErrorCodes.INVALID_INPUT);
     }
     let parsed: URL;
     try {
       parsed = new URL(options.baseUrl);
     } catch {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_BASE_URL_FORMAT, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_BASE_URL_FORMAT, ErrorCodes.INVALID_INPUT);
     }
     const isHttps = parsed.protocol === 'https:';
     const isLocalhost =
       parsed.protocol === 'http:' &&
       (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
     if (!isHttps && !isLocalhost) {
-      throw new GhostIDError(ERROR_MESSAGES.BASE_URL_REQUIRES_HTTPS, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.BASE_URL_REQUIRES_HTTPS, ErrorCodes.INVALID_INPUT);
     }
     // Strip trailing slash so `${baseUrl}${path}` always produces one slash.
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.timeout = options.timeout ?? TIMEOUTS.DEFAULT_REQUEST;
     this.retryAttempts = options.retryAttempts ?? RETRY.DEFAULT_ATTEMPTS;
     if (this.timeout <= 0 || this.timeout > 300_000) {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_TIMEOUT, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_TIMEOUT, ErrorCodes.INVALID_INPUT);
     }
     if (this.retryAttempts < 1 || this.retryAttempts > 10) {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_RETRY_ATTEMPTS, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_RETRY_ATTEMPTS, ErrorCodes.INVALID_INPUT);
     }
     this.onUnauthorized = options.onUnauthorized;
   }
@@ -109,7 +109,7 @@ export class CoreApiClient {
         method as (typeof SECURITY.ALLOWED_HTTP_METHODS)[number]
       )
     ) {
-      throw new GhostIDError(
+      throw new IgnotiError(
         `${ERROR_MESSAGES.INVALID_HTTP_METHOD}: ${method}`,
         ErrorCodes.INVALID_INPUT
       );
@@ -122,13 +122,13 @@ export class CoreApiClient {
    */
   private validatePath(path: string): string {
     if (!path) {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_PATH, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_PATH, ErrorCodes.INVALID_INPUT);
     }
     if (path.length > SECURITY.MAX_PATH_LENGTH) {
-      throw new GhostIDError(ERROR_MESSAGES.PATH_TOO_LONG, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.PATH_TOO_LONG, ErrorCodes.INVALID_INPUT);
     }
     if (!PATH_RE.test(path)) {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_PATH_FORMAT, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_PATH_FORMAT, ErrorCodes.INVALID_INPUT);
     }
     return path;
   }
@@ -145,20 +145,20 @@ export class CoreApiClient {
         name.length > SECURITY.MAX_HEADER_NAME_LENGTH ||
         !HEADER_NAME_RE.test(name)
       ) {
-        throw new GhostIDError(
+        throw new IgnotiError(
           `${ERROR_MESSAGES.INVALID_HEADER_NAME}: ${name}`,
           ErrorCodes.INVALID_INPUT
         );
       }
       const lower = name.toLowerCase();
       if (FORBIDDEN_REQUEST_HEADERS.has(lower)) {
-        throw new GhostIDError(
+        throw new IgnotiError(
           `${ERROR_MESSAGES.FORBIDDEN_HEADER}: ${name}`,
           ErrorCodes.INVALID_INPUT
         );
       }
       if (value.length > SECURITY.MAX_HEADER_VALUE_LENGTH || !HEADER_VALUE_RE.test(value)) {
-        throw new GhostIDError(
+        throw new IgnotiError(
           `${ERROR_MESSAGES.INVALID_HEADER_VALUE} ${name}`,
           ErrorCodes.INVALID_INPUT
         );
@@ -178,14 +178,14 @@ export class CoreApiClient {
     try {
       stringified = JSON.stringify(data);
     } catch (error) {
-      throw new GhostIDError(
+      throw new IgnotiError(
         ERROR_MESSAGES.FAILED_TO_SERIALIZE,
         ErrorCodes.INVALID_INPUT,
         error as Error
       );
     }
     if (stringified.length > SECURITY.MAX_REQUEST_BODY_SIZE) {
-      throw new GhostIDError(ERROR_MESSAGES.REQUEST_BODY_TOO_LARGE, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.REQUEST_BODY_TOO_LARGE, ErrorCodes.INVALID_INPUT);
     }
     return stringified;
   }
@@ -235,7 +235,7 @@ export class CoreApiClient {
       requestOptions.body = this.safeStringify(data);
     }
     // POST and PATCH are not idempotent. Retrying them is safe here because
-    // every GhostID mutation is guarded server-side by a single-use challenge
+    // every Ignoti mutation is guarded server-side by a single-use challenge
     // or a unique constraint, so a duplicate request is rejected, not applied.
 
     const retryDelay = (attempt: number) =>
@@ -278,7 +278,7 @@ export class CoreApiClient {
       }
     }
 
-    throw new GhostIDError(
+    throw new IgnotiError(
       `${ERROR_MESSAGES.API_REQUEST_FAILED}: ${lastError?.message}`,
       ErrorCodes.API_ERROR,
       lastError
@@ -297,7 +297,7 @@ export class CoreApiClient {
     requestOptions: RequestInit
   ): Promise<
     | { kind: 'value'; value: T }
-    | { kind: 'unauthorized'; error: GhostIDError }
+    | { kind: 'unauthorized'; error: IgnotiError }
     | { kind: 'retry'; error: Error }
   > {
     const controller = new AbortController();
@@ -309,7 +309,7 @@ export class CoreApiClient {
       } catch (fetchError) {
         const err = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
         if (err.name === 'AbortError') {
-          throw new GhostIDError(ERROR_MESSAGES.REQUEST_TIMED_OUT, ErrorCodes.API_ERROR, err);
+          throw new IgnotiError(ERROR_MESSAGES.REQUEST_TIMED_OUT, ErrorCodes.API_ERROR, err);
         }
         // Browsers surface every network failure as TypeError - transient
         // (offline, DNS, reset) and permanent (CORS, bad config) alike, and are
@@ -326,7 +326,7 @@ export class CoreApiClient {
           response.status === HTTP_STATUS.UNAUTHORIZED &&
           errorData.error === SERVER_ERROR_CODES.SESSION_TIMESTAMP_OUT_OF_RANGE
         ) {
-          throw new GhostIDError(
+          throw new IgnotiError(
             ERROR_MESSAGES.CLOCK_SKEW,
             ErrorCodes.CLOCK_SKEW,
             new Error(`HTTP ${response.status}`),
@@ -339,34 +339,34 @@ export class CoreApiClient {
         );
         const code =
           (errorData.error && SERVER_ERROR_TO_CODE[errorData.error]) ?? ErrorCodes.API_ERROR;
-        const ghostError = new GhostIDError(
+        const ignotiError = new IgnotiError(
           message,
           code,
           new Error(`HTTP ${response.status}`),
           response.status
         );
 
-        if (ghostError.httpStatus === HTTP_STATUS.UNAUTHORIZED) {
-          return { kind: 'unauthorized', error: ghostError };
+        if (ignotiError.httpStatus === HTTP_STATUS.UNAUTHORIZED) {
+          return { kind: 'unauthorized', error: ignotiError };
         }
 
         // 4xx (not handled above) and 501: retrying won't change the outcome.
         if (
-          (ghostError.httpStatus &&
-            ghostError.httpStatus >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
-            ghostError.httpStatus <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
-          ghostError.httpStatus === HTTP_STATUS.NOT_IMPLEMENTED
+          (ignotiError.httpStatus &&
+            ignotiError.httpStatus >= HTTP_STATUS_RANGES.CLIENT_ERROR_START &&
+            ignotiError.httpStatus <= HTTP_STATUS_RANGES.CLIENT_ERROR_END) ||
+          ignotiError.httpStatus === HTTP_STATUS.NOT_IMPLEMENTED
         ) {
-          throw ghostError;
+          throw ignotiError;
         }
 
-        return { kind: 'retry', error: ghostError };
+        return { kind: 'retry', error: ignotiError };
       }
 
       try {
         return { kind: 'value', value: (await response.json()) as T };
       } catch (parseError) {
-        throw new GhostIDError(
+        throw new IgnotiError(
           ERROR_MESSAGES.FAILED_TO_PARSE_RESPONSE,
           ErrorCodes.API_ERROR,
           parseError

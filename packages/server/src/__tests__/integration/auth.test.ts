@@ -289,7 +289,7 @@ describe('Integration: auth happy paths', () => {
     it('does NOT revoke on a garbage secret for a known session id (revocation DoS guard)', async () => {
       const { sessionCookie, sessionId } = await registerAndLogin(app);
 
-      const garbageCookie = `ghostid_session=${sessionId}.not-the-real-secret-000000000000`;
+      const garbageCookie = `ignoti_session=${sessionId}.not-the-real-secret-000000000000`;
       const attack = await restoreWithCookie(app, garbageCookie);
       expect(attack.statusCode).toBe(401);
 
@@ -469,7 +469,7 @@ describe('Integration: auth happy paths', () => {
     it('rejects a request with a tampered signature', async () => {
       const { sessionId, sessionPrivate } = await registerAndLogin(app);
       const headers = await buildSessionHeaders('GET', '/api/sessions', sessionId, sessionPrivate);
-      headers['X-GhostID-Signature'] =
+      headers['X-Ignoti-Signature'] =
         'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
       const res = await app.inject({ method: 'GET', url: '/api/sessions', headers });
       expect(res.statusCode).toBe(401);

@@ -10,10 +10,10 @@
  * hand-roll a canonical form for signing.
  *
  * `typ` provides cross-protocol isolation (RFC 8725 §3.11) distinct from
- * `ghostid-root-binding+jwt`.
+ * `ignoti-root-binding+jwt`.
  */
 
-import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ghostid/shared';
+import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { SignJWT } from 'jose';
 
 export interface SessionBindingClaims {

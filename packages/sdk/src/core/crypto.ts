@@ -22,7 +22,7 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import { CRYPTO, ERROR_MESSAGES } from '@/constants';
 import type { RootKeySet } from '@/types';
 
-import { ErrorCodes, GhostIDError } from './errors';
+import { ErrorCodes, IgnotiError } from './errors';
 
 const textEncoder = new TextEncoder();
 
@@ -122,7 +122,7 @@ export async function deriveRootKeysFromMnemonic(
   version = 1
 ): Promise<RootKeySet> {
   if (!validateMnemonic(mnemonic)) {
-    throw new GhostIDError(ERROR_MESSAGES.INVALID_MNEMONIC, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.INVALID_MNEMONIC, ErrorCodes.INVALID_INPUT);
   }
   try {
     const seed = await mnemonicToSeed(mnemonic);
@@ -144,10 +144,10 @@ export async function deriveRootKeysFromMnemonic(
       createdAt: Date.now(),
     };
   } catch (error) {
-    if (error instanceof GhostIDError) {
+    if (error instanceof IgnotiError) {
       throw error;
     }
-    throw new GhostIDError(
+    throw new IgnotiError(
       `${ERROR_MESSAGES.KEY_DERIVATION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.INVALID_INPUT,
       error as Error

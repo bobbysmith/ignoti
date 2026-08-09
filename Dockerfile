@@ -15,20 +15,20 @@ RUN pnpm install --frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY packages/server ./packages/server
 
-RUN pnpm --filter @ghostid/shared build
-RUN pnpm --filter @ghostid/server build
+RUN pnpm --filter @ignoti/shared build
+RUN pnpm --filter @ignoti/server build
 
-RUN pnpm --filter @ghostid/server deploy --prod --legacy /app
+RUN pnpm --filter @ignoti/server deploy --prod --legacy /app
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-RUN addgroup -S ghostid && adduser -S ghostid -G ghostid
+RUN addgroup -S ignoti && adduser -S ignoti -G ignoti
 
-COPY --from=builder --chown=ghostid:ghostid /app ./
-COPY --from=builder --chown=ghostid:ghostid /build/packages/server/src/db/migrations ./dist/db/migrations
+COPY --from=builder --chown=ignoti:ignoti /app ./
+COPY --from=builder --chown=ignoti:ignoti /build/packages/server/src/db/migrations ./dist/db/migrations
 
-USER ghostid
+USER ignoti
 
 EXPOSE 8787
 ENV NODE_ENV=production

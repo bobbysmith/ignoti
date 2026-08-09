@@ -20,7 +20,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
    * Lets an integrator's own backend validate the session headers the SDK
    * produced via getSessionHeaders(). The backend forwards the four header
    * values plus the method and path of the request it received; verification
-   * runs the exact same checks as GhostID's own protected routes, including
+   * runs the exact same checks as Ignoti's own protected routes, including
    * nonce replay prevention — so verify each request exactly once.
    */
   // Rate limiting is disabled here: this endpoint sits on the integrator

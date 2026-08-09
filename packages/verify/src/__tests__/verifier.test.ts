@@ -1,14 +1,14 @@
-import { SERVER_ERROR_CODES } from '@ghostid/shared';
+import { SERVER_ERROR_CODES } from '@ignoti/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type AuthRequest,
-  GhostIDVerifier,
-  GhostIDVerifyError,
+  IgnotiVerifier,
+  IgnotiVerifyError,
   type IncomingHeaders,
 } from '../index.js';
 
-const SERVER_URL = 'http://ghostid.internal:8787';
+const SERVER_URL = 'http://ignoti.internal:8787';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
 const USER_ID = '550e8400-e29b-41d4-a716-446655440002';
 const DEVICE_ID = '550e8400-e29b-41d4-a716-446655440003';
@@ -24,10 +24,10 @@ const VALID_RESPONSE = {
 
 function makeHeaders(overrides: IncomingHeaders = {}): IncomingHeaders {
   return {
-    authorization: `GhostID-Session ${SESSION_ID}`,
-    'x-ghostid-nonce': crypto.randomUUID(),
-    'x-ghostid-timestamp': String(Math.floor(Date.now() / 1000)),
-    'x-ghostid-signature': 'c2lnbmF0dXJl',
+    authorization: `Ignoti-Session ${SESSION_ID}`,
+    'x-ignoti-nonce': crypto.randomUUID(),
+    'x-ignoti-timestamp': String(Math.floor(Date.now() / 1000)),
+    'x-ignoti-signature': 'c2lnbmF0dXJl',
     ...overrides,
   };
 }
@@ -41,8 +41,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
-function makeVerifier(options: Partial<ConstructorParameters<typeof GhostIDVerifier>[0]> = {}) {
-  return new GhostIDVerifier({
+function makeVerifier(options: Partial<ConstructorParameters<typeof IgnotiVerifier>[0]> = {}) {
+  return new IgnotiVerifier({
     serverUrl: SERVER_URL,
     fetch: fetchMock as unknown as typeof fetch,
     ...options,
@@ -53,10 +53,10 @@ beforeEach(() => {
   fetchMock = vi.fn();
 });
 
-describe('GhostIDVerifier', () => {
+describe('IgnotiVerifier', () => {
   describe('constructor', () => {
-    it('throws GhostIDVerifyError on an invalid serverUrl', () => {
-      expect(() => new GhostIDVerifier({ serverUrl: 'not a url' })).toThrow(GhostIDVerifyError);
+    it('throws IgnotiVerifyError on an invalid serverUrl', () => {
+      expect(() => new IgnotiVerifier({ serverUrl: 'not a url' })).toThrow(IgnotiVerifyError);
     });
 
     it('strips a trailing slash from serverUrl', async () => {
@@ -84,9 +84,9 @@ describe('GhostIDVerifier', () => {
         method: 'GET',
         path: '/api/feed',
         authorization: headers.authorization,
-        nonce: headers['x-ghostid-nonce'],
-        timestamp: headers['x-ghostid-timestamp'],
-        signature: headers['x-ghostid-signature'],
+        nonce: headers['x-ignoti-nonce'],
+        timestamp: headers['x-ignoti-timestamp'],
+        signature: headers['x-ignoti-signature'],
       });
     });
 
@@ -104,9 +104,9 @@ describe('GhostIDVerifier', () => {
 
     it.each([
       'authorization',
-      'x-ghostid-nonce',
-      'x-ghostid-timestamp',
-      'x-ghostid-signature',
+      'x-ignoti-nonce',
+      'x-ignoti-timestamp',
+      'x-ignoti-signature',
     ])('short-circuits with missing_session_headers when %s is absent, without a network call', async header => {
       const headers = makeHeaders();
       delete headers[header];
@@ -119,7 +119,7 @@ describe('GhostIDVerifier', () => {
     });
 
     it('treats a multi-value (array) header as missing', async () => {
-      const headers = makeHeaders({ 'x-ghostid-nonce': ['a', 'b'] });
+      const headers = makeHeaders({ 'x-ignoti-nonce': ['a', 'b'] });
       const result = await makeVerifier().verify({ method: 'GET', path: '/x', headers });
       expect(result).toEqual({ valid: false, error: SERVER_ERROR_CODES.MISSING_SESSION_HEADERS });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -131,34 +131,34 @@ describe('GhostIDVerifier', () => {
         method: 'GET',
         path: '/api/feed',
         headers: {
-          Authorization: `GhostID-Session ${SESSION_ID}`,
-          'X-GhostID-Nonce': crypto.randomUUID(),
-          'X-GhostID-Timestamp': '1719000000',
-          'X-GhostID-Signature': 'c2ln',
+          Authorization: `Ignoti-Session ${SESSION_ID}`,
+          'X-Ignoti-Nonce': crypto.randomUUID(),
+          'X-Ignoti-Timestamp': '1719000000',
+          'X-Ignoti-Signature': 'c2ln',
         },
       });
       expect(result.valid).toBe(true);
     });
 
-    it('throws GhostIDVerifyError with httpStatus on a non-200 response', async () => {
+    it('throws IgnotiVerifyError with httpStatus on a non-200 response', async () => {
       fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_input' }, 400));
       await expect(
         makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
-      ).rejects.toMatchObject({ name: 'GhostIDVerifyError', httpStatus: 400 });
+      ).rejects.toMatchObject({ name: 'IgnotiVerifyError', httpStatus: 400 });
     });
 
-    it('wraps network failures in GhostIDVerifyError', async () => {
+    it('wraps network failures in IgnotiVerifyError', async () => {
       fetchMock.mockRejectedValue(new TypeError('fetch failed'));
       await expect(
         makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
-      ).rejects.toBeInstanceOf(GhostIDVerifyError);
+      ).rejects.toBeInstanceOf(IgnotiVerifyError);
     });
 
-    it('throws GhostIDVerifyError when the response body is not JSON', async () => {
+    it('throws IgnotiVerifyError when the response body is not JSON', async () => {
       fetchMock.mockResolvedValue(new Response('not json', { status: 200 }));
       await expect(
         makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
-      ).rejects.toMatchObject({ name: 'GhostIDVerifyError' });
+      ).rejects.toMatchObject({ name: 'IgnotiVerifyError' });
     });
   });
 
@@ -179,7 +179,7 @@ describe('GhostIDVerifier', () => {
       return { status, json };
     }
 
-    it('attaches req.ghostid and calls next() on a valid session', async () => {
+    it('attaches req.ignoti and calls next() on a valid session', async () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const middleware = makeVerifier().expressMiddleware();
       const req = makeReq();
@@ -189,7 +189,7 @@ describe('GhostIDVerifier', () => {
       middleware(req, res, next);
       await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
 
-      expect(req.ghostid).toEqual({
+      expect(req.ignoti).toEqual({
         sessionId: SESSION_ID,
         userId: USER_ID,
         deviceId: DEVICE_ID,
@@ -232,7 +232,7 @@ describe('GhostIDVerifier', () => {
       const next = vi.fn();
 
       middleware(makeReq(), res, next);
-      await vi.waitFor(() => expect(next).toHaveBeenCalledWith(expect.any(GhostIDVerifyError)));
+      await vi.waitFor(() => expect(next).toHaveBeenCalledWith(expect.any(IgnotiVerifyError)));
 
       expect(res.status).not.toHaveBeenCalled();
     });
@@ -245,7 +245,7 @@ describe('GhostIDVerifier', () => {
       return { code, send };
     }
 
-    it('attaches req.ghostid on a valid session', async () => {
+    it('attaches req.ignoti on a valid session', async () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const preHandler = makeVerifier().fastifyPreHandler();
       const req = { method: 'GET', url: '/api/feed', headers: makeHeaders() };
@@ -254,7 +254,7 @@ describe('GhostIDVerifier', () => {
       await preHandler(req, reply);
 
       expect(req).toMatchObject({
-        ghostid: {
+        ignoti: {
           sessionId: SESSION_ID,
           userId: USER_ID,
           deviceId: DEVICE_ID,
@@ -283,7 +283,7 @@ describe('GhostIDVerifier', () => {
 
       await expect(
         preHandler({ method: 'GET', url: '/api/feed', headers: makeHeaders() }, makeReply())
-      ).rejects.toBeInstanceOf(GhostIDVerifyError);
+      ).rejects.toBeInstanceOf(IgnotiVerifyError);
     });
   });
 });

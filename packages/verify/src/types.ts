@@ -1,10 +1,10 @@
-import type { ServerErrorCode } from '@ghostid/shared';
+import type { ServerErrorCode } from '@ignoti/shared';
 
 // Incoming headers as any Node/edge framework exposes them.
 export type IncomingHeaders = Record<string, string | string[] | undefined>;
 
-export interface GhostIDVerifierOptions {
-  // Base URL of your self-hosted GhostID server, e.g. `http://ghostid.internal:8787`.
+export interface IgnotiVerifierOptions {
+  // Base URL of your self-hosted Ignoti server, e.g. `http://ignoti.internal:8787`.
   serverUrl: string;
   // Abort the verification request after this many milliseconds. Default: 5000.
   timeoutMs?: number;
@@ -22,7 +22,7 @@ export interface VerifyInput {
 }
 
 // The authenticated identity attached to a request after verification.
-export interface GhostIDSession {
+export interface IgnotiSession {
   sessionId: string;
   userId: string;
   deviceId: string;
@@ -31,17 +31,17 @@ export interface GhostIDSession {
 }
 
 export type VerifyResult =
-  | ({ valid: true } & GhostIDSession)
+  | ({ valid: true } & IgnotiSession)
   | { valid: false; error: ServerErrorCode };
 
-// The request being authenticated. `ghostid` is set after verification succeeds.
+// The request being authenticated. `ignoti` is set after verification succeeds.
 export interface AuthRequest {
   method: string;
   url: string;
   // Express keeps the unrouted URL here; preferred over `url` when present.
   originalUrl?: string;
   headers: IncomingHeaders;
-  ghostid?: GhostIDSession;
+  ignoti?: IgnotiSession;
 }
 
 // Structural subset of an Express `Response`.

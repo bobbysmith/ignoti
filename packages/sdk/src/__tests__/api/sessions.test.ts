@@ -34,8 +34,8 @@ describe('SessionsApiClient', () => {
       const headers = makeRequest.mock.calls[0][3];
       expect(headers).toMatchObject({
         Authorization: expect.stringContaining(SESSION_ID),
-        'X-GhostID-Timestamp': String(IAT),
-        'X-GhostID-Signature': SIGNATURE,
+        'X-Ignoti-Timestamp': String(IAT),
+        'X-Ignoti-Signature': SIGNATURE,
       });
     });
 
@@ -95,8 +95,8 @@ describe('SessionsApiClient', () => {
       const headers = makeRequest.mock.calls[0][3];
       expect(headers).toMatchObject({
         Authorization: expect.stringContaining(SESSION_ID),
-        'X-GhostID-Timestamp': String(IAT),
-        'X-GhostID-Signature': SIGNATURE,
+        'X-Ignoti-Timestamp': String(IAT),
+        'X-Ignoti-Signature': SIGNATURE,
       });
     });
 
@@ -172,9 +172,9 @@ describe('SessionsApiClient', () => {
       const headers = makeRequest.mock.calls[0][3];
       expect(headers).toMatchObject({
         Authorization: expect.stringContaining(SESSION_ID),
-        'X-GhostID-Nonce': JTI,
-        'X-GhostID-Timestamp': String(IAT),
-        'X-GhostID-Signature': SIGNATURE,
+        'X-Ignoti-Nonce': JTI,
+        'X-Ignoti-Timestamp': String(IAT),
+        'X-Ignoti-Signature': SIGNATURE,
       });
     });
 

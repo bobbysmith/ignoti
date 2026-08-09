@@ -28,8 +28,8 @@ export {
   validateMnemonic,
   verify,
 } from './core/crypto';
-export { ErrorCodes, GhostIDError } from './core/errors';
-export { GhostID } from './ghostid';
+export { ErrorCodes, IgnotiError } from './core/errors';
+export { Ignoti } from './ignoti';
 export type {
   // API Client types
   ApiClientOptions,
@@ -45,8 +45,8 @@ export type {
   FormattedCreatePasskeyResponse,
   FormattedGetPasskeyAssertionResponse,
   GetDevicesResponse,
-  // GhostID SDK types
-  GhostIDOptions,
+  // Ignoti SDK types
+  IgnotiOptions,
   // Core types
   KeyPair,
   LoginRequest,

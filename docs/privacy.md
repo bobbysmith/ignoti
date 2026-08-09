@@ -1,6 +1,6 @@
-# Privacy in GhostID
+# Privacy in Ignoti
 
-Most auth systems collect identity as a side effect of doing their job. They need an email to send a verification link, a phone number to send an OTP, or an OAuth token tied to a real-world account. GhostID is built around the idea that auth does not need any of that.
+Most auth systems collect identity as a side effect of doing their job. They need an email to send a verification link, a phone number to send an OTP, or an OAuth token tied to a real-world account. Ignoti is built around the idea that auth does not need any of that.
 
 ---
 
@@ -39,7 +39,7 @@ That is the entire schema. No email. No phone number. No IP address. No user age
 
 OAuth and "Sign in with" flows route the user through a provider. Google knows which apps you use and when. Auth0 and Clerk see every login across all their customers. Even if those providers are trustworthy today, your users' auth activity is sitting in someone else's data center.
 
-GhostID is self-hosted. The only system that sees a login is your server. There is no GhostID cloud, no licensing server, no SDK phone-home. When your user logs in, the only parties involved are the user's browser, their authenticator, and your server.
+Ignoti is self-hosted. The only system that sees a login is your server. There is no Ignoti cloud, no licensing server, no SDK phone-home. When your user logs in, the only parties involved are the user's browser, their authenticator, and your server.
 
 ## The mnemonic never leaves the client
 
@@ -47,17 +47,17 @@ The 12-word recovery phrase is the root of the user's identity. It is used clien
 
 ## User IDs are not linkable
 
-The `userId` stored in your database is a random UUID generated at registration. It is not derived from the user's public key, their passkey, or any other attribute. Two different applications using GhostID that somehow obtained the same user's public key cannot correlate them back to each other by `userId`, because the UUID is per-deployment.
+The `userId` stored in your database is a random UUID generated at registration. It is not derived from the user's public key, their passkey, or any other attribute. Two different applications using Ignoti that somehow obtained the same user's public key cannot correlate them back to each other by `userId`, because the UUID is per-deployment.
 
 ## Stale data is deleted automatically
 
-Sessions and challenges are garbage collected on a schedule. The server runs the cleanup in-process every hour by default (`GC_INTERVAL_SECONDS`), so a stock deployment prunes itself with no extra setup; you can disable it and drive `ghostid_gc()` from an external scheduler instead. Expired challenges and nonces are removed on the next sweep; sessions are removed seven days after they expire or are revoked. The database does not accumulate years of login history by default. What was not collected cannot be subpoenaed, breached, or sold.
+Sessions and challenges are garbage collected on a schedule. The server runs the cleanup in-process every hour by default (`GC_INTERVAL_SECONDS`), so a stock deployment prunes itself with no extra setup; you can disable it and drive `ignoti_gc()` from an external scheduler instead. Expired challenges and nonces are removed on the next sweep; sessions are removed seven days after they expire or are revoked. The database does not accumulate years of login history by default. What was not collected cannot be subpoenaed, breached, or sold.
 
 ## GDPR and data minimization
 
-Because GhostID collects no PII, most GDPR obligations around personal data simply do not apply in the traditional sense. There is no email to delete, no profile to export, no marketing preferences to honor. Deleting a user account means deleting a UUID, a public key, and some timestamps. Nothing in that record identifies a natural person on its own.
+Because Ignoti collects no PII, most GDPR obligations around personal data simply do not apply in the traditional sense. There is no email to delete, no profile to export, no marketing preferences to honor. Deleting a user account means deleting a UUID, a public key, and some timestamps. Nothing in that record identifies a natural person on its own.
 
-If your application layer collects PII and links it to a GhostID `userId`, those obligations are yours to handle. GhostID's job is to make the auth layer clean.
+If your application layer collects PII and links it to a Ignoti `userId`, those obligations are yours to handle. Ignoti's job is to make the auth layer clean.
 
 ## What is not hidden
 
@@ -65,24 +65,24 @@ The server does record when a device was last used and how many times it has aut
 
 The transports field reveals something minor about the user's authenticator type (whether it is a platform authenticator like Face ID or a roaming key like a USB security key). This is a WebAuthn technical requirement, not a tracking mechanism, but it is worth knowing it is there.
 
-Server logs record the method and path of each request but not the client IP: GhostID overrides the framework's default request-log serializer, which would otherwise include the remote address. Nothing in the database or the default logs ties a request to an IP. If you place a reverse proxy or load balancer in front of the server, that layer may keep its own access logs with client IPs — that is outside GhostID's control, so configure it in line with your privacy posture.
+Server logs record the method and path of each request but not the client IP: Ignoti overrides the framework's default request-log serializer, which would otherwise include the remote address. Nothing in the database or the default logs ties a request to an IP. If you place a reverse proxy or load balancer in front of the server, that layer may keep its own access logs with client IPs — that is outside Ignoti's control, so configure it in line with your privacy posture.
 
 ## No device fingerprinting via attestation
 
 WebAuthn supports attestation: a mechanism where the authenticator cryptographically proves what kind of device it is, including manufacturer, model, and firmware version. Many auth systems collect this to enforce hardware policies, but it is also a detailed device fingerprint.
 
-GhostID explicitly requests `attestationType: 'none'`. The server verifies that a valid credential was created, but it does not collect or store any information about the authenticator's hardware identity. Your users' device details are not in your database.
+Ignoti explicitly requests `attestationType: 'none'`. The server verifies that a valid credential was created, but it does not collect or store any information about the authenticator's hardware identity. Your users' device details are not in your database.
 
 ## The WebAuthn username is an opaque ID
 
-During passkey registration, WebAuthn requires a `userName` field that the authenticator may display to the user. GhostID sets this to the user's opaque UUID, not a name or email. No real-world identifier is passed to the authenticator.
+During passkey registration, WebAuthn requires a `userName` field that the authenticator may display to the user. Ignoti sets this to the user's opaque UUID, not a name or email. No real-world identifier is passed to the authenticator.
 
 ## A note on platform passkey sync
 
-Modern platform authenticators like iCloud Keychain and Google Password Manager sync passkeys across the user's devices. This is a browser and OS level behavior, not something GhostID controls. If a user registers with Safari on iPhone, Apple holds a copy of their passkey encrypted in iCloud. GhostID cannot prevent this, and it is the same trade-off users accept for any passkey-based app.
+Modern platform authenticators like iCloud Keychain and Google Password Manager sync passkeys across the user's devices. This is a browser and OS level behavior, not something Ignoti controls. If a user registers with Safari on iPhone, Apple holds a copy of their passkey encrypted in iCloud. Ignoti cannot prevent this, and it is the same trade-off users accept for any passkey-based app.
 
 Users who want to avoid cloud sync entirely can use a hardware security key, which stores the credential on the device only.
 
 ## No SDK telemetry
 
-The GhostID SDK does not make any network requests other than the ones your code explicitly triggers. It does not collect usage metrics, error reports, or performance data. It does not know who is using it or how often.
+The Ignoti SDK does not make any network requests other than the ones your code explicitly triggers. It does not collect usage metrics, error reports, or performance data. It does not know who is using it or how often.

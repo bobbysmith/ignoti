@@ -19,7 +19,7 @@ import { registerSessionRoutes } from '../../routes/sessions.js';
 vi.mock('../../config.js', () => ({
   config: {
     RP_ID: 'localhost',
-    RP_NAME: 'GhostID',
+    RP_NAME: 'Ignoti',
     RP_ORIGIN: ['http://localhost:5173'],
     CHALLENGE_TTL_SECONDS: 300,
     SESSION_TTL_SECONDS: 86400,
@@ -85,7 +85,7 @@ describe('sessions', () => {
       return {
         method: 'GET',
         path: '/api/feed',
-        authorization: `GhostID-Session ${SESSION_ID}`,
+        authorization: `Ignoti-Session ${SESSION_ID}`,
         nonce: crypto.randomUUID(),
         timestamp: String(Math.floor(Date.now() / 1000)),
         signature: 'c2lnbmF0dXJl',
@@ -295,7 +295,7 @@ describe('sessions', () => {
         const res = await deleteSession(SESSION_ID);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toMatch(/ghostid_session=(?:;|$| )/);
+        expect(cookieStr).toMatch(/ignoti_session=(?:;|$| )/);
       });
 
       it('does not clear the session cookie when revoking a different session', async () => {
@@ -336,7 +336,7 @@ describe('sessions', () => {
       const res = await deleteAllSessions();
       const raw = res.headers['set-cookie'];
       const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-      expect(cookieStr).toMatch(/ghostid_session=(?:;|$| )/);
+      expect(cookieStr).toMatch(/ignoti_session=(?:;|$| )/);
     });
   });
 });

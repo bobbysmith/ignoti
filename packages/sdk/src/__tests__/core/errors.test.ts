@@ -1,32 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorCodes, GhostIDError } from '../../core/errors';
+import { ErrorCodes, IgnotiError } from '../../core/errors';
 
-describe('GhostIDError', () => {
+describe('IgnotiError', () => {
   it('sets name, message, and code', () => {
-    const err = new GhostIDError('bad thing', ErrorCodes.INVALID_INPUT);
-    expect(err.name).toBe('GhostIDError');
+    const err = new IgnotiError('bad thing', ErrorCodes.INVALID_INPUT);
+    expect(err.name).toBe('IgnotiError');
     expect(err.message).toBe('bad thing');
     expect(err.code).toBe(ErrorCodes.INVALID_INPUT);
   });
 
   it('sets httpStatus when provided', () => {
-    const err = new GhostIDError('not found', ErrorCodes.API_ERROR, undefined, 404);
+    const err = new IgnotiError('not found', ErrorCodes.API_ERROR, undefined, 404);
     expect(err.httpStatus).toBe(404);
   });
 
   it('httpStatus is undefined when not provided', () => {
-    const err = new GhostIDError('oops', ErrorCodes.CRYPTOGRAPHY_ERROR);
+    const err = new IgnotiError('oops', ErrorCodes.CRYPTOGRAPHY_ERROR);
     expect(err.httpStatus).toBeUndefined();
   });
 
   it('attaches cause', () => {
     const cause = new Error('root cause');
-    const err = new GhostIDError('wrapper', ErrorCodes.API_ERROR, cause);
+    const err = new IgnotiError('wrapper', ErrorCodes.API_ERROR, cause);
     expect(err.cause).toBe(cause);
   });
 
   it('works without cause', () => {
-    const err = new GhostIDError('no cause', ErrorCodes.NO_KEYS);
+    const err = new IgnotiError('no cause', ErrorCodes.NO_KEYS);
     expect(err.cause).toBeUndefined();
   });
 

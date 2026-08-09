@@ -1,14 +1,14 @@
-# How GhostID protects your users
+# How Ignoti protects your users
 
-This covers the attacks that matter most for an auth system and how GhostID handles each one. It is written for 
-builders evaluating whether GhostID is the right fit, not for cryptographers. The full technical details are in the 
+This covers the attacks that matter most for an auth system and how Ignoti handles each one. It is written for 
+builders evaluating whether Ignoti is the right fit, not for cryptographers. The full technical details are in the 
 threat model.
 
 ---
 
 ## No passwords means no password problems
 
-GhostID has no passwords. There is nothing to phish, nothing to reuse across sites, and nothing for an attacker to 
+Ignoti has no passwords. There is nothing to phish, nothing to reuse across sites, and nothing for an attacker to 
 brute-force or find in a breach dump. Authentication is always done with a passkey, a hardware-bound cryptographic 
 key that never leaves the user's device.
 
@@ -34,7 +34,7 @@ list of public keys and UUIDs. There is no password to crack and no PII to sell.
 
 ## Server compromise does not mean account takeover
 
-A server compromise is serious, but GhostID limits what an attacker can do with it.
+A server compromise is serious, but Ignoti limits what an attacker can do with it.
 
 What they get:
 
@@ -50,7 +50,7 @@ reach the server. An attacker who owns your database cannot impersonate your use
 
 OAuth and OIDC providers ("Sign in with Google", Auth0, Clerk) are central points of failure. If Google's auth 
 infrastructure is compromised, every application using it is affected, whether that application was targeted or not.
-GhostID is self-hosted. Your auth is only as compromised as your own server.
+Ignoti is self-hosted. Your auth is only as compromised as your own server.
 
 ## Session hijacking is much harder than it sounds
 
@@ -65,7 +65,7 @@ successful XSS attack cannot steal the cookie directly.
 ## Tokens are never in localStorage
 
 Many auth systems store session tokens or JWTs in `localStorage`. Any script running on your page can read 
-`localStorage`, including third-party analytics, chat widgets, and injected ads. GhostID stores the session token 
+`localStorage`, including third-party analytics, chat widgets, and injected ads. Ignoti stores the session token 
 in an `httpOnly` cookie that JavaScript cannot access. The session signing key lives in memory only and is gone 
 when the page closes.
 
@@ -77,7 +77,7 @@ valid signature. A forged request without a valid signature is rejected by the s
 session cookie was sent.
 
 In production, the session cookie is `SameSite=None; Secure`, which is required for cross-origin deployments where 
-your frontend and GhostID server are on different domains. The SameSite attribute alone is not the CSRF protection 
+your frontend and Ignoti server are on different domains. The SameSite attribute alone is not the CSRF protection 
 - the per-request signature is.
 
 ## Replay attacks are blocked
@@ -110,7 +110,7 @@ authenticator on every mistyped phrase.
 ## There is no support team to social-engineer
 
 Many high-profile account takeovers do not involve breaking crypto at all. The attacker calls support, claims to be 
-the user, and gets the account reset. GhostID has no support-line recovery path. There is no "I forgot my mnemonic, 
+the user, and gets the account reset. Ignoti has no support-line recovery path. There is no "I forgot my mnemonic, 
 help me reset my account" flow and no team that can override authentication. The mnemonic is the recovery mechanism 
 and there is no fallback to social engineering.
 
@@ -122,7 +122,7 @@ which the server marks as consumed immediately, and is cryptographically tied to
 
 ## There is no "guess the token" surface
 
-Many auth systems use random strings as bearer tokens. If you can guess or enumerate one, you are in. GhostID 
+Many auth systems use random strings as bearer tokens. If you can guess or enumerate one, you are in. Ignoti 
 sessions do not work this way. Every authenticated request must be accompanied by a live Ed25519 signature produced 
 by the session private key. There is no token to guess because a token alone is not enough to authenticate.
 
@@ -136,14 +136,14 @@ bounded to the active session window.
 
 ## Biometric or PIN is always required
 
-GhostID sets `userVerification: required` on every authentication and registration request. The authenticator must 
+Ignoti sets `userVerification: required` on every authentication and registration request. The authenticator must 
 verify the user, not just their presence. Tapping a security key without a PIN or presenting a device without a 
 biometric will be rejected. Someone who picks up an unlocked device cannot log in without the owner's fingerprint 
 or face.
 
 ## Cloned authenticators are detectable
 
-WebAuthn tracks a sign count: a number the authenticator increments every time it signs. GhostID's server stores 
+WebAuthn tracks a sign count: a number the authenticator increments every time it signs. Ignoti's server stores 
 this count and rejects any login where the new count is not higher than the stored one, which is a strong signal 
 that the credential was cloned. Cloning a hardware authenticator is difficult, but if it happens, the server can 
 detect it and refuse the login.
@@ -182,10 +182,10 @@ validate signed session headers. It is intentionally not rate limited, because i
 (one call per authenticated request) and forging a positive result already requires a valid Ed25519 signature over 
 a server-issued session, so there is nothing for an unauthenticated caller to brute-force.
 
-## What GhostID cannot protect against
+## What Ignoti cannot protect against
 
 **Malicious JavaScript on your own page.** If an attacker injects script into your site, they can use the in-memory 
-session key while the user is logged in and make API calls for the duration of that session. GhostID's `httpOnly` 
+session key while the user is logged in and make API calls for the duration of that session. Ignoti's `httpOnly` 
 cookie prevents cookie theft and `extractable: false` prevents the key bytes from being exfiltrated, but neither 
 stops an attacker who already has code execution on your origin from making calls during the session window.
 
@@ -206,10 +206,10 @@ The defense is preventing XSS in the first place. At minimum:
 **Mnemonic theft.** Anyone with the user's 12-word phrase can recover the account. Users need to store it offline 
 and treat it like a private key. There is no "forgot mnemonic" flow, by design.
 
-**Physical coercion.** If someone forces a user to authenticate, GhostID cannot stop them. Duress mnemonics (a 
+**Physical coercion.** If someone forces a user to authenticate, Ignoti cannot stop them. Duress mnemonics (a 
 second phrase that authenticates but flags the session as coerced) are on the roadmap but not yet implemented.
 
-**A compromised authenticator.** GhostID trusts the WebAuthn layer. A device with a broken secure enclave is out of 
+**A compromised authenticator.** Ignoti trusts the WebAuthn layer. A device with a broken secure enclave is out of 
 scope.
 
 ---

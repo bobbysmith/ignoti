@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Header } from '../components/Header';
 import { useSession } from '../context/session';
-import { ghost } from '../ghost';
+import { ignoti } from '../ignoti';
 
 export function Account() {
   const { session } = useSession();
-  const [devices, setDevices] = useState<Awaited<ReturnType<typeof ghost.getDevices>> | null>(null);
-  const [sessions, setSessions] = useState<Awaited<ReturnType<typeof ghost.getSessions>> | null>(
+  const [devices, setDevices] = useState<Awaited<ReturnType<typeof ignoti.getDevices>> | null>(
+    null
+  );
+  const [sessions, setSessions] = useState<Awaited<ReturnType<typeof ignoti.getSessions>> | null>(
     null
   );
   const [loggingOut, setLoggingOut] = useState(false);
@@ -23,11 +25,11 @@ export function Account() {
   const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    ghost
+    ignoti
       .getDevices()
       .then(setDevices)
       .catch(() => {});
-    ghost
+    ignoti
       .getSessions()
       .then(setSessions)
       .catch(() => {});
@@ -42,11 +44,11 @@ export function Account() {
     if (!currentSession) return;
     setSessionError(null);
     try {
-      await ghost.revokeSession(sessionId);
+      await ignoti.revokeSession(sessionId);
       if (sessionId === currentSession.sessionId) {
         return;
       }
-      ghost
+      ignoti
         .getSessions()
         .then(setSessions)
         .catch(() => {});
@@ -60,14 +62,14 @@ export function Account() {
     const mnemonic = mnemonicRef.current?.value ?? '';
     setDeviceError(null);
     try {
-      await ghost.revokeDevice(
+      await ignoti.revokeDevice(
         revokeTarget.deviceId,
         mnemonic,
         session?.userId ?? '',
         revokeTarget.credentialId
       );
       setRevokeTarget(null);
-      ghost
+      ignoti
         .getDevices()
         .then(setDevices)
         .catch(() => {});
@@ -80,7 +82,7 @@ export function Account() {
     setLoggingOut(true);
     setLogoutError(null);
     try {
-      await ghost.logout();
+      await ignoti.logout();
     } catch (e) {
       setLogoutError((e as Error).message);
     } finally {
@@ -97,7 +99,7 @@ export function Account() {
 
     let headers: Record<string, string>;
     try {
-      headers = await ghost.getSessionHeaders('GET', path);
+      headers = await ignoti.getSessionHeaders('GET', path);
       setSignedHeaders(headers);
     } catch {
       setSignedHeaders(null);

@@ -3,7 +3,7 @@
  * non-200 response). Distinct from `{ valid: false }`, which is a successful
  * introspection of an invalid session.
  */
-export class GhostIDVerifyError extends Error {
+export class IgnotiVerifyError extends Error {
   constructor(
     message: string,
     // HTTP status of the introspection response, if one was received.
@@ -11,6 +11,6 @@ export class GhostIDVerifyError extends Error {
     cause?: unknown
   ) {
     super(message, cause ? { cause } : undefined);
-    this.name = 'GhostIDVerifyError';
+    this.name = 'IgnotiVerifyError';
   }
 }

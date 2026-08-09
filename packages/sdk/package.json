@@ -1,5 +1,5 @@
 {
-  "name": "@ghostid/sdk",
+  "name": "@ignoti/sdk",
   "version": "0.0.1",
   "description": "Anonymous, self-sovereign authentication SDK using passkeys and BIP39 mnemonics.",
   "type": "module",
@@ -17,14 +17,14 @@
     }
   },
   "publishConfig": {
-    "main": "./dist/ghostid.umd.cjs",
-    "module": "./dist/ghostid.js",
+    "main": "./dist/ignoti.umd.cjs",
+    "module": "./dist/ignoti.js",
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
-        "import": "./dist/ghostid.js",
-        "require": "./dist/ghostid.umd.cjs"
+        "import": "./dist/ignoti.js",
+        "require": "./dist/ignoti.umd.cjs"
       },
       "./types": {
         "types": "./dist/types-entry.d.ts",
@@ -56,7 +56,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ghostid/shared": "workspace:*",
+    "@ignoti/shared": "workspace:*",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
     "@scure/bip39": "^1.2.1",

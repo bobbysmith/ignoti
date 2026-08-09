@@ -17,7 +17,7 @@ import type {
   RequestChallengeResponse,
   RestoreSessionResponse,
 } from '@/types';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { ErrorCodes, IgnotiError } from '../core/errors';
 
 import type { MakeRequest } from './core';
 import { validateString } from './validation';
@@ -68,10 +68,7 @@ export class AuthApiClient {
     };
 
     if (!request.registrationResponse || typeof request.registrationResponse !== 'object') {
-      throw new GhostIDError(
-        ERROR_MESSAGES.INVALID_REGISTRATION_RESPONSE,
-        ErrorCodes.INVALID_INPUT
-      );
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_REGISTRATION_RESPONSE, ErrorCodes.INVALID_INPUT);
     }
 
     return this.makeRequest<RegisterDeviceResponse>(
@@ -102,7 +99,7 @@ export class AuthApiClient {
    */
   async login(request: LoginRequest): Promise<LoginResponse> {
     if (!request.assertion || typeof request.assertion !== 'object') {
-      throw new GhostIDError(ERROR_MESSAGES.INVALID_ASSERTION_RESPONSE, ErrorCodes.INVALID_INPUT);
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_ASSERTION_RESPONSE, ErrorCodes.INVALID_INPUT);
     }
     return this.makeRequest<LoginResponse>(HTTP_METHODS.POST, API_ENDPOINTS.AUTH.LOGIN, {
       assertion: request.assertion,

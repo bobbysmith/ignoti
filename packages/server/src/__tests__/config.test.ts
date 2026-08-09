@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const VALID_DB_URL = 'postgresql://user:pass@localhost:5432/ghostid';
+const VALID_DB_URL = 'postgresql://user:pass@localhost:5432/ignoti';
 const VALID_ORIGIN = 'http://localhost:5173';
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;
 const MOCK_URL = 'https://app.example.com';
@@ -265,10 +265,10 @@ describe('config', () => {
   });
 
   describe('RP_NAME', () => {
-    it('defaults to "GhostID" when RP_NAME is not set', async () => {
+    it('defaults to "Ignoti" when RP_NAME is not set', async () => {
       stubEnv();
       const config = await loadConfig();
-      expect(config.RP_NAME).toBe('GhostID');
+      expect(config.RP_NAME).toBe('Ignoti');
     });
 
     it('uses the provided RP_NAME value', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorCodes, GhostIDError } from '@/core/errors.ts';
-import { GhostID } from '@/ghostid.ts';
+import { ErrorCodes, IgnotiError } from '@/core/errors.ts';
+import { Ignoti } from '@/ignoti.ts';
 
 const {
   mockGenerateMnemonic,
@@ -147,7 +147,7 @@ function makeOptions(overrides: Record<string, unknown> = {}) {
 }
 
 function sdk() {
-  return new GhostID({ backendUrl: 'http://localhost' });
+  return new Ignoti({ backendUrl: 'http://localhost' });
 }
 
 function initializedSdk() {
@@ -187,7 +187,7 @@ async function withSession(opts?: Parameters<typeof stubLoginMocks>[0]) {
   return { g, ...info };
 }
 
-describe('GhostID', () => {
+describe('Ignoti', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     onUnauthorizedRef.current = undefined;
@@ -204,7 +204,7 @@ describe('GhostID', () => {
   describe('ensureInitialized', () => {
     it('throws NOT_INITIALIZED before init()', async () => {
       const g = sdk();
-      await expect(g.createIdentity()).rejects.toThrow(GhostIDError);
+      await expect(g.createIdentity()).rejects.toThrow(IgnotiError);
       await expect(g.createIdentity()).rejects.toThrow('init()');
     });
 
@@ -219,7 +219,7 @@ describe('GhostID', () => {
     it('throws when WebAuthn is not supported', async () => {
       mockIsWebAuthnSupported.mockReturnValue(false);
       const g = initializedSdk();
-      await expect(g.createIdentity()).rejects.toThrow(GhostIDError);
+      await expect(g.createIdentity()).rejects.toThrow(IgnotiError);
     });
 
     it('registers user, creates passkey, registers device and returns mnemonic', async () => {
@@ -349,7 +349,7 @@ describe('GhostID', () => {
   describe('getSessionHeaders', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow(GhostIDError);
+      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow(IgnotiError);
     });
 
     it('propagates restore error when session is expired and restore fails', async () => {
@@ -367,7 +367,7 @@ describe('GhostID', () => {
         await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
       }
 
-      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as GhostIDError;
+      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
       expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
     });
@@ -375,12 +375,12 @@ describe('GhostID', () => {
     it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
       const { g, sessionId } = await withSession();
       const headers = await g.getSessionHeaders('GET', '/api/data');
-      expect(headers.Authorization).toBe(`GhostID-Session ${sessionId}`);
-      expect(headers['X-GhostID-Nonce']).toMatch(
+      expect(headers.Authorization).toBe(`Ignoti-Session ${sessionId}`);
+      expect(headers['X-Ignoti-Nonce']).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
       );
-      expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
-      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
+      expect(headers['X-Ignoti-Timestamp']).toMatch(/^\d+$/);
+      expect(headers['X-Ignoti-Signature']).toBe('sig-abc');
     });
 
     it('proactively restores when expired and returns headers from the new session', async () => {
@@ -400,8 +400,8 @@ describe('GhostID', () => {
       const headers = await g.getSessionHeaders('GET', '/api/data');
 
       expect(mockRestoreSession).toHaveBeenCalledTimes(1);
-      expect(headers.Authorization).toBe('GhostID-Session sess-restored');
-      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
+      expect(headers.Authorization).toBe('Ignoti-Session sess-restored');
+      expect(headers['X-Ignoti-Signature']).toBe('sig-abc');
     });
 
     it('throws NO_KEYS if a concurrent logout clears the session during the restore', async () => {
@@ -429,8 +429,8 @@ describe('GhostID', () => {
         }
       });
 
-      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as GhostIDError;
-      expect(err).toBeInstanceOf(GhostIDError);
+      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as IgnotiError;
+      expect(err).toBeInstanceOf(IgnotiError);
       expect(err.code).toBe(ErrorCodes.NO_KEYS);
     });
   });
@@ -467,7 +467,7 @@ describe('GhostID', () => {
   describe('getDevices', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.getDevices()).rejects.toThrow(GhostIDError);
+      await expect(g.getDevices()).rejects.toThrow(IgnotiError);
     });
 
     it('returns device list on success', async () => {
@@ -534,7 +534,7 @@ describe('GhostID', () => {
   describe('getSessions', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.getSessions()).rejects.toThrow(GhostIDError);
+      await expect(g.getSessions()).rejects.toThrow(IgnotiError);
     });
 
     it('returns session list on success', async () => {
@@ -573,7 +573,7 @@ describe('GhostID', () => {
   describe('revokeSession', () => {
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.revokeSession('other-sess')).rejects.toThrow(GhostIDError);
+      await expect(g.revokeSession('other-sess')).rejects.toThrow(IgnotiError);
     });
 
     it('revokes another session without clearing local session', async () => {
@@ -601,7 +601,7 @@ describe('GhostID', () => {
   describe('revokeAllSessions', () => {
     it('throws NO_KEYS when no active session', async () => {
       const g = initializedSdk();
-      await expect(g.revokeAllSessions()).rejects.toThrow(GhostIDError);
+      await expect(g.revokeAllSessions()).rejects.toThrow(IgnotiError);
     });
 
     it('calls the API with signed session headers', async () => {
@@ -631,7 +631,7 @@ describe('GhostID', () => {
     it('throws when WebAuthn is not supported', async () => {
       mockIsWebAuthnSupported.mockReturnValue(false);
       const g = initializedSdk();
-      await expect(g.recoverIdentity('mnemonic')).rejects.toThrow(GhostIDError);
+      await expect(g.recoverIdentity('mnemonic')).rejects.toThrow(IgnotiError);
     });
 
     it('recovers account and returns userId + new deviceId', async () => {
@@ -652,15 +652,13 @@ describe('GhostID', () => {
       mockIsWebAuthnSupported.mockReturnValue(true);
       mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
       mockRecoverAccount.mockRejectedValue(
-        new GhostIDError('user_not_found', ErrorCodes.API_ERROR, undefined, 404)
+        new IgnotiError('user_not_found', ErrorCodes.API_ERROR, undefined, 404)
       );
 
       const g = initializedSdk();
-      const err = (await g
-        .recoverIdentity('word '.repeat(12).trim())
-        .catch(e => e)) as GhostIDError;
+      const err = (await g.recoverIdentity('word '.repeat(12).trim()).catch(e => e)) as IgnotiError;
 
-      expect(err).toBeInstanceOf(GhostIDError);
+      expect(err).toBeInstanceOf(IgnotiError);
       expect(err.code).toBe(ErrorCodes.INVALID_INPUT);
       expect(mockCreatePasskey).not.toHaveBeenCalled();
     });
@@ -668,7 +666,7 @@ describe('GhostID', () => {
     it('rethrows a non-404 recover error unchanged and never prompts for a passkey', async () => {
       mockIsWebAuthnSupported.mockReturnValue(true);
       mockDeriveRootKeys.mockResolvedValue(makeRootKeySet());
-      const serverError = new GhostIDError('boom', ErrorCodes.API_ERROR, undefined, 500);
+      const serverError = new IgnotiError('boom', ErrorCodes.API_ERROR, undefined, 500);
       mockRecoverAccount.mockRejectedValue(serverError);
 
       const g = initializedSdk();
@@ -769,7 +767,7 @@ describe('GhostID', () => {
     function capturedOnUnauthorized() {
       const cb = onUnauthorizedRef.current;
       if (!cb) {
-        throw new Error('onUnauthorized not captured — was GhostID constructed?');
+        throw new Error('onUnauthorized not captured — was Ignoti constructed?');
       }
       return cb;
     }
@@ -796,12 +794,12 @@ describe('GhostID', () => {
       const headers = await onUnauthorized('GET', '/api/devices');
 
       expect(mockRestoreSession).toHaveBeenCalledTimes(1);
-      expect(headers.Authorization).toBe('GhostID-Session sess-restored');
-      expect(headers['X-GhostID-Signature']).toBe('sig-abc');
-      expect(headers['X-GhostID-Nonce']).toMatch(
+      expect(headers.Authorization).toBe('Ignoti-Session sess-restored');
+      expect(headers['X-Ignoti-Signature']).toBe('sig-abc');
+      expect(headers['X-Ignoti-Nonce']).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
       );
-      expect(headers['X-GhostID-Timestamp']).toMatch(/^\d+$/);
+      expect(headers['X-Ignoti-Timestamp']).toMatch(/^\d+$/);
     });
 
     it('uppercases the http method in the signed payload', async () => {
@@ -858,7 +856,7 @@ describe('GhostID', () => {
         await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
       }
 
-      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as GhostIDError;
+      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
       expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
     });
@@ -881,7 +879,7 @@ describe('GhostID', () => {
       // Two more real attempts remain before the cap trips
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
-      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as GhostIDError;
+      const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
       expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
     });
@@ -910,7 +908,7 @@ describe('GhostID', () => {
   describe('restoreSession', () => {
     it('throws NOT_INITIALIZED before init()', async () => {
       const g = sdk();
-      await expect(g.restoreSession()).rejects.toThrow(GhostIDError);
+      await expect(g.restoreSession()).rejects.toThrow(IgnotiError);
     });
 
     function stubRestoreMocks(serverResult: 'success' | 'failure') {
@@ -954,21 +952,21 @@ describe('GhostID', () => {
       expect(claims.sessionChallenge.length).toBeGreaterThan(0);
     });
 
-    it('converts a 401 API error to NO_ACTIVE_SESSION GhostIDError', async () => {
+    it('converts a 401 API error to NO_ACTIVE_SESSION IgnotiError', async () => {
       mockGenerateSessionKeypair.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
       mockSignSessionBindingJWS.mockResolvedValue('restore-binding');
       mockRestoreSession.mockRejectedValue(
-        new GhostIDError('unauthorized', ErrorCodes.API_ERROR, undefined, 401)
+        new IgnotiError('unauthorized', ErrorCodes.API_ERROR, undefined, 401)
       );
 
       const err = await initializedSdk()
         .restoreSession()
         .catch(e => e);
-      expect(err).toBeInstanceOf(GhostIDError);
-      expect((err as GhostIDError).message).toContain('No active session');
+      expect(err).toBeInstanceOf(IgnotiError);
+      expect((err as IgnotiError).message).toContain('No active session');
     });
 
     it('rethrows non-401 errors unchanged', async () => {
@@ -983,7 +981,7 @@ describe('GhostID', () => {
         .restoreSession()
         .catch(e => e);
       expect(err).toBeInstanceOf(Error);
-      expect(err).not.toBeInstanceOf(GhostIDError);
+      expect(err).not.toBeInstanceOf(IgnotiError);
       expect(err.message).toBe('network error');
     });
 
@@ -998,7 +996,7 @@ describe('GhostID', () => {
   describe('init', () => {
     it('enables guarded methods synchronously without awaiting', async () => {
       const g = sdk();
-      await expect(g.logout()).rejects.toThrow(GhostIDError);
+      await expect(g.logout()).rejects.toThrow(IgnotiError);
       g.init();
       await expect(g.logout()).resolves.toBeUndefined();
     });
@@ -1016,7 +1014,7 @@ describe('GhostID', () => {
     it('uses "Unknown Device" when navigator is undefined', async () => {
       stubCreateIdentityMocks();
       vi.stubGlobal('navigator', undefined);
-      const g = new GhostID({ backendUrl: 'http://localhost' });
+      const g = new Ignoti({ backendUrl: 'http://localhost' });
       g.init();
       await g.createIdentity();
       vi.unstubAllGlobals();
@@ -1029,7 +1027,7 @@ describe('GhostID', () => {
     it('uses matched UA hint when userAgent is recognised', async () => {
       stubCreateIdentityMocks();
       vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)' });
-      const g = new GhostID({ backendUrl: 'http://localhost' });
+      const g = new Ignoti({ backendUrl: 'http://localhost' });
       g.init();
       await g.createIdentity();
       vi.unstubAllGlobals();

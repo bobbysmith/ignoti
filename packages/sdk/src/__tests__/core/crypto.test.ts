@@ -16,7 +16,7 @@ import {
   validateMnemonic,
   verify,
 } from '@/core/crypto.ts';
-import { ErrorCodes, GhostIDError } from '@/core/errors.ts';
+import { ErrorCodes, IgnotiError } from '@/core/errors.ts';
 
 const { mockMnemonicToSeed } = vi.hoisted(() => ({ mockMnemonicToSeed: vi.fn() }));
 
@@ -79,15 +79,15 @@ describe('crypto', () => {
       await expect(deriveRootKeysFromMnemonic('bad mnemonic')).rejects.toThrow();
     });
 
-    it('wraps unexpected internal errors as GhostIDError (catch branch)', async () => {
+    it('wraps unexpected internal errors as IgnotiError (catch branch)', async () => {
       mockMnemonicToSeed.mockRejectedValueOnce(new Error('internal failure'));
       await expect(deriveRootKeysFromMnemonic(generateMnemonic().join(' '))).rejects.toBeInstanceOf(
-        GhostIDError
+        IgnotiError
       );
     });
 
-    it('re-throws GhostIDError unchanged when thrown inside try (catch branch)', async () => {
-      const original = new GhostIDError('already wrapped', ErrorCodes.CRYPTOGRAPHY_ERROR);
+    it('re-throws IgnotiError unchanged when thrown inside try (catch branch)', async () => {
+      const original = new IgnotiError('already wrapped', ErrorCodes.CRYPTOGRAPHY_ERROR);
       mockMnemonicToSeed.mockRejectedValueOnce(original);
       const thrown = await deriveRootKeysFromMnemonic(generateMnemonic().join(' ')).catch(e => e);
       expect(thrown).toBe(original);
@@ -195,7 +195,7 @@ describe('crypto', () => {
 
   describe('hash', () => {
     it('produces a 32-byte deterministic output', () => {
-      const input = stringToBytes('ghostid');
+      const input = stringToBytes('ignoti');
       expect(hash(input)).toHaveLength(32);
       expect(hash(input)).toEqual(hash(input));
     });

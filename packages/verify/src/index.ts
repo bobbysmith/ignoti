@@ -1,13 +1,13 @@
-export { GhostIDVerifyError } from './errors.js';
+export { IgnotiVerifyError } from './errors.js';
 export type {
   AuthReply,
   AuthRequest,
   AuthResponse,
-  GhostIDSession,
-  GhostIDVerifierOptions,
+  IgnotiSession,
+  IgnotiVerifierOptions,
   IncomingHeaders,
   NextFunction,
   VerifyInput,
   VerifyResult,
 } from './types.js';
-export { GhostIDVerifier } from './verifier.js';
+export { IgnotiVerifier } from './verifier.js';

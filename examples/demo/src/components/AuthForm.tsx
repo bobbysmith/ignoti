@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { SessionInfo } from '@/types';
-import { ghost } from '../ghost';
+import { ignoti } from '../ignoti';
 import type { AuthView } from '../types';
 import { MnemonicView } from './MnemonicView';
 
@@ -29,7 +29,7 @@ export function AuthForm({
     setLoading(true);
     setError(null);
     try {
-      const s = await ghost.login();
+      const s = await ignoti.login();
       onSession(s);
     } catch (e) {
       setError(parseError(e));
@@ -42,7 +42,7 @@ export function AuthForm({
     setLoading(true);
     setError(null);
     try {
-      const result = await ghost.createIdentity();
+      const result = await ignoti.createIdentity();
       setNewMnemonic(result.mnemonic);
     } catch (e) {
       setError(parseError(e));
@@ -55,8 +55,8 @@ export function AuthForm({
     setLoading(true);
     setError(null);
     try {
-      await ghost.recoverIdentity(mnemonicRef.current?.value ?? '');
-      const s = await ghost.login();
+      await ignoti.recoverIdentity(mnemonicRef.current?.value ?? '');
+      const s = await ignoti.login();
       onSession(s);
     } catch (e) {
       setError(parseError(e));

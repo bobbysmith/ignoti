@@ -1,7 +1,7 @@
 import { ERROR_MESSAGES } from '@/constants';
 import type { FormattedCreatePasskeyResponse, FormattedGetPasskeyAssertionResponse } from '@/types';
 import { bufferToBase64Url } from '../core/crypto';
-import { ErrorCodes, GhostIDError } from '../core/errors';
+import { ErrorCodes, IgnotiError } from '../core/errors';
 
 declare const window: {
   PublicKeyCredential: typeof PublicKeyCredential;
@@ -16,7 +16,7 @@ export async function createPasskey(
   options: PublicKeyCredentialCreationOptions
 ): Promise<FormattedCreatePasskeyResponse> {
   if (typeof window === 'undefined' || !('credentials' in navigator)) {
-    throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
   }
 
   let cred: PublicKeyCredential | null;
@@ -26,7 +26,7 @@ export async function createPasskey(
       publicKey: options,
     })) as PublicKeyCredential | null;
   } catch (error) {
-    throw new GhostIDError(
+    throw new IgnotiError(
       `${ERROR_MESSAGES.PASSKEY_CREATION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
@@ -34,7 +34,7 @@ export async function createPasskey(
   }
 
   if (!cred) {
-    throw new GhostIDError(ERROR_MESSAGES.PASSKEY_CREATION_CANCELLED, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.PASSKEY_CREATION_CANCELLED, ErrorCodes.INVALID_INPUT);
   }
 
   const resp = cred.response as AuthenticatorAttestationResponse;
@@ -69,7 +69,7 @@ export async function getPasskeyAssertion(
   options: PublicKeyCredentialRequestOptions
 ): Promise<FormattedGetPasskeyAssertionResponse> {
   if (typeof window === 'undefined' || !('credentials' in navigator)) {
-    throw new GhostIDError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.WEB_AUTHN_NOT_SUPPORTED, ErrorCodes.INVALID_INPUT);
   }
 
   let assertion: PublicKeyCredential | null;
@@ -79,7 +79,7 @@ export async function getPasskeyAssertion(
       publicKey: options,
     })) as PublicKeyCredential | null;
   } catch (error) {
-    throw new GhostIDError(
+    throw new IgnotiError(
       `${ERROR_MESSAGES.PASSKEY_ASSERTION_FAILED}: ${(error as Error).message}`,
       ErrorCodes.CRYPTOGRAPHY_ERROR,
       error as Error
@@ -87,7 +87,7 @@ export async function getPasskeyAssertion(
   }
 
   if (!assertion) {
-    throw new GhostIDError(ERROR_MESSAGES.PASSKEY_ASSERTION_CANCELLED, ErrorCodes.INVALID_INPUT);
+    throw new IgnotiError(ERROR_MESSAGES.PASSKEY_ASSERTION_CANCELLED, ErrorCodes.INVALID_INPUT);
   }
 
   const resp = assertion.response as AuthenticatorAssertionResponse;

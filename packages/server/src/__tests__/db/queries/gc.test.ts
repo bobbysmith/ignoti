@@ -18,7 +18,7 @@ describe('runGc', () => {
     );
   });
 
-  it('acquires the advisory lock, runs ghostid_gc(), and returns true', async () => {
+  it('acquires the advisory lock, runs ignoti_gc(), and returns true', async () => {
     vi.mocked(sql).mockResolvedValueOnce([{ locked: true }] as never);
     vi.mocked(sql).mockResolvedValueOnce(undefined as never);
     await expect(runGc()).resolves.toBe(true);

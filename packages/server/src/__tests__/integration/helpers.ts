@@ -1,4 +1,4 @@
-import { canonicalJson, ROOT_BINDING_TYP, SESSION_BINDING_TYP } from '@ghostid/shared';
+import { canonicalJson, ROOT_BINDING_TYP, SESSION_BINDING_TYP } from '@ignoti/shared';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { sql } from '../../db/client.js';
 
@@ -70,10 +70,10 @@ export async function buildSessionHeaders(
   const sigBuffer = await crypto.subtle.sign('Ed25519', privateKey, bytes);
   const signature = Buffer.from(sigBuffer).toString('base64url');
   return {
-    Authorization: `GhostID-Session ${sessionId}`,
-    'X-GhostID-Timestamp': String(iat),
-    'X-GhostID-Nonce': jti,
-    'X-GhostID-Signature': signature,
+    Authorization: `Ignoti-Session ${sessionId}`,
+    'X-Ignoti-Timestamp': String(iat),
+    'X-Ignoti-Nonce': jti,
+    'X-Ignoti-Signature': signature,
   };
 }
 

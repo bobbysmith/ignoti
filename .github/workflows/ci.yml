@@ -22,7 +22,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @ghostid/shared --filter @ghostid/verify build
+      - run: pnpm --filter @ignoti/shared --filter @ignoti/verify build
 
       - run: pnpm lint
 
@@ -41,7 +41,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ghostid_test
+          POSTGRES_DB: ignoti_test
         ports:
           - 5432:5432
         options: >-
@@ -50,10 +50,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ghostid_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ignoti_test
       DB_PREPARE: false
       RP_ID: localhost
-      RP_NAME: GhostID
+      RP_NAME: Ignoti
       RP_ORIGIN: http://localhost:5173
       COOKIE_SECURE: false
       RATE_LIMIT_DISABLED: true
@@ -69,10 +69,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @ghostid/shared build
+      - run: pnpm --filter @ignoti/shared build
 
       - name: Run migrations
-        run: pnpm --filter @ghostid/server db:migrate:ci
+        run: pnpm --filter @ignoti/server db:migrate:ci
 
       - name: Run integration tests
-        run: pnpm --filter @ghostid/server test:integration:ci
+        run: pnpm --filter @ignoti/server test:integration:ci
