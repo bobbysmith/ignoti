@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const GITHUB_URL = 'https://github.com/dipsettheory/ignoti';
+const GITHUB_URL = 'https://github.com/bobbysmith/ignoti';
 
 export function Header({ slug, actions }: { slug?: string; actions?: React.ReactNode }) {
   const [docsOpen, setDocsOpen] = useState(false);

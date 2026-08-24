@@ -1,6 +1,6 @@
 # @ignoti/verify
 
-Server-side session verification for [Ignoti](https://github.com/dipsettheory/ignoti). Validates the signed
+Server-side session verification for [Ignoti](https://github.com/bobbysmith/ignoti). Validates the signed
 session headers produced by the client SDK's `getSessionHeaders()` against your self-hosted Ignoti server.
 
 Zero runtime dependencies. Node 18+.

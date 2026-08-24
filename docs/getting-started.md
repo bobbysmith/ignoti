@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks through deploying the Ignoti server and integrating the client SDK into a web app. By the end you 
+This guide walks through deploying the Ignoti server and integrating the client SDK into a web app. By the end you
 will have working registration, login, and account recovery.
 
 ## Prerequisites
@@ -16,8 +16,8 @@ will have working registration, login, and account recovery.
 Download the Docker Compose file and configure it for your domain:
 
 ```bash
-curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/packages/server/.env.example
+curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/packages/server/.env.example
 mv .env.example .env
 ```
 
@@ -45,7 +45,7 @@ The server starts on port `8787`. Database migrations run automatically on first
 > default; if you are developing over plain `http://localhost`, set `COOKIE_SECURE=false` so the
 > browser will send the cookie, and never do this in a deployed environment.
 
-> For a full list of configuration options see the [environment variable reference](https://github.com/dipsettheory/ignoti#self-hosting).
+> For a full list of configuration options see the [environment variable reference](https://github.com/bobbysmith/ignoti#self-hosting).
 
 ---
 
@@ -77,14 +77,14 @@ ignoti.init();
 
 ## 4. Register a new user
 
-`createIdentity()` generates a root keypair from a new mnemonic, registers it with the server, and prompts the user 
+`createIdentity()` generates a root keypair from a new mnemonic, registers it with the server, and prompts the user
 to create a passkey.
 
 ```ts
 const { userId, deviceId, mnemonic } = await ignoti.createIdentity();
 ```
 
-**The mnemonic is the user's only recovery path.** Present it to the user immediately and prompt them to store it 
+**The mnemonic is the user's only recovery path.** Present it to the user immediately and prompt them to store it
 somewhere safe. Ignoti never stores it - once this screen is dismissed, it cannot be retrieved.
 
 ```ts
@@ -96,14 +96,14 @@ showMnemonicScreen(mnemonic); // your UI
 
 ## 5. Log in
 
-`login()` requests a WebAuthn challenge from the server, prompts the user to authenticate with their passkey, and 
+`login()` requests a WebAuthn challenge from the server, prompts the user to authenticate with their passkey, and
 establishes an in-memory session.
 
 ```ts
 const { sessionId, expiresAt } = await ignoti.login();
 ```
 
-The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from 
+The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from
 the httpOnly cookie, no passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
 
 ---
@@ -149,10 +149,10 @@ useEffect(() => {
 - The user logged out
 - The session cookie was cleared (browser storage wiped, incognito tab closed, device reset)
 
-The last case is worth handling explicitly. The session cookie is `httpOnly` and stored by the browser. If the user 
-clears site data, switches browsers, or wipes the device, the cookie is gone and `restoreSession()` will throw 
-`NO_KEYS`. The user is not logged out from the server's perspective until that session expires or is revoked, but 
-from the user's perspective they need to authenticate again. Show your login UI and let them tap their passkey. No 
+The last case is worth handling explicitly. The session cookie is `httpOnly` and stored by the browser. If the user
+clears site data, switches browsers, or wipes the device, the cookie is gone and `restoreSession()` will throw
+`NO_KEYS`. The user is not logged out from the server's perspective until that session expires or is revoked, but
+from the user's perspective they need to authenticate again. Show your login UI and let them tap their passkey. No
 mnemonic needed unless they've lost the device entirely.
 
 ```ts
@@ -183,7 +183,7 @@ const response = await fetch('https://myapp.com/api/protected', {
 });
 ```
 
-The session key signs a short-lived timestamp on every call. A stolen session ID alone cannot be replayed - the 
+The session key signs a short-lived timestamp on every call. A stolen session ID alone cannot be replayed - the
 attacker would also need the in-memory private key.
 
 The `method` and `path` you pass to `getSessionHeaders()` are baked into the signature. They must match what your
@@ -249,7 +249,7 @@ const mnemonic = promptUserForMnemonic(); // your UI
 const { userId, deviceId } = await ignoti.recoverIdentity(mnemonic);
 ```
 
-Recovery registers a new passkey for the existing account. The `userId` returned is the same as the original - the 
+Recovery registers a new passkey for the existing account. The `userId` returned is the same as the original - the
 account is preserved.
 
 ---
@@ -304,9 +304,9 @@ try {
 }
 ```
 
-The session is revoked server-side (which clears the httpOnly cookie), and only then is the in-memory key wiped and 
-`onSessionChange(null)` fired. If the server call fails, the error is thrown and the session is left intact — the 
-user stays logged in. Ignoti does not hide the failure or clear state optimistically; handle the error and retry if 
+The session is revoked server-side (which clears the httpOnly cookie), and only then is the in-memory key wiped and
+`onSessionChange(null)` fired. If the server call fails, the error is thrown and the session is left intact — the
+user stays logged in. Ignoti does not hide the failure or clear state optimistically; handle the error and retry if
 you want. Only treat the user as logged out after `logout()` resolves.
 
 ---

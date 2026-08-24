@@ -1,10 +1,10 @@
 # Ignoti
 
-[![CI](https://github.com/dipsettheory/ignoti/actions/workflows/ci.yml/badge.svg)](https://github.com/dipsettheory/ignoti/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![npm](https://img.shields.io/npm/v/@ignoti/sdk)](https://www.npmjs.com/package/@ignoti/sdk)
+[![CI](https://github.com/bobbysmith/ignoti/actions/workflows/ci.yml/badge.svg)](https://github.com/bobbysmith/ignoti/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![npm](https://img.shields.io/npm/v/@ignoti/sdk)](https://www.npmjs.com/package/@ignoti/sdk)
 
 **A free, open-source, self-hosted authentication platform. A privacy-first alternative to auth that treats your users as the product.**
 
-Ignoti gives builders complete auth without writing it and gives their users complete control without surrendering 
+Ignoti gives builders complete auth without writing it and gives their users complete control without surrendering
 their identity to a third party. No email. No phone number. No OAuth middleman. No PII stored anywhere.
 
 ---
@@ -13,12 +13,12 @@ their identity to a third party. No email. No phone number. No OAuth middleman. 
 
 Ignoti is two things working together:
 
-- **A backend server** - pre-built and ready to deploy. You host it, you own it. Your users' data never leaves your 
+- **A backend server** - pre-built and ready to deploy. You host it, you own it. Your users' data never leaves your
   infrastructure.
 - **A client SDK** (`ignoti`) - drop it into your app, point it at your server, and you have full auth.
 
-The result is the same experience your users expect from "Sign in with Google" - one tap to register, one tap to log 
-back in, but built on passkeys and cryptographic keys instead of a social account. No passwords. No email 
+The result is the same experience your users expect from "Sign in with Google" - one tap to register, one tap to log
+back in, but built on passkeys and cryptographic keys instead of a social account. No passwords. No email
 verification. Nothing to phish.
 
 ---
@@ -28,18 +28,18 @@ verification. Nothing to phish.
 Ignoti uses a three-layer identity system:
 
 **Root identity (your mnemonic)**
-A 12-word phrase derived into an Ed25519 keypair. Never stored anywhere - not on the server, not in the SDK. Used 
-only for account recovery and high-stakes operations like revoking a device. Lose the phrase, lose the account. Keep 
+A 12-word phrase derived into an Ed25519 keypair. Never stored anywhere - not on the server, not in the SDK. Used
+only for account recovery and high-stakes operations like revoking a device. Lose the phrase, lose the account. Keep
 it like a private key.
 
 **Device identity (your passkey)**
-A WebAuthn passkey bound to the user's authenticator - Touch ID, Face ID, Windows Hello, a hardware key. 
+A WebAuthn passkey bound to the user's authenticator - Touch ID, Face ID, Windows Hello, a hardware key.
 Hardware-backed, phishing-resistant. This is how users log in day to day.
 
 **Session identity (ephemeral)**
 An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key.
-A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session 
-survives page reloads via an httpOnly cookie, the private key is never persisted, only a session token that 
+A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session
+survives page reloads via an httpOnly cookie, the private key is never persisted, only a session token that
 JavaScript cannot read.
 
 The server stores only opaque public keys and UUIDs. No email, no phone, no OAuth token, no PII of any kind.
@@ -48,7 +48,7 @@ The server stores only opaque public keys and UUIDs. No email, no phone, no OAut
 
 ## Who it's for
 
-Builders whose users care about privacy. If you're building for people who use Signal instead of WhatsApp, Proton 
+Builders whose users care about privacy. If you're building for people who use Signal instead of WhatsApp, Proton
 instead of Gmail, or who just don't want to hand their identity to Google to use your app, Ignoti is the auth you want.
 
 ---
@@ -59,11 +59,11 @@ For a full walkthrough see [docs/getting-started.md](./docs/getting-started.md).
 
 **1. Deploy the server**
 
-Ignoti ships as a Docker image. The included `docker-compose.yml` starts the server and a Postgres database 
+Ignoti ships as a Docker image. The included `docker-compose.yml` starts the server and a Postgres database
 together and runs migrations automatically on first boot.
 
 ```bash
-curl -O https://raw.githubusercontent.com/dipsettheory/ignoti/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/docker-compose.yml
 
 # Set RP_ID and RP_ORIGIN for your domain - see Environment variables below
 cp .env.example .env
@@ -111,17 +111,17 @@ ignoti SDK        -->  Fastify and auth routes        -->  users
                           Rate limiting and CORS              challenges
 ```
 
-The SDK handles all cryptography client-side. The server handles verification, challenge issuance, and session 
+The SDK handles all cryptography client-side. The server handles verification, challenge issuance, and session
 management. Your database stores only public keys and opaque identifiers.
 
 ---
 
 ## Self-hosting
 
-Ignoti is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in 
+Ignoti is designed to be self-hosted. User identity data lives in your Postgres database, under your control, in
 your infrastructure. Ignoti never has access to it.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dipsettheory/ignoti) [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/dipsettheory/ignoti)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/bobbysmith/ignoti) [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/bobbysmith/ignoti)
 
 **Environment variables:**
 
@@ -151,8 +151,8 @@ RP_ID=example.com
 RP_ORIGIN=https://app.example.com,https://admin.example.com,https://staging.example.com
 ```
 
-A passkey registered on one subdomain works on every subdomain listed in `RP_ORIGIN`. WebAuthn requires `RP_ID` to 
-be either the exact hostname or a registrable suffix of every origin. The server enforces this match at verification 
+A passkey registered on one subdomain works on every subdomain listed in `RP_ORIGIN`. WebAuthn requires `RP_ID` to
+be either the exact hostname or a registrable suffix of every origin. The server enforces this match at verification
 time.
 
 **Session signature timing:**
@@ -161,7 +161,7 @@ Every authenticated request includes a signed timestamp. The server accepts sign
 
 **Database:**
 
-Ignoti requires Postgres 14 or later. When using Docker Compose, a Postgres container is included and migrations 
+Ignoti requires Postgres 14 or later. When using Docker Compose, a Postgres container is included and migrations
 run automatically on startup. To run migrations manually against an external database:
 
 ```bash
@@ -172,11 +172,11 @@ The server image is published to Docker Hub as `ignoti/server`. You can also bui
 
 **Database maintenance:**
 
-The server prunes expired challenges, nonces, and old sessions itself, running the `ignoti_gc()` function 
-in-process every `GC_INTERVAL_SECONDS` (default 3600). Only one instance sweeps at a time, coordinated by a Postgres 
+The server prunes expired challenges, nonces, and old sessions itself, running the `ignoti_gc()` function
+in-process every `GC_INTERVAL_SECONDS` (default 3600). Only one instance sweeps at a time, coordinated by a Postgres
 advisory lock, so this is safe to run with multiple replicas. No setup is required.
 
-If you would rather drive cleanup from an external scheduler, set `GC_INTERVAL_SECONDS=0` to disable the in-process 
+If you would rather drive cleanup from an external scheduler, set `GC_INTERVAL_SECONDS=0` to disable the in-process
 timer and call the function on a schedule your database supports:
 
 ```sql
@@ -193,7 +193,7 @@ A nightly `pg_dump` is the minimum:
 pg_dump "$DATABASE_URL" --no-owner --no-privileges -Fc -f ignoti-$(date +%F).dump
 ```
 
-For production, use your platform's native point-in-time recovery (Supabase, RDS, and most managed Postgres 
+For production, use your platform's native point-in-time recovery (Supabase, RDS, and most managed Postgres
 providers include this) and verify a restore at least once before going live. Back up at least hourly so you never lose more than an hour of new registrations, and test your restore process so you know how long it takes to come back online. Until the database is restored, users cannot log in.
 
 ---
