@@ -105,7 +105,7 @@ const headers = await ignoti.getSessionHeaders('GET', '/api/feed');
 ```
 Your app (browser)      Ignoti server (you host this)      Your Postgres DB
 ──────────────────      ──────────────────────────────      ────────────────
-ignoti SDK        -->  Fastify and auth routes        -->  users
+ignoti SDK        -->     Fastify and auth routes     -->     users
                           WebAuthn verification               devices
                           Ed25519 session signing             sessions
                           Rate limiting and CORS              challenges
@@ -129,7 +129,7 @@ your infrastructure. Ignoti never has access to it.
 |-------------------------|----------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                                                                   |
 | `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                                                                 |
-| `RP_NAME`               | No       | `Ignoti`               | Display name shown to users in passkey dialogs.                                                                                                               |
+| `RP_NAME`               | No       | `Ignoti`                | Display name shown to users in passkey dialogs.                                                                                                               |
 | `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins.                                         |
 | `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                                                                |
 | `SESSION_TTL_SECONDS`   | No       | `86400` (24 hr)         | How long a session token stays valid. Min: 60, max: 2592000 (30 days).                                                                                        |
