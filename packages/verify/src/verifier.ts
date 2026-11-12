@@ -158,7 +158,7 @@ export class IgnotiVerifier {
    *
    *   app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, handler);
    */
-  fastifyPreHandler(): (req: AuthRequest, reply: AuthReply) => Promise<void> {
+  fastifyPreHandler(): (req: AuthRequest, reply: AuthReply) => Promise<unknown> {
     return async (req, reply) => {
       const result = await this.verify({
         method: req.method,
@@ -167,7 +167,7 @@ export class IgnotiVerifier {
       });
       if (!result.valid) {
         reply.code(401).send({ error: result.error });
-        return;
+        return reply;
       }
       const { valid: _valid, ...session } = result;
       req.ignoti = session;

@@ -271,10 +271,14 @@ describe('IgnotiVerifier', () => {
       const preHandler = makeVerifier().fastifyPreHandler();
       const reply = makeReply();
 
-      await preHandler({ method: 'GET', url: '/api/feed', headers: makeHeaders() }, reply);
+      const returned = await preHandler(
+        { method: 'GET', url: '/api/feed', headers: makeHeaders() },
+        reply
+      );
 
       expect(reply.code).toHaveBeenCalledWith(401);
       expect(reply.send).toHaveBeenCalledWith({ error: SERVER_ERROR_CODES.SESSION_NONCE_USED });
+      expect(returned).toBe(reply);
     });
 
     it('propagates introspection failures', async () => {
