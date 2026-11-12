@@ -63,7 +63,11 @@ function makeSessionHeaders(
 
 function makeSession(
   publicKeyB64: string,
-  overrides: { expires_at?: Date; revoked_at?: Date | null } = {}
+  overrides: {
+    expires_at?: Date;
+    revoked_at?: Date | null;
+    device_revoked_at?: Date | null;
+  } = {}
 ) {
   return {
     session_id: SESSION_ID,
@@ -72,6 +76,7 @@ function makeSession(
     session_public_key: publicKeyB64,
     expires_at: overrides.expires_at ?? new Date(Date.now() + 3_600_000),
     revoked_at: overrides.revoked_at ?? null,
+    device_revoked_at: overrides.device_revoked_at ?? null,
   };
 }
 
@@ -537,6 +542,23 @@ describe('session auth', () => {
           expect.objectContaining({ error: ERROR_CODES.SESSION_REVOKED })
         );
         expect(req.sessionContext).toBeNull();
+      });
+
+      it('returns 401 SESSION_REVOKED when the session is live but its device is revoked', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(
+          makeSession(keypair.publicKeyB64, {
+            device_revoked_at: new Date(Date.now() - 1000),
+          }) as never
+        );
+        const iat = Math.floor(Date.now() / 1000);
+        const req = mockSessionRequest(makeSessionHeaders(SESSION_ID, iat, keypair.privateKey));
+        const reply = makeMockReply();
+        await requireSession(req, reply as never);
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.SESSION_REVOKED })
+        );
+        expect(req.sessionContext).toBeNull();
+        expect(storeNonce).not.toHaveBeenCalled();
       });
 
       it('returns 401 SESSION_EXPIRED when the valid-signature session is past expiry', async () => {

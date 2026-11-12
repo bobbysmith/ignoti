@@ -170,7 +170,8 @@ only usable for a short window. A signature from last week cannot be replayed to
 When a device is revoked, the server marks both the device and all its active sessions revoked in a single database 
 transaction (the rows are hard-deleted later by garbage collection, seven days on). There is no window between the 
 two operations where the device is revoked but its sessions are still live. An attacker cannot race to use an active 
-session after revocation has been issued.
+session after revocation has been issued. Every signed request and every session restore also checks the device 
+itself, so a session created while a revocation was in flight is rejected as well.
 
 ## Sensitive endpoints are rate limited
 

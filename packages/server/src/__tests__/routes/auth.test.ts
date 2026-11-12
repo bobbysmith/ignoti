@@ -53,7 +53,7 @@ vi.mock('../../lib/session-jws.js');
 vi.mock('../../helpers/auth.js');
 
 const VALID_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-const VALID_ROOT_PUBLIC_KEY = 'A'.repeat(32);
+const VALID_ROOT_PUBLIC_KEY = 'A'.repeat(VALIDATION.ROOT_PUBLIC_KEY_LENGTH);
 const VALID_ROOT_SIGNATURE = 'x'.repeat(64);
 const VALID_CREDENTIAL_ID = 'credential-id-base64url';
 const VALID_CHALLENGE = 'challenge-base64url-value';
@@ -61,8 +61,8 @@ const VALID_SESSION_BINDING = 'x'.repeat(64);
 const VALID_DEVICE_ID = 'device-uuid-abcd';
 const VALID_SESSION_PUBLIC_KEY = 'session-pub-key-b64';
 const VALID_SESSION_CHALLENGE = 'session-challenge-value';
-const SHORT_ROOT_PUBLIC_KEY = 'A'.repeat(VALIDATION.MIN_ROOT_PUBLIC_KEY_LENGTH - 1);
-const LONG_ROOT_PUBLIC_KEY = 'A'.repeat(VALIDATION.MAX_ROOT_PUBLIC_KEY_LENGTH + 1);
+const SHORT_ROOT_PUBLIC_KEY = 'A'.repeat(VALIDATION.ROOT_PUBLIC_KEY_LENGTH - 1);
+const LONG_ROOT_PUBLIC_KEY = 'A'.repeat(VALIDATION.ROOT_PUBLIC_KEY_LENGTH + 1);
 const SHORT_ROOT_SIGNATURE = 'x'.repeat(VALIDATION.MIN_ROOT_SIGNATURE_LENGTH - 1);
 const LONG_ROOT_SIGNATURE = 'x'.repeat(VALIDATION.MAX_ROOT_SIGNATURE_LENGTH + 1);
 const SHORT_SESSION_BINDING = 'x'.repeat(VALIDATION.MIN_SESSION_BINDING_LENGTH - 1);
@@ -159,6 +159,22 @@ describe('auth', () => {
         const res = await app.inject({ method: 'POST', url: REGISTER_URL, body: {} });
         expect(res.statusCode).toBe(400);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+
+      it.each([
+        ['has non-zero trailing bits (an alias of another key)', `${'A'.repeat(42)}B`],
+        ['uses the standard base64 alphabet', `${'A'.repeat(42)}+`],
+        ['contains a NUL byte', `${'A'.repeat(42)}\u0000`],
+        ['is padded', `${'A'.repeat(42)}=`],
+      ])('returns 400 INVALID_INPUT when rootPublicKey %s', async (_label, rootPublicKey) => {
+        const res = await app.inject({
+          method: 'POST',
+          url: REGISTER_URL,
+          body: { rootPublicKey },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+        expect(upsertUser).not.toHaveBeenCalled();
       });
 
       it('returns 400 INVALID_INPUT when rootPublicKey is missing', async () => {
@@ -280,6 +296,40 @@ describe('auth', () => {
 
       it('returns 400 INVALID_INPUT when rootSignature is too long', async () => {
         const res = await registerDevice({ rootSignature: LONG_ROOT_SIGNATURE });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+
+      it.each([
+        ['a NUL byte', 'My\u0000Phone'],
+        ['a newline', 'My\nPhone'],
+        ['an escape character', 'My\u001bPhone'],
+      ])('returns 400 INVALID_INPUT when deviceName contains %s', async (_label, deviceName) => {
+        const res = await registerDevice({ deviceName });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+        expect(getUserById).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['is not base64url', 'cred id+/='],
+        ['contains a NUL byte', 'cred\u0000id'],
+        ['is empty', ''],
+      ])('returns 400 INVALID_INPUT when the credential id %s', async (_label, id) => {
+        const res = await registerDevice({
+          registrationResponse: { ...VALID_REGISTRATION_RESPONSE, id, rawId: id },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
+      });
+
+      it('returns 400 INVALID_INPUT when a transport is not a lowercase token', async () => {
+        const res = await registerDevice({
+          registrationResponse: {
+            ...VALID_REGISTRATION_RESPONSE,
+            response: { ...VALID_REGISTRATION_RESPONSE.response, transports: ['usb', 'x\u0000y'] },
+          },
+        });
         expect(res.statusCode).toBe(400);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INPUT });
       });
@@ -979,6 +1029,26 @@ describe('auth', () => {
         );
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
+      });
+
+      it('clears the cookie with the attributes it was set with', async () => {
+        vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(false);
+        const { config } = await import('../../config.js');
+        const original = (config as Record<string, unknown>).COOKIE_SECURE;
+        (config as Record<string, unknown>).COOKIE_SECURE = true;
+        try {
+          const res = await postRestore(undefined, VALID_SESSION_COOKIE);
+          const raw = res.headers['set-cookie'];
+          const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
+          expect(cookieStr).toMatch(/^ignoti_session=;/);
+          expect(cookieStr).toContain('SameSite=None');
+          expect(cookieStr).toContain('Secure');
+          expect(cookieStr).toContain('HttpOnly');
+          expect(cookieStr).toContain('Path=/');
+          expect(cookieStr).toContain('Expires=Thu, 01 Jan 1970');
+        } finally {
+          (config as Record<string, unknown>).COOKIE_SECURE = original;
+        }
       });
 
       it('clears the session cookie on rotation failure', async () => {

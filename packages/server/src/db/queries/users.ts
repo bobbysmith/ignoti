@@ -9,21 +9,22 @@ interface UserId {
   id: string;
 }
 
+// Separate statements: the SELECT needs a snapshot taken after a concurrent
+// insert of the same key commits.
 export async function upsertUser(rootPublicKey: string): Promise<UserId> {
-  const [user] = await sql<UserId[]>`
-    with ins as (
-      insert into users (root_public_key)
-      values (${rootPublicKey})
-      on conflict (root_public_key) do nothing
-      returning id
-    )
-    select id from ins
-    union all
-    select id from users where root_public_key = ${rootPublicKey}
-    limit 1
+  const [inserted] = await sql<UserId[]>`
+    insert into users (root_public_key)
+    values (${rootPublicKey})
+    on conflict (root_public_key) do nothing
+    returning id
   `;
-  if (!user) throw new Error('upsertUser returned no row');
-  return user;
+  if (inserted) return inserted;
+
+  const [existing] = await sql<UserId[]>`
+    select id from users where root_public_key = ${rootPublicKey}
+  `;
+  if (!existing) throw new Error('upsertUser returned no row');
+  return existing;
 }
 
 export async function getUserById(id: string): Promise<UserRow | undefined> {

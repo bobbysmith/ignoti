@@ -1,7 +1,9 @@
+import rateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ERROR_CODES, ERROR_MESSAGES } from '../../constants';
-import { sendError } from '../../helpers/response.js';
+import { registerErrorHandler, sendError } from '../../helpers/response.js';
 
 function makeMockReply() {
   const reply = { code: vi.fn(), send: vi.fn() };
@@ -84,5 +86,75 @@ describe('sendError', () => {
     const reply = makeMockReply();
     const result = sendError(reply as never, 400, ERROR_CODES.INVALID_INPUT);
     expect(result).toBe(reply);
+  });
+});
+
+describe('registerErrorHandler', () => {
+  function buildApp() {
+    const app = Fastify();
+    registerErrorHandler(app);
+    app.post('/boom', async () => {
+      throw Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), {
+        code: '22021',
+      });
+    });
+    app.post('/explicit-500', async () => {
+      throw Object.assign(new Error('secret internal detail'), { statusCode: 500 });
+    });
+    app.post('/teapot', async () => {
+      throw Object.assign(new Error('short and stout'), { statusCode: 418 });
+    });
+    app.post('/echo', async req => req.body);
+    return app;
+  }
+
+  it.each(['/boom', '/explicit-500'])('answers %s with a generic 500 body', async url => {
+    const res = await buildApp().inject({ method: 'POST', url });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      error: ERROR_CODES.INTERNAL_ERROR,
+      message: ERROR_MESSAGES[ERROR_CODES.INTERNAL_ERROR],
+    });
+    expect(res.body).not.toContain('UTF8');
+    expect(res.body).not.toContain('secret internal detail');
+    expect(res.body).not.toContain('22021');
+  });
+
+  it('keeps the status and message of a 4xx error', async () => {
+    const res = await buildApp().inject({ method: 'POST', url: '/teapot' });
+    expect(res.statusCode).toBe(418);
+    expect(res.json()).toMatchObject({ statusCode: 418, message: 'short and stout' });
+  });
+
+  it('keeps the 429 from the rate limiter', async () => {
+    const app = Fastify();
+    registerErrorHandler(app);
+    await app.register(rateLimit, { max: 1, timeWindow: '1 minute' });
+    app.get('/limited', async () => ({ ok: true }));
+    await app.inject({ method: 'GET', url: '/limited' });
+    const res = await app.inject({ method: 'GET', url: '/limited' });
+    expect(res.statusCode).toBe(429);
+    expect(res.headers['retry-after']).toBeDefined();
+    expect(res.json()).toMatchObject({ statusCode: 429 });
+  });
+
+  it("keeps Fastify's own 400 for malformed JSON", async () => {
+    const res = await buildApp().inject({
+      method: 'POST',
+      url: '/echo',
+      headers: { 'content-type': 'application/json' },
+      payload: '{not json',
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("keeps Fastify's own 415 for an unsupported media type", async () => {
+    const res = await buildApp().inject({
+      method: 'POST',
+      url: '/echo',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'a=b',
+    });
+    expect(res.statusCode).toBe(415);
   });
 });

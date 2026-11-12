@@ -132,7 +132,7 @@ export async function verifySessionAuth(
 
   // Classify revoked/expired only after the signature verifies, so the granular
   // state reaches only the session-key holder; a keyless caller sees invalid_signature.
-  if (session.revoked_at) {
+  if (session.revoked_at || session.device_revoked_at) {
     return { ok: false, code: ERROR_CODES.SESSION_REVOKED };
   }
   if (session.expires_at.getTime() <= Date.now()) {

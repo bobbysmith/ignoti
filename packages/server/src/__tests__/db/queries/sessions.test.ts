@@ -93,6 +93,13 @@ describe('sessions db queries', () => {
       expect(joined).not.toContain('expires_at > now()');
     });
 
+    it('selects the device revocation time so the caller can reject revoked devices', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      await getSessionWithUser(SESSION_ID);
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      expect(query).toContain('d.revoked_at as device_revoked_at');
+    });
+
     it('passes sessionId to the query', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await getSessionWithUser(SESSION_ID);
@@ -215,7 +222,8 @@ describe('sessions db queries', () => {
         NEW_PUBLIC_KEY
       );
       const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
-      expect(query).toContain('revoked_at is null');
+      expect(query).toContain('s.revoked_at is null');
+      expect(query).toContain('d.revoked_at is null');
       expect(query).toContain('expires_at > now()');
     });
 

@@ -202,6 +202,22 @@ describe('verifySessionBindingJWS', () => {
   });
 
   describe('sessionChallenge claim', () => {
+    it.each([
+      ['a NUL byte', 'abc\u0000def'],
+      ['characters outside base64url', 'abc def/+='],
+      ['more than 128 characters', 'a'.repeat(129)],
+    ])('throws when sessionChallenge contains %s', async (_label, value) => {
+      const jws = await signSessionJWS(value, keypair);
+      await expect(verifySessionBindingJWS(jws)).rejects.toThrow(
+        'missing or malformed sessionChallenge claim'
+      );
+    });
+
+    it('accepts a UUID (the restore nonce format)', async () => {
+      const jws = await signSessionJWS(crypto.randomUUID(), keypair);
+      await expect(verifySessionBindingJWS(jws)).resolves.toBeDefined();
+    });
+
     it('throws when sessionChallenge is absent from payload', async () => {
       const jwk = {
         kty: 'OKP',
@@ -218,12 +234,16 @@ describe('verifySessionBindingJWS', () => {
         })
         .setIssuedAt()
         .sign(key);
-      await expect(verifySessionBindingJWS(jws)).rejects.toThrow('missing sessionChallenge claim');
+      await expect(verifySessionBindingJWS(jws)).rejects.toThrow(
+        'missing or malformed sessionChallenge claim'
+      );
     });
 
     it('throws when sessionChallenge is an empty string', async () => {
       const jws = await signSessionJWS('', keypair);
-      await expect(verifySessionBindingJWS(jws)).rejects.toThrow('missing sessionChallenge claim');
+      await expect(verifySessionBindingJWS(jws)).rejects.toThrow(
+        'missing or malformed sessionChallenge claim'
+      );
     });
   });
 });

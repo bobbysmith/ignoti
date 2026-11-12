@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { RATE_LIMITS } from './constants.js';
 import { sql } from './db/client.js';
 import { runGc } from './db/queries/gc.js';
+import { registerErrorHandler } from './helpers/response.js';
 import { reqLogSerializer } from './lib/logging.js';
 import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -52,6 +53,7 @@ export async function buildServer() {
     allowList: config.RATE_LIMIT_DISABLED ? () => true : undefined,
   });
 
+  registerErrorHandler(app);
   registerSessionAuthPlugin(app);
 
   await app.register(registerHealthRoutes);

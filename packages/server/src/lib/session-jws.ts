@@ -16,6 +16,9 @@
 import { SESSION_BINDING_TYP, SESSION_JWS_MAX_AGE_SECONDS } from '@ignoti/shared';
 import { decodeProtectedHeader, EmbeddedJWK, type JWTPayload, jwtVerify } from 'jose';
 
+// base64url (server-issued challenge) or a UUID (restore nonce)
+const SESSION_CHALLENGE_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
 interface VerifiedSessionBinding {
   /** base64url Ed25519 public key extracted from the JWS `jwk` header. */
   sessionPublicKey: string;
@@ -58,8 +61,11 @@ export async function verifySessionBindingJWS(jws: string): Promise<VerifiedSess
     maxTokenAge: SESSION_JWS_MAX_AGE_SECONDS,
   });
 
-  if (typeof payload.sessionChallenge !== 'string' || payload.sessionChallenge.length === 0) {
-    throw new Error('missing sessionChallenge claim');
+  if (
+    typeof payload.sessionChallenge !== 'string' ||
+    !SESSION_CHALLENGE_RE.test(payload.sessionChallenge)
+  ) {
+    throw new Error('missing or malformed sessionChallenge claim');
   }
 
   return {

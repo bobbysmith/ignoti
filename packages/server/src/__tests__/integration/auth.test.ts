@@ -566,6 +566,44 @@ describe('Integration: auth happy paths', () => {
     });
   });
 
+  describe('sessions on a revoked device', () => {
+    // Leaves the session row live, as a session insert racing a revocation does.
+    async function revokeDeviceOnly(deviceId: string) {
+      await sql`update devices set revoked_at = now() where id = ${deviceId}`;
+    }
+
+    it('rejects signed requests', async () => {
+      const { deviceId, sessionId, sessionPrivate } = await registerAndLogin(app);
+      await revokeDeviceOnly(deviceId);
+
+      const headers = await buildSessionHeaders('GET', '/api/sessions', sessionId, sessionPrivate);
+      const res = await app.inject({ method: 'GET', url: '/api/sessions', headers });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'session_revoked' });
+    });
+
+    it('rejects session restore', async () => {
+      const { deviceId, sessionCookie } = await registerAndLogin(app);
+      await revokeDeviceOnly(deviceId);
+
+      const res = await restoreWithCookie(app, sessionCookie);
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe('concurrent registration of one root key', () => {
+    it('returns the same userId to every caller without erroring', async () => {
+      const { publicKeyB64: rootPublicKey } = await generateRootKeypair();
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          app.inject({ method: 'POST', url: '/api/auth/register', payload: { rootPublicKey } })
+        )
+      );
+      expect(responses.map(r => r.statusCode)).toEqual(Array(10).fill(200));
+      expect(new Set(responses.map(r => r.json<{ userId: string }>().userId)).size).toBe(1);
+    });
+  });
+
   describe('authorization boundaries', () => {
     it("cannot revoke another user's session", async () => {
       const { sessionId: sessionIdA, sessionPrivate: sessionPrivateA } =

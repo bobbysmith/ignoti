@@ -32,6 +32,7 @@ export const RATE_LIMITS = {
 } as const;
 
 export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
+  [SERVER_ERROR_CODES.INTERNAL_ERROR]: 'Internal server error',
   [SERVER_ERROR_CODES.INVALID_INPUT]: 'Request validation failed',
   [SERVER_ERROR_CODES.USER_NOT_FOUND]: 'User not found',
   [SERVER_ERROR_CODES.DEVICE_NOT_FOUND]: 'Device not found',

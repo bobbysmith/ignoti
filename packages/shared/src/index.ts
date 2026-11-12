@@ -63,8 +63,8 @@ export const IGNOTI_HEADERS = {
 // Changing any value here requires a coordinated update to both packages.
 export const PROTOCOL_VALIDATION = {
   MAX_DEVICE_NAME_LENGTH: 100,
-  MIN_ROOT_PUBLIC_KEY_LENGTH: 16,
-  MAX_ROOT_PUBLIC_KEY_LENGTH: 1024,
+  // base64url (no padding) of a 32-byte Ed25519 public key
+  ROOT_PUBLIC_KEY_LENGTH: 43,
   MIN_ROOT_SIGNATURE_LENGTH: 16,
   MAX_ROOT_SIGNATURE_LENGTH: 1024,
   MIN_SESSION_BINDING_LENGTH: 64,
@@ -79,6 +79,7 @@ export const SERVER_ERROR_CODES = {
   CREDENTIAL_ALREADY_REGISTERED: 'credential_already_registered',
   DEVICE_NOT_FOUND: 'device_not_found',
   INVALID_AUTHORIZATION_SCHEME: 'invalid_authorization_scheme',
+  INTERNAL_ERROR: 'internal_error',
   INVALID_INPUT: 'invalid_input',
   INVALID_OR_EXPIRED_CHALLENGE: 'invalid_or_expired_challenge',
   INVALID_OR_EXPIRED_SESSION_CHALLENGE: 'invalid_or_expired_session_challenge',

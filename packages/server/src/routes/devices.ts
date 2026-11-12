@@ -7,6 +7,7 @@ import {
 } from '../db/queries/devices.js';
 import { getUserById } from '../db/queries/users.js';
 import { sendError } from '../helpers/response.js';
+import { errSummary } from '../lib/logging.js';
 import { verifyDeviceBindingJWS } from '../lib/root-jws.js';
 import { requireSession } from '../plugins/session-auth.js';
 import { revokeDeviceBody, revokeDeviceParams } from '../schemas/devices.js';
@@ -78,7 +79,7 @@ export async function registerDeviceRoutes(app: FastifyInstance) {
           challenge: deviceId,
         });
       } catch (err) {
-        req.log.warn({ err }, 'root signature verification failed');
+        req.log.warn({ reason: errSummary(err) }, 'root signature verification failed');
         return sendError(reply, 401, ERROR_CODES.INVALID_ROOT_SIGNATURE);
       }
 

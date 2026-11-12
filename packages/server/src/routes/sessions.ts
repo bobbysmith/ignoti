@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { ERROR_CODES, ROUTES, SESSION_COOKIE_NAME } from '../constants.js';
+import { ERROR_CODES, ROUTES } from '../constants.js';
 import {
   getSessionsForUser,
   revokeAllSessionsForUser,
   revokeSessionForUser,
 } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
+import { clearSessionCookie } from '../lib/session-cookie.js';
 import { requireSession, verifySessionAuth } from '../plugins/session-auth.js';
 import { revokeSessionParams, verifySessionBody } from '../schemas/sessions.js';
 
@@ -103,7 +104,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
     }
 
     if (targetSessionId === currentSessionId) {
-      reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+      clearSessionCookie(reply);
     }
 
     req.log.info({ targetSessionId, currentSessionId, userId }, 'session revoked');
@@ -123,7 +124,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
     // biome-ignore lint/style/noNonNullAssertion: requireSession preHandler guarantees non-null
     const { userId } = req.sessionContext!;
     const revoked = await revokeAllSessionsForUser(userId);
-    reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+    clearSessionCookie(reply);
     req.log.info({ userId, revoked }, 'all sessions revoked');
     return reply.send({ revoked });
   });

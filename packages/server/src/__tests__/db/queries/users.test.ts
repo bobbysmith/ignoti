@@ -19,12 +19,21 @@ describe('users db queries', () => {
       await expect(upsertUser(ROOT_PUBLIC_KEY)).resolves.toEqual({ id: USER_ID });
     });
 
-    it('returns { id } when INSERT conflicts (existing rootPublicKey — idempotent upsert)', async () => {
+    it('does not run the SELECT when the INSERT returns a row', async () => {
       vi.mocked(sql).mockResolvedValueOnce([{ id: USER_ID }] as never);
-      await expect(upsertUser(ROOT_PUBLIC_KEY)).resolves.toEqual({ id: USER_ID });
+      await upsertUser(ROOT_PUBLIC_KEY);
+      expect(sql).toHaveBeenCalledTimes(1);
     });
 
-    it('throws "upsertUser returned no row" when INSERT returns empty array', async () => {
+    it('returns the existing { id } from a second statement when the INSERT conflicts', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
+      vi.mocked(sql).mockResolvedValueOnce([{ id: USER_ID }] as never);
+      await expect(upsertUser(ROOT_PUBLIC_KEY)).resolves.toEqual({ id: USER_ID });
+      expect(sql).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws "upsertUser returned no row" when neither statement returns a row', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([] as never);
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(upsertUser(ROOT_PUBLIC_KEY)).rejects.toThrow('upsertUser returned no row');
     });

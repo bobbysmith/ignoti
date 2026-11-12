@@ -1,6 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { reqLogSerializer } from '../../lib/logging.js';
+import { errSummary, reqLogSerializer } from '../../lib/logging.js';
 
 describe('reqLogSerializer', () => {
   it('keeps only method and url', () => {
@@ -32,5 +32,30 @@ describe('reqLogSerializer', () => {
     expect(out).not.toHaveProperty('remotePort');
     expect(out).not.toHaveProperty('ip');
     expect(JSON.stringify(out)).not.toContain('198.51.100.9');
+  });
+});
+
+describe('errSummary', () => {
+  it('keeps name, code, and message only', () => {
+    const err = Object.assign(new Error('"exp" claim timestamp check failed'), {
+      name: 'JWTExpired',
+      code: 'ERR_JWT_EXPIRED',
+      payload: { userId: 'u-1', credentialId: 'cred-1', challenge: 'chal' },
+      detail: 'Key (credential_id)=(cred-1) already exists.',
+    });
+    expect(errSummary(err)).toEqual({
+      name: 'JWTExpired',
+      code: 'ERR_JWT_EXPIRED',
+      message: '"exp" claim timestamp check failed',
+    });
+  });
+
+  it('omits a non-string code', () => {
+    const err = Object.assign(new Error('boom'), { code: 42 });
+    expect(errSummary(err).code).toBeUndefined();
+  });
+
+  it('does not serialize non-Error values', () => {
+    expect(errSummary({ secret: 'x' })).toEqual({ message: 'non-error thrown' });
   });
 });

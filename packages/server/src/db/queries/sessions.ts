@@ -20,6 +20,7 @@ interface SessionAuthRow {
   device_id: string;
   expires_at: Date;
   revoked_at: Date | null;
+  device_revoked_at: Date | null;
 }
 
 interface SessionListRow {
@@ -58,7 +59,8 @@ export async function insertSession(params: InsertSessionParams): Promise<Sessio
 // session-key holder learns the granular state.
 export async function getSessionWithUser(sessionId: string): Promise<SessionAuthRow | undefined> {
   const [row] = await sql<SessionAuthRow[]>`
-    select s.session_public_key, s.device_id, s.expires_at, s.revoked_at, d.user_id
+    select s.session_public_key, s.device_id, s.expires_at, s.revoked_at, d.user_id,
+           d.revoked_at as device_revoked_at
     from sessions s
     join devices d on d.id = s.device_id
     where s.id = ${sessionId}
@@ -79,6 +81,7 @@ export async function getSessionsForUser(userId: string): Promise<SessionListRow
     from sessions s
     join devices d on d.id = s.device_id
     where d.user_id = ${userId}
+      and d.revoked_at is null
       and s.revoked_at is null
       and s.expires_at > now()
     order by s.created_at desc
@@ -107,6 +110,7 @@ export async function rotateSessionOnRestore(
       and s.device_id = d.id
       and s.restore_family_hash = ${familyHash}
       and s.restore_token_hash = ${presentedHash}
+      and d.revoked_at is null
       and s.revoked_at is null
       and s.expires_at > now()
     returning d.user_id, s.device_id, s.expires_at

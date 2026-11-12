@@ -34,6 +34,7 @@ import {
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../helpers/auth.js';
 import { sendError } from '../helpers/response.js';
+import { errSummary } from '../lib/logging.js';
 import {
   buildSessionCookie,
   generateRestoreToken,
@@ -41,6 +42,7 @@ import {
   parseSessionCookie,
 } from '../lib/restore-token.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../lib/root-jws.js';
+import { clearSessionCookie, setSessionCookie } from '../lib/session-cookie.js';
 import { verifySessionBindingJWS } from '../lib/session-jws.js';
 import {
   loginBody,
@@ -49,17 +51,6 @@ import {
   registerDeviceBody,
   sessionBody,
 } from '../schemas/auth.js';
-
-function sessionCookieOptions() {
-  const secure = config.COOKIE_SECURE;
-  return {
-    httpOnly: true,
-    secure,
-    sameSite: secure ? ('none' as const) : ('lax' as const),
-    path: '/',
-    maxAge: config.SESSION_TTL_SECONDS,
-  };
-}
 
 export async function registerAuthRoutes(app: FastifyInstance) {
   /**
@@ -116,7 +107,10 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       try {
         expectedChallenge = extractChallenge(registrationResponse);
       } catch (err) {
-        req.log.warn({ err }, 'failed to extract challenge from registration response');
+        req.log.warn(
+          { reason: errSummary(err) },
+          'failed to extract challenge from registration response'
+        );
         return sendError(reply, 400, ERROR_CODES.INVALID_INPUT);
       }
 
@@ -153,7 +147,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           challenge: expectedChallenge,
         });
       } catch (err) {
-        req.log.warn({ err }, 'root signature verification failed');
+        req.log.warn({ reason: errSummary(err) }, 'root signature verification failed');
         return sendError(reply, 401, ERROR_CODES.INVALID_ROOT_SIGNATURE);
       }
 
@@ -168,7 +162,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           requireUserVerification: true,
         });
       } catch (err) {
-        req.log.warn({ err }, 'webauthn verification failed');
+        req.log.warn({ reason: errSummary(err) }, 'webauthn verification failed');
         return sendError(reply, 401, ERROR_CODES.ATTESTATION_VERIFICATION_FAILED);
       }
       if (!verification.verified || !verification.registrationInfo) {
@@ -195,7 +189,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       } catch (err) {
         if ((err as Record<string, unknown>).code === '23505') {
           // unique violation
-          req.log.warn({ err }, 'credential already registered');
+          req.log.warn({ reason: errSummary(err) }, 'credential already registered');
           return sendError(reply, 409, ERROR_CODES.CREDENTIAL_ALREADY_REGISTERED);
         }
         throw err;
@@ -264,7 +258,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     try {
       expectedChallenge = extractChallenge(assertion);
     } catch (err) {
-      req.log.warn({ err }, 'failed to extract challenge from login assertion');
+      req.log.warn({ reason: errSummary(err) }, 'failed to extract challenge from login assertion');
       return sendError(reply, 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -292,7 +286,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         },
       });
     } catch (err) {
-      req.log.warn({ err }, 'webauthn authentication verification failed');
+      req.log.warn({ reason: errSummary(err) }, 'webauthn authentication verification failed');
       return sendError(reply, 401, ERROR_CODES.ASSERTION_VERIFICATION_FAILED);
     }
     if (!verification.verified) {
@@ -339,7 +333,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       try {
         verified = await verifySessionBindingJWS(sessionBinding);
       } catch (err) {
-        req.log.warn({ err }, 'session binding verification failed');
+        req.log.warn({ reason: errSummary(err) }, 'session binding verification failed');
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
@@ -364,11 +358,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         expiresAt,
       });
 
-      reply.setCookie(
-        SESSION_COOKIE_NAME,
-        buildSessionCookie(session.id, family.secret, secret),
-        sessionCookieOptions()
-      );
+      setSessionCookie(reply, buildSessionCookie(session.id, family.secret, secret));
 
       return reply.send({
         sessionId: session.id,
@@ -404,7 +394,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       const cookie = req.cookies[SESSION_COOKIE_NAME];
       const parsedCookie = cookie ? parseSessionCookie(cookie) : null;
       if (!parsedCookie || !z.string().uuid().safeParse(parsedCookie.sessionId).success) {
-        reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+        clearSessionCookie(reply);
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
       const { sessionId, family, secret } = parsedCookie;
@@ -419,7 +409,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       try {
         verified = await verifySessionBindingJWS(sessionBinding);
       } catch (err) {
-        req.log.warn({ err }, 'session restore: binding verification failed');
+        req.log.warn({ reason: errSummary(err) }, 'session restore: binding verification failed');
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
@@ -441,15 +431,11 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         if (reuseDetected) {
           req.log.warn({ sessionId }, 'session restore token reuse detected; session revoked');
         }
-        reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+        clearSessionCookie(reply);
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
 
-      reply.setCookie(
-        SESSION_COOKIE_NAME,
-        buildSessionCookie(sessionId, family, rotated.secret),
-        sessionCookieOptions()
-      );
+      setSessionCookie(reply, buildSessionCookie(sessionId, family, rotated.secret));
 
       return reply.send({
         sessionId,
