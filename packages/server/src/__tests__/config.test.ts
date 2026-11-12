@@ -199,6 +199,25 @@ describe('config', () => {
     });
   });
 
+  describe('PUBLIC_URL', () => {
+    it('defaults to http://localhost:8787', async () => {
+      stubEnv();
+      const config = await loadConfig();
+      expect(config.PUBLIC_URL).toBe('http://localhost:8787');
+    });
+
+    it('strips a trailing slash', async () => {
+      stubEnv({ PUBLIC_URL: 'https://auth.example.com/' });
+      const config = await loadConfig();
+      expect(config.PUBLIC_URL).toBe('https://auth.example.com');
+    });
+
+    it('throws when it is not a URL', async () => {
+      stubEnv({ PUBLIC_URL: 'auth.example.com' });
+      await expect(loadConfig()).rejects.toThrow();
+    });
+  });
+
   describe('TRUST_PROXY', () => {
     it('defaults to false (no proxy trusted) when TRUST_PROXY is not set', async () => {
       stubEnv();

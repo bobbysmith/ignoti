@@ -222,13 +222,14 @@ Returns: `boolean`
 
 ---
 
-### `ignoti.getSessionHeaders(method, path)`
+### `ignoti.getSessionHeaders(method, url)`
 
-Returns signed headers to attach to an authenticated request to your backend. The method and path must match the request exactly.
+Returns signed headers to attach to an authenticated request to your backend. The signature covers the method and the full URL (host, path, and query string), so the headers are only valid for that exact request. The request body is not covered.
 
 ```ts
-const headers = await ignoti.getSessionHeaders('GET', '/api/feed');
-const res = await fetch('https://api.example.com/api/feed', { headers });
+const url = 'https://api.example.com/api/feed?page=2';
+const headers = await ignoti.getSessionHeaders('GET', url);
+const res = await fetch(url, { headers });
 ```
 
 If the session is expired, automatically attempts to restore it before signing. Do not cache the result - each call generates a fresh signature with a unique nonce.
@@ -240,7 +241,7 @@ Your backend validates these headers by forwarding them to the Ignoti server's `
 | Name     | Type     | Description                                                  |
 |----------|----------|--------------------------------------------------------------|
 | `method` | `string` | HTTP method of the request (`GET`, `POST`, etc.)             |
-| `path`   | `string` | Path of the request, exactly as your backend will receive it |
+| `url`    | `string` | URL of the request, including any query string. A relative URL resolves against the page URL |
 
 Returns: `Promise<Record<string, string>>`
 

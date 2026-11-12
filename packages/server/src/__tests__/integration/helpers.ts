@@ -1,5 +1,11 @@
-import { canonicalJson, ROOT_BINDING_TYP, SESSION_BINDING_TYP } from '@ignoti/shared';
+import {
+  canonicalJson,
+  canonicalRequestUrl,
+  ROOT_BINDING_TYP,
+  SESSION_BINDING_TYP,
+} from '@ignoti/shared';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { config } from '../../config.js';
 import { sql } from '../../db/client.js';
 
 export { runMigrations } from '../../db/migrate.js';
@@ -57,15 +63,25 @@ export async function signSessionBindingJWS(
     .sign(privateKey);
 }
 
-export async function buildSessionHeaders(
+export function buildSessionHeaders(
   method: string,
   path: string,
   sessionId: string,
   privateKey: CryptoKey
 ): Promise<Record<string, string>> {
+  return buildSessionHeadersForUrl(method, `${config.PUBLIC_URL}${path}`, sessionId, privateKey);
+}
+
+export async function buildSessionHeadersForUrl(
+  method: string,
+  url: string,
+  sessionId: string,
+  privateKey: CryptoKey
+): Promise<Record<string, string>> {
   const iat = Math.floor(Date.now() / 1000);
   const jti = crypto.randomUUID();
-  const payload = { htm: method.toUpperCase(), htu: path, iat, jti, sessionId };
+  const htu = canonicalRequestUrl(url);
+  const payload = { htm: method.toUpperCase(), htu, iat, jti, sessionId };
   const bytes = new TextEncoder().encode(canonicalJson(payload));
   const sigBuffer = await crypto.subtle.sign('Ed25519', privateKey, bytes);
   const signature = Buffer.from(sigBuffer).toString('base64url');

@@ -347,15 +347,47 @@ describe('Ignoti', () => {
   });
 
   describe('getSessionHeaders', () => {
+    const DATA_URL = 'https://api.example.com/api/data';
+
+    it('signs the full URL including the query string, without the fragment', async () => {
+      const { g } = await withSession();
+      await g.getSessionHeaders('get', 'https://API.example.com/api/data?page=2#top');
+      expect(mockApiClientSignRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({ htm: 'GET', htu: 'https://api.example.com/api/data?page=2' }),
+        expect.anything()
+      );
+    });
+
+    it('resolves a relative URL against the page URL', async () => {
+      const { g } = await withSession();
+      vi.stubGlobal('location', { href: 'https://app.example.com/dashboard' });
+      try {
+        await g.getSessionHeaders('GET', '/api/data?page=2');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(mockApiClientSignRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({ htu: 'https://app.example.com/api/data?page=2' }),
+        expect.anything()
+      );
+    });
+
+    it('throws INVALID_INPUT for a relative URL when there is no page URL', async () => {
+      const { g } = await withSession();
+      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as IgnotiError;
+      expect(err).toBeInstanceOf(IgnotiError);
+      expect(err.code).toBe(ErrorCodes.INVALID_INPUT);
+    });
+
     it('throws NO_KEYS when no session', async () => {
       const g = initializedSdk();
-      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow(IgnotiError);
+      await expect(g.getSessionHeaders('GET', DATA_URL)).rejects.toThrow(IgnotiError);
     });
 
     it('propagates restore error when session is expired and restore fails', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
       mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
-      await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
+      await expect(g.getSessionHeaders('GET', DATA_URL)).rejects.toThrow('restore failed');
     });
 
     it('stops attempting restore after the failure cap, same as the 401 interceptor', async () => {
@@ -364,17 +396,17 @@ describe('Ignoti', () => {
       mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
 
       for (let i = 0; i < 3; i++) {
-        await expect(g.getSessionHeaders('GET', '/api/data')).rejects.toThrow('restore failed');
+        await expect(g.getSessionHeaders('GET', DATA_URL)).rejects.toThrow('restore failed');
       }
 
-      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as IgnotiError;
+      const err = (await g.getSessionHeaders('GET', DATA_URL).catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
       expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
     });
 
     it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
       const { g, sessionId } = await withSession();
-      const headers = await g.getSessionHeaders('GET', '/api/data');
+      const headers = await g.getSessionHeaders('GET', DATA_URL);
       expect(headers.Authorization).toBe(`Ignoti-Session ${sessionId}`);
       expect(headers['X-Ignoti-Nonce']).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -397,7 +429,7 @@ describe('Ignoti', () => {
         expiresAt: Date.now() + 3_600_000,
       });
 
-      const headers = await g.getSessionHeaders('GET', '/api/data');
+      const headers = await g.getSessionHeaders('GET', DATA_URL);
 
       expect(mockRestoreSession).toHaveBeenCalledTimes(1);
       expect(headers.Authorization).toBe('Ignoti-Session sess-restored');
@@ -429,7 +461,7 @@ describe('Ignoti', () => {
         }
       });
 
-      const err = (await g.getSessionHeaders('GET', '/api/data').catch(e => e)) as IgnotiError;
+      const err = (await g.getSessionHeaders('GET', DATA_URL).catch(e => e)) as IgnotiError;
       expect(err).toBeInstanceOf(IgnotiError);
       expect(err.code).toBe(ErrorCodes.NO_KEYS);
     });
@@ -810,7 +842,7 @@ describe('Ignoti', () => {
       await onUnauthorized('delete', '/api/sessions/sess-1');
 
       expect(mockApiClientSignRequest).toHaveBeenLastCalledWith(
-        expect.objectContaining({ htm: 'DELETE', htu: '/api/sessions/sess-1' }),
+        expect.objectContaining({ htm: 'DELETE', htu: 'http://localhost/api/sessions/sess-1' }),
         expect.anything()
       );
     });

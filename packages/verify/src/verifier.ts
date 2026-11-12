@@ -49,6 +49,7 @@ function pluckHeader(headers: IncomingHeaders, wantedLower: string): string | un
 
 export class IgnotiVerifier {
   private readonly serverUrl: string;
+  private readonly publicUrl: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
@@ -58,7 +59,13 @@ export class IgnotiVerifier {
     } catch {
       throw new IgnotiVerifyError(`Invalid serverUrl: ${options.serverUrl}`);
     }
+    try {
+      new URL(options.publicUrl);
+    } catch {
+      throw new IgnotiVerifyError(`Invalid publicUrl: ${options.publicUrl}`);
+    }
     this.serverUrl = options.serverUrl.replace(/\/$/, '');
+    this.publicUrl = options.publicUrl.replace(/\/+$/, '');
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = options.fetch ?? fetch;
   }
@@ -91,7 +98,8 @@ export class IgnotiVerifier {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           method: input.method,
-          path: input.path,
+          // Paths resolve against publicUrl; the Host header is client-controlled.
+          url: input.url.startsWith('/') ? `${this.publicUrl}${input.url}` : input.url,
           authorization,
           nonce,
           timestamp,
@@ -135,7 +143,7 @@ export class IgnotiVerifier {
     return (req, res, next) => {
       this.verify({
         method: req.method,
-        path: (req.originalUrl ?? req.url).split('?')[0] as string,
+        url: req.originalUrl ?? req.url,
         headers: req.headers,
       })
         .then(result => {
@@ -162,7 +170,7 @@ export class IgnotiVerifier {
     return async (req, reply) => {
       const result = await this.verify({
         method: req.method,
-        path: req.url.split('?')[0] as string,
+        url: req.url,
         headers: req.headers,
       });
       if (!result.valid) {

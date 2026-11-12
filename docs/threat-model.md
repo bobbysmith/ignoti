@@ -207,6 +207,9 @@ These are not optional. A deployment that violates them is not implementing the 
 - **Per-RP user handles** - to harden against cross-site correlation by colluding integrators.
 - **Hardware attestation policy** - currently `attestation: 'none'`. Stricter policies for high-stakes deployments.
 - **Anonymity set analysis** - at what user count does pseudonymity become practically anonymous?
+- **Request body signing** - session request signatures cover the method and full URL but not the body. For 
+  high-value writes (payments, admin actions), bind a body digest into the signature and require it on any request 
+  that carries a body.
 
 ## 10. Reporting vulnerabilities
 

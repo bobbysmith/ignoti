@@ -17,6 +17,7 @@ import { sql } from '../../db/client.js';
 import { buildServer } from '../../index.js';
 import {
   buildSessionHeaders,
+  buildSessionHeadersForUrl,
   cleanDatabase,
   generateRootKeypair,
   generateSessionKeypair,
@@ -508,6 +509,60 @@ describe('Integration: auth happy paths', () => {
       const res = await app.inject({ method: 'GET', url: '/api/sessions', headers: getHeaders });
       expect(res.statusCode).toBe(401);
       expect(res.json()).toMatchObject({ error: 'session_revoked' });
+    });
+  });
+
+  describe('POST /api/sessions/verify URL binding', () => {
+    const SIGNED_URL = 'https://api.example.com/orders?id=1';
+
+    async function verifyAs(url: string, headers: Record<string, string>) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/sessions/verify',
+        payload: {
+          method: 'GET',
+          url,
+          authorization: headers.Authorization,
+          nonce: headers['X-Ignoti-Nonce'],
+          timestamp: headers['X-Ignoti-Timestamp'],
+          signature: headers['X-Ignoti-Signature'],
+        },
+      });
+      return res.json<{ valid: boolean; error?: string; userId?: string }>();
+    }
+
+    it('accepts headers for the exact URL they were signed for', async () => {
+      const { sessionId, sessionPrivate, userId } = await registerAndLogin(app);
+      const headers = await buildSessionHeadersForUrl('GET', SIGNED_URL, sessionId, sessionPrivate);
+      expect(await verifyAs(SIGNED_URL, headers)).toMatchObject({ valid: true, userId });
+    });
+
+    it.each([
+      ['another backend', 'https://billing.example.com/orders?id=1'],
+      ['another path', 'https://api.example.com/refunds?id=1'],
+      ['another query string', 'https://api.example.com/orders?id=2'],
+    ])('rejects the same headers replayed against %s', async (_label, replayUrl) => {
+      const { sessionId, sessionPrivate } = await registerAndLogin(app);
+      const headers = await buildSessionHeadersForUrl('GET', SIGNED_URL, sessionId, sessionPrivate);
+      expect(await verifyAs(replayUrl, headers)).toEqual({
+        valid: false,
+        error: 'invalid_session_signature',
+      });
+      // A rejected replay does not consume the nonce.
+      expect(await verifyAs(SIGNED_URL, headers)).toMatchObject({ valid: true });
+    });
+
+    it('rejects headers signed for a backend when replayed at an Ignoti route', async () => {
+      const { sessionId, sessionPrivate } = await registerAndLogin(app);
+      const headers = await buildSessionHeadersForUrl(
+        'GET',
+        'https://api.example.com/api/sessions',
+        sessionId,
+        sessionPrivate
+      );
+      const res = await app.inject({ method: 'GET', url: '/api/sessions', headers });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'invalid_session_signature' });
     });
   });
 

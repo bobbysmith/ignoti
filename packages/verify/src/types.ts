@@ -6,6 +6,8 @@ export type IncomingHeaders = Record<string, string | string[] | undefined>;
 export interface IgnotiVerifierOptions {
   // Base URL of your self-hosted Ignoti server, e.g. `http://ignoti.internal:8787`.
   serverUrl: string;
+  // Public base URL of your backend as clients address it, e.g. `https://api.example.com`.
+  publicUrl: string;
   // Abort the verification request after this many milliseconds. Default: 5000.
   timeoutMs?: number;
   // Custom fetch implementation (dependency injection for tests/edge runtimes).
@@ -15,8 +17,9 @@ export interface IgnotiVerifierOptions {
 export interface VerifyInput {
   // HTTP method of the request your backend received.
   method: string;
-  // Path of the request, exactly as the client signed it (query string is ignored).
-  path: string;
+  // URL of the request your backend received, including any query string.
+  // Either absolute, or a path starting with `/` (resolved against `publicUrl`).
+  url: string;
   // Headers of the request your backend received.
   headers: IncomingHeaders;
 }

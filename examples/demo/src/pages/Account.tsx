@@ -95,11 +95,11 @@ export function Account() {
     setApiError(null);
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8787';
-    const path = '/api/sessions';
+    const url = `${backendUrl}/api/sessions`;
 
     let headers: Record<string, string>;
     try {
-      headers = await ignoti.getSessionHeaders('GET', path);
+      headers = await ignoti.getSessionHeaders('GET', url);
       setSignedHeaders(headers);
     } catch {
       setSignedHeaders(null);
@@ -107,7 +107,7 @@ export function Account() {
     }
 
     try {
-      const res = await fetch(`${backendUrl}${path}`, { headers, credentials: 'include' });
+      const res = await fetch(url, { headers, credentials: 'include' });
       const body = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
         setApiError(`rejected: ${String(body.error ?? res.status)}`);

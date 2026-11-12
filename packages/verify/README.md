@@ -12,6 +12,7 @@ import { IgnotiVerifier } from '@ignoti/verify';
 
 const verifier = new IgnotiVerifier({
   serverUrl: 'https://your-ignoti-server.example.com',
+  publicUrl: 'https://api.example.com', // this backend, as the browser addresses it
 });
 ```
 
@@ -39,7 +40,7 @@ app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, async req => {
 ```ts
 const result = await verifier.verify({
   method: req.method,
-  path: req.path, // must match the path the client signed
+  url: req.originalUrl, // path and query string, or the full URL
   headers: req.headers,
 });
 
@@ -52,11 +53,15 @@ if (result.valid) {
 
 ## How it works
 
-Each call forwards the four session headers plus the method and path to your Ignoti server's
+Each call forwards the four session headers plus the method and full URL to your Ignoti server's
 `POST /api/sessions/verify` endpoint (RFC 7662-style introspection). The server runs the full check -
 Ed25519 signature, session revocation and expiry, timestamp window, and single-use nonce - and returns the
 authenticated identity. Verification is centralized by design: instant revocation and replay prevention
 require the Ignoti server's state, so sessions cannot be verified offline.
+
+The signature covers the method and the full request URL: host, path, and query string. Headers signed for
+another backend, another path, or another query are rejected. The host comes from `publicUrl`, never from the
+`Host` header, which the sender controls. The request body is not covered by the signature.
 
 Rules:
 
@@ -73,6 +78,7 @@ or a malformed response. An invalid session is a *successful* introspection and 
 | Option      | Default | Description                                             |
 |-------------|---------|---------------------------------------------------------|
 | `serverUrl` | -       | Base URL of your self-hosted Ignoti server. Required.  |
+| `publicUrl` | -       | Public base URL of your backend. Required.              |
 | `timeoutMs` | `5000`  | Abort the verification request after this many ms.      |
 | `fetch`     | global  | Custom fetch implementation (tests, edge runtimes).     |
 

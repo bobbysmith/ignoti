@@ -16,6 +16,16 @@ export function canonicalJson(payload: unknown): string {
   return `{${pairs.join(',')}}`;
 }
 
+/**
+ * Canonical `htu` for session request signatures: the absolute URL with its
+ * query string and without the fragment. Throws if `url` is not absolute.
+ */
+export function canonicalRequestUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = '';
+  return parsed.href;
+}
+
 // JWS type identifiers — provide cross-protocol isolation (RFC 8725 §3.11)
 // so a token minted for one purpose cannot be misread as another.
 export const ROOT_BINDING_TYP = 'ignoti-root-binding+jwt';

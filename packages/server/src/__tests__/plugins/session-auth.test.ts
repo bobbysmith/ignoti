@@ -12,6 +12,10 @@ import { storeNonce } from '../../db/queries/nonces.js';
 import { getSessionWithUser, touchSession } from '../../db/queries/sessions.js';
 import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
 
+const PUBLIC_URL = 'https://auth.example.com';
+
+vi.mock('../../config.js', () => ({ config: { PUBLIC_URL: 'https://auth.example.com' } }));
+
 vi.mock('../../db/queries/sessions.js', () => ({
   getSessionWithUser: vi.fn(),
   touchSession: vi.fn(),
@@ -43,7 +47,7 @@ function makeSessionHeaders(
   sessionId: string,
   iat: number,
   privateKey: KeyObject,
-  htu = DEFAULT_PATH,
+  htu = `${PUBLIC_URL}${DEFAULT_PATH}`,
   htm = DEFAULT_METHOD,
   jti = crypto.randomUUID()
 ) {
@@ -426,6 +430,46 @@ describe('session auth', () => {
     });
 
     describe('signature verification', () => {
+      it.each([
+        ['a different host', 'https://other.example.com/api/devices', '/api/devices'],
+        ['a different path', `${PUBLIC_URL}/api/sessions`, '/api/devices'],
+        ['a different query string', `${PUBLIC_URL}/api/devices?page=1`, '/api/devices?page=2'],
+        ['no query string', `${PUBLIC_URL}/api/devices`, '/api/devices?page=2'],
+      ])('rejects a signature made for %s', async (_label, signedUrl, requestUrl) => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const iat = Math.floor(Date.now() / 1000);
+        const reply = makeMockReply();
+        await requireSession(
+          mockSessionRequest(
+            makeSessionHeaders(SESSION_ID, iat, keypair.privateKey, signedUrl),
+            requestUrl
+          ),
+          reply as never
+        );
+        expect(reply.send).toHaveBeenCalledWith(
+          expect.objectContaining({ error: ERROR_CODES.INVALID_SESSION_SIGNATURE })
+        );
+        expect(storeNonce).not.toHaveBeenCalled();
+      });
+
+      it('accepts a signature that covers the query string', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        vi.mocked(storeNonce).mockResolvedValue(true);
+        vi.mocked(touchSession).mockResolvedValue(undefined);
+        const iat = Math.floor(Date.now() / 1000);
+        const req = mockSessionRequest(
+          makeSessionHeaders(
+            SESSION_ID,
+            iat,
+            keypair.privateKey,
+            `${PUBLIC_URL}/api/devices?page=2`
+          ),
+          '/api/devices?page=2'
+        );
+        await requireSession(req, makeMockReply() as never);
+        expect(req.sessionContext?.sessionId).toBe(SESSION_ID);
+      });
+
       it('returns 401 INVALID_SESSION_SIGNATURE when signature is valid base64url but wrong bytes', async () => {
         vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
         const iat = Math.floor(Date.now() / 1000);
@@ -536,7 +580,7 @@ describe('session auth', () => {
               SESSION_ID,
               iat,
               keypair.privateKey,
-              DEFAULT_PATH,
+              `${PUBLIC_URL}${DEFAULT_PATH}`,
               DEFAULT_METHOD,
               jti
             )

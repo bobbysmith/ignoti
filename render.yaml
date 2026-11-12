@@ -9,6 +9,8 @@ services:
         fromDatabase:
           name: ignoti-db
           property: connectionString
+      - key: PUBLIC_URL
+        sync: false
       - key: RP_ID
         sync: false
       - key: RP_ORIGIN

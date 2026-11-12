@@ -29,6 +29,9 @@ RP_ID=myapp.com
 
 # The full origin your frontend is served from
 RP_ORIGIN=https://myapp.com
+
+# The public URL of this Ignoti server, the same value you pass to the SDK as backendUrl
+PUBLIC_URL=https://auth.myapp.com
 ```
 
 Start the stack:
@@ -176,18 +179,19 @@ All requests to your backend that require authentication must include a session 
 to get pre-built headers to attach to each request.
 
 ```ts
-const headers = await ignoti.getSessionHeaders('GET', '/api/protected');
+const url = 'https://api.myapp.com/api/protected?page=2';
+const headers = await ignoti.getSessionHeaders('GET', url);
 
-const response = await fetch('https://myapp.com/api/protected', {
-  headers,
-});
+const response = await fetch(url, { headers });
 ```
 
 The session key signs a short-lived timestamp on every call. A stolen session ID alone cannot be replayed - the
 attacker would also need the in-memory private key.
 
-The `method` and `path` you pass to `getSessionHeaders()` are baked into the signature. They must match what your
-backend forwards for verification below, character for character.
+The `method` and `url` you pass to `getSessionHeaders()` are baked into the signature: host, path, and query
+string. The headers are only valid for that exact request, so sign the same URL you fetch. A relative URL
+resolves against the page URL, the same way `fetch` resolves it. The request body is not covered by the
+signature.
 
 ### Verify on your backend
 
@@ -204,6 +208,8 @@ import { IgnotiVerifier } from '@ignoti/verify';
 
 const verifier = new IgnotiVerifier({
   serverUrl: 'https://your-ignoti-server.example.com',
+  // The public URL of this backend, as the browser addresses it
+  publicUrl: 'https://api.myapp.com',
 });
 
 // Express: protect routes with one line
@@ -223,12 +229,15 @@ app.get('/feed', { preHandler: [verifier.fastifyPreHandler()] }, async req => {
 });
 ```
 
-For other frameworks, call `verifier.verify({ method, path, headers })` directly - it returns
+For other frameworks, call `verifier.verify({ method, url, headers })` directly, where `url` is the request
+path and query string (or the full URL) - it returns
 `{ valid: true, userId, deviceId, sessionId, expiresAt }` or `{ valid: false, error }`.
 
 Under the hood this is one POST to your Ignoti server's `POST /api/sessions/verify` endpoint
-(RFC 7662-style introspection), so it works from any language - forward `{ method, path, authorization,
-nonce, timestamp, signature }` and read the same JSON back.
+(RFC 7662-style introspection), so it works from any language - forward `{ method, url, authorization,
+nonce, timestamp, signature }` and read the same JSON back. `url` is the full URL the client requested, built
+from your backend's configured public URL plus the request path and query. Do not build it from the `Host`
+header, which the sender controls.
 
 Two rules:
 

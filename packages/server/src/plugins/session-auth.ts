@@ -1,7 +1,8 @@
 import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
-import { canonicalJson } from '@ignoti/shared';
+import { canonicalJson, canonicalRequestUrl } from '@ignoti/shared';
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { config } from '../config.js';
 import {
   AUTH_HEADERS,
   ERROR_CODES,
@@ -30,7 +31,8 @@ export interface SessionVerifyInput {
   timestamp: unknown;
   signature: unknown;
   method: string;
-  path: string;
+  /** Absolute URL of the request, including any query string. */
+  url: string;
 }
 
 export type SessionVerifyResult =
@@ -55,8 +57,9 @@ export function registerSessionAuthPlugin(app: FastifyInstance): void {
  * POST /api/sessions/verify (integrator backends validating forwarded headers).
  *
  * Implements DPoP-style replay prevention (RFC 9449): the client signs
- * { htm, htu, iat, jti, sessionId } where `jti` is a per-request UUID.
- * The server rejects any `jti` it has seen within the tolerance window.
+ * { htm, htu, iat, jti, sessionId } where `htu` is the full request URL
+ * (origin, path, and query) and `jti` is a per-request UUID. The server
+ * rejects any `jti` it has seen within the tolerance window.
  */
 export async function verifySessionAuth(
   input: SessionVerifyInput,
@@ -101,7 +104,12 @@ export async function verifySessionAuth(
     return { ok: false, code: ERROR_CODES.SESSION_NOT_FOUND };
   }
 
-  const htu = input.path.split('?')[0];
+  let htu: string;
+  try {
+    htu = canonicalRequestUrl(input.url);
+  } catch {
+    return { ok: false, code: ERROR_CODES.MALFORMED_SESSION_HEADERS };
+  }
   const htm = input.method.toUpperCase();
   const payload = canonicalJson({ htm, htu, iat, jti, sessionId });
   const data = Buffer.from(payload, 'utf-8');
@@ -171,7 +179,8 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
       timestamp: req.headers[AUTH_HEADERS.SESSION_TIMESTAMP],
       signature: req.headers[AUTH_HEADERS.SESSION_SIGNATURE],
       method: req.method,
-      path: req.url,
+      // Origin comes from PUBLIC_URL; the Host header is client-controlled.
+      url: `${config.PUBLIC_URL}${req.url}`,
     },
     req.log
   );

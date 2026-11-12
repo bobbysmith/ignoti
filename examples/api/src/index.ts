@@ -24,8 +24,9 @@ declare module 'fastify' {
 const IGNOTI_URL = process.env.IGNOTI_URL ?? 'http://localhost:8787';
 const DEMO_ORIGIN = process.env.DEMO_ORIGIN ?? 'http://localhost:5173';
 const PORT = Number(process.env.PORT ?? 8788);
+const PUBLIC_URL = process.env.PUBLIC_URL ?? `http://localhost:${PORT}`;
 
-const verifier = new IgnotiVerifier({ serverUrl: IGNOTI_URL });
+const verifier = new IgnotiVerifier({ serverUrl: IGNOTI_URL, publicUrl: PUBLIC_URL });
 const requireIgnoti = verifier.fastifyPreHandler();
 
 const app = Fastify({ logger: true });

@@ -19,6 +19,13 @@ const envSchema = z.object({
     .string()
     .default('true')
     .transform(v => v.toLowerCase() !== 'false'),
+  // Public base URL of this server. Must equal the SDK's `backendUrl`; session
+  // request signatures are verified against it.
+  PUBLIC_URL: z
+    .string()
+    .url()
+    .default('http://localhost:8787')
+    .transform(v => v.replace(/\/+$/, '')),
   RP_ID: z.string().default('localhost'),
   RP_NAME: z.string().default('Ignoti'),
   // Comma-separated list of allowed origins, e.g.

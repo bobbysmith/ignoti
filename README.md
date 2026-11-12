@@ -95,7 +95,7 @@ const { userId, deviceId, mnemonic } = await ignoti.createIdentity();
 const { sessionId, expiresAt } = await ignoti.login();
 
 // Sign authenticated requests
-const headers = await ignoti.getSessionHeaders('GET', '/api/feed');
+const headers = await ignoti.getSessionHeaders('GET', 'https://api.example.com/api/feed');
 ```
 
 ---
@@ -129,6 +129,7 @@ your infrastructure. Ignoti never has access to it.
 |-------------------------|----------|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                                                                                                                                                                                   |
 | `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                                                                                                                                                                                 |
+| `PUBLIC_URL`            | Yes      | `http://localhost:8787` | Public base URL of this server, the same value the SDK uses as `backendUrl`. Session request signatures cover the full URL, so a mismatch rejects every signed request with `invalid_session_signature`.                                                                      |
 | `RP_NAME`               | No       | `Ignoti`                | Display name shown to users in passkey dialogs.                                                                                                                                                                                                                               |
 | `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins.                                                                                                                                                         |
 | `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                                                                                                                                                                                |

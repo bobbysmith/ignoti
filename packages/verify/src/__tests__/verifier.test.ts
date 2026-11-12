@@ -9,6 +9,7 @@ import {
 } from '../index.js';
 
 const SERVER_URL = 'http://ignoti.internal:8787';
+const PUBLIC_URL = 'https://api.example.com';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
 const USER_ID = '550e8400-e29b-41d4-a716-446655440002';
 const DEVICE_ID = '550e8400-e29b-41d4-a716-446655440003';
@@ -44,6 +45,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 function makeVerifier(options: Partial<ConstructorParameters<typeof IgnotiVerifier>[0]> = {}) {
   return new IgnotiVerifier({
     serverUrl: SERVER_URL,
+    publicUrl: PUBLIC_URL,
     fetch: fetchMock as unknown as typeof fetch,
     ...options,
   });
@@ -56,13 +58,21 @@ beforeEach(() => {
 describe('IgnotiVerifier', () => {
   describe('constructor', () => {
     it('throws IgnotiVerifyError on an invalid serverUrl', () => {
-      expect(() => new IgnotiVerifier({ serverUrl: 'not a url' })).toThrow(IgnotiVerifyError);
+      expect(() => new IgnotiVerifier({ serverUrl: 'not a url', publicUrl: PUBLIC_URL })).toThrow(
+        IgnotiVerifyError
+      );
+    });
+
+    it('throws IgnotiVerifyError on an invalid publicUrl', () => {
+      expect(() => new IgnotiVerifier({ serverUrl: SERVER_URL, publicUrl: 'not a url' })).toThrow(
+        IgnotiVerifyError
+      );
     });
 
     it('strips a trailing slash from serverUrl', async () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const verifier = makeVerifier({ serverUrl: `${SERVER_URL}/` });
-      await verifier.verify({ method: 'GET', path: '/api/feed', headers: makeHeaders() });
+      await verifier.verify({ method: 'GET', url: '/api/feed', headers: makeHeaders() });
       expect(fetchMock).toHaveBeenCalledWith(
         `${SERVER_URL}/api/sessions/verify`,
         expect.anything()
@@ -71,10 +81,32 @@ describe('IgnotiVerifier', () => {
   });
 
   describe('verify', () => {
+    it('passes an absolute url through unchanged', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
+      await makeVerifier().verify({
+        method: 'GET',
+        url: 'https://other.example.com/api/feed?x=1',
+        headers: makeHeaders(),
+      });
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string).url).toBe('https://other.example.com/api/feed?x=1');
+    });
+
+    it('keeps a path that looks protocol-relative on the configured publicUrl', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
+      await makeVerifier().verify({
+        method: 'GET',
+        url: '//evil.example.com/api/feed',
+        headers: makeHeaders(),
+      });
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string).url).toBe(`${PUBLIC_URL}//evil.example.com/api/feed`);
+    });
+
     it('POSTs the forwarded material and returns the parsed result', async () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const headers = makeHeaders();
-      const result = await makeVerifier().verify({ method: 'GET', path: '/api/feed', headers });
+      const result = await makeVerifier().verify({ method: 'GET', url: '/api/feed', headers });
 
       expect(result).toEqual(VALID_RESPONSE);
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -82,7 +114,7 @@ describe('IgnotiVerifier', () => {
       expect(init.method).toBe('POST');
       expect(JSON.parse(init.body as string)).toEqual({
         method: 'GET',
-        path: '/api/feed',
+        url: `${PUBLIC_URL}/api/feed`,
         authorization: headers.authorization,
         nonce: headers['x-ignoti-nonce'],
         timestamp: headers['x-ignoti-timestamp'],
@@ -96,7 +128,7 @@ describe('IgnotiVerifier', () => {
       );
       const result = await makeVerifier().verify({
         method: 'GET',
-        path: '/api/feed',
+        url: '/api/feed',
         headers: makeHeaders(),
       });
       expect(result).toEqual({ valid: false, error: SERVER_ERROR_CODES.SESSION_NOT_FOUND });
@@ -110,7 +142,7 @@ describe('IgnotiVerifier', () => {
     ])('short-circuits with missing_session_headers when %s is absent, without a network call', async header => {
       const headers = makeHeaders();
       delete headers[header];
-      const result = await makeVerifier().verify({ method: 'GET', path: '/x', headers });
+      const result = await makeVerifier().verify({ method: 'GET', url: '/x', headers });
       expect(result).toEqual({
         valid: false,
         error: SERVER_ERROR_CODES.MISSING_SESSION_HEADERS,
@@ -120,7 +152,7 @@ describe('IgnotiVerifier', () => {
 
     it('treats a multi-value (array) header as missing', async () => {
       const headers = makeHeaders({ 'x-ignoti-nonce': ['a', 'b'] });
-      const result = await makeVerifier().verify({ method: 'GET', path: '/x', headers });
+      const result = await makeVerifier().verify({ method: 'GET', url: '/x', headers });
       expect(result).toEqual({ valid: false, error: SERVER_ERROR_CODES.MISSING_SESSION_HEADERS });
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -129,7 +161,7 @@ describe('IgnotiVerifier', () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const result = await makeVerifier().verify({
         method: 'GET',
-        path: '/api/feed',
+        url: '/api/feed',
         headers: {
           Authorization: `Ignoti-Session ${SESSION_ID}`,
           'X-Ignoti-Nonce': crypto.randomUUID(),
@@ -143,21 +175,21 @@ describe('IgnotiVerifier', () => {
     it('throws IgnotiVerifyError with httpStatus on a non-200 response', async () => {
       fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_input' }, 400));
       await expect(
-        makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
+        makeVerifier().verify({ method: 'GET', url: '/x', headers: makeHeaders() })
       ).rejects.toMatchObject({ name: 'IgnotiVerifyError', httpStatus: 400 });
     });
 
     it('wraps network failures in IgnotiVerifyError', async () => {
       fetchMock.mockRejectedValue(new TypeError('fetch failed'));
       await expect(
-        makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
+        makeVerifier().verify({ method: 'GET', url: '/x', headers: makeHeaders() })
       ).rejects.toBeInstanceOf(IgnotiVerifyError);
     });
 
     it('throws IgnotiVerifyError when the response body is not JSON', async () => {
       fetchMock.mockResolvedValue(new Response('not json', { status: 200 }));
       await expect(
-        makeVerifier().verify({ method: 'GET', path: '/x', headers: makeHeaders() })
+        makeVerifier().verify({ method: 'GET', url: '/x', headers: makeHeaders() })
       ).rejects.toMatchObject({ name: 'IgnotiVerifyError' });
     });
   });
@@ -198,7 +230,7 @@ describe('IgnotiVerifier', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('strips the query string from the verified path', async () => {
+    it('verifies the full URL, query string included, anchored to publicUrl', async () => {
       fetchMock.mockResolvedValue(jsonResponse(VALID_RESPONSE));
       const middleware = makeVerifier().expressMiddleware();
       const next = vi.fn();
@@ -207,7 +239,7 @@ describe('IgnotiVerifier', () => {
       await vi.waitFor(() => expect(next).toHaveBeenCalled());
 
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      expect(JSON.parse(init.body as string).path).toBe('/api/feed');
+      expect(JSON.parse(init.body as string).url).toBe(`${PUBLIC_URL}/api/feed?page=2`);
     });
 
     it('responds 401 with the error code on an invalid session', async () => {

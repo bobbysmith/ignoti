@@ -202,6 +202,8 @@ export const ERROR_MESSAGES = {
 
   // API client configuration
   INVALID_BASE_URL: 'Invalid baseUrl provided',
+  INVALID_REQUEST_URL:
+    'Invalid request URL: pass an absolute URL, or a path when running in a page',
   INVALID_BASE_URL_FORMAT: 'Invalid URL format for baseUrl',
   BASE_URL_REQUIRES_HTTPS: 'baseUrl must use HTTPS (HTTP is only permitted for localhost)',
   INVALID_TIMEOUT: 'Invalid timeout value',

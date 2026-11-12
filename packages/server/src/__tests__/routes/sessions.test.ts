@@ -84,7 +84,7 @@ describe('sessions', () => {
     function makeVerifyBody(overrides: Record<string, unknown> = {}) {
       return {
         method: 'GET',
-        path: '/api/feed',
+        url: 'https://api.example.com/api/feed',
         authorization: `Ignoti-Session ${SESSION_ID}`,
         nonce: crypto.randomUUID(),
         timestamp: String(Math.floor(Date.now() / 1000)),
@@ -100,7 +100,7 @@ describe('sessions', () => {
     describe('body validation', () => {
       it.each([
         'method',
-        'path',
+        'url',
         'authorization',
         'nonce',
         'timestamp',
@@ -165,12 +165,15 @@ describe('sessions', () => {
       });
 
       it('passes the forwarded material to verifySessionAuth verbatim', async () => {
-        const body = makeVerifyBody({ method: 'DELETE', path: '/api/things/42' });
+        const body = makeVerifyBody({
+          method: 'DELETE',
+          url: 'https://api.example.com/api/things/42?x=1',
+        });
         await postVerify(body);
         expect(verifySessionAuth).toHaveBeenCalledWith(
           {
             method: 'DELETE',
-            path: '/api/things/42',
+            url: 'https://api.example.com/api/things/42?x=1',
             authorization: body.authorization,
             nonce: body.nonce,
             timestamp: body.timestamp,

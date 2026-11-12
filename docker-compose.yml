@@ -31,6 +31,7 @@ services:
       - "8787:8787"
     environment:
       DATABASE_URL: postgres://ignoti:ignoti@db:5432/ignoti
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8787}
       RP_ID: ${RP_ID:-localhost}
       RP_NAME: ${RP_NAME:-Ignoti}
       RP_ORIGIN: ${RP_ORIGIN:-http://localhost:5173}

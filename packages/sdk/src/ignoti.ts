@@ -14,6 +14,7 @@
  * guarantee secure erasure (GC may copy buffers before they are zeroed).
  */
 
+import { canonicalRequestUrl } from '@ignoti/shared';
 import { ApiClient, createApiClient } from './api/client';
 import { signDeviceBindingJWS } from './api/root-jws';
 import { signSessionBindingJWS } from './api/session-jws';
@@ -57,6 +58,7 @@ interface ActiveSession {
 
 export class Ignoti {
   private readonly apiClient: ApiClient;
+  private readonly backendUrl: string;
   private readonly defaultDeviceName?: string;
   private initialized = false;
   private session: ActiveSession | null = null;
@@ -70,7 +72,23 @@ export class Ignoti {
       ...options.apiClientOptions,
       onUnauthorized: (m, p) => this.handleUnauthorized(m, p),
     });
+    this.backendUrl = options.backendUrl.replace(/\/$/, '');
     this.defaultDeviceName = options.defaultDeviceName;
+  }
+
+  /** `htu` for a request to the Ignoti server. */
+  private backendHtu(path: string): string {
+    return canonicalRequestUrl(`${this.backendUrl}${path}`);
+  }
+
+  /** `htu` for an integrator request. Relative URLs resolve against the page URL. */
+  private resolveHtu(url: string): string {
+    try {
+      const base = typeof location !== 'undefined' ? location.href : undefined;
+      return canonicalRequestUrl(new URL(url, base).href);
+    } catch {
+      throw new IgnotiError(ERROR_MESSAGES.INVALID_REQUEST_URL, ErrorCodes.INVALID_INPUT);
+    }
   }
 
   /**
@@ -115,7 +133,7 @@ export class Ignoti {
     const jti = crypto.randomUUID();
     const signature = await this.signWithSessionKey({
       htm: method.toUpperCase(),
-      htu: path,
+      htu: this.backendHtu(path),
       iat,
       jti,
       sessionId,
@@ -354,13 +372,15 @@ export class Ignoti {
    * POST /api/sessions/verify endpoint.
    *
    * Every call generates a fresh nonce and signature, do not cache or reuse the result.
-   * Pass the exact HTTP method and path of the request you are about to make.
+   * `url` is the request URL including any query string; a relative URL resolves
+   * against the page URL. The headers are valid only for that method and URL.
    */
-  async getSessionHeaders(method: string, path: string): Promise<Record<string, string>> {
+  async getSessionHeaders(method: string, url: string): Promise<Record<string, string>> {
     this.ensureInitialized();
     if (!this.session) {
       throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
     }
+    const htu = this.resolveHtu(url);
     if (this.isSessionExpired()) {
       await this.restoreOnce();
     }
@@ -368,7 +388,7 @@ export class Ignoti {
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
     const htm = method.toUpperCase();
-    const signature = await this.signWithSessionKey({ htm, htu: path, iat, jti, sessionId });
+    const signature = await this.signWithSessionKey({ htm, htu, iat, jti, sessionId });
     return {
       [HTTP_HEADERS.AUTHORIZATION]: `${SESSION_AUTH_SCHEME} ${sessionId}`,
       [HTTP_HEADERS.SESSION_NONCE]: jti,
@@ -385,7 +405,7 @@ export class Ignoti {
     const { sessionId, sessionPrivateKey } = this.session;
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
-    const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`;
+    const htu = this.backendHtu(`${API_ENDPOINTS.SESSIONS.REVOKE}/${sessionId}`);
     const signature = await ApiClient.signRequest(
       { htm: 'DELETE', htu, iat, jti, sessionId },
       sessionPrivateKey
@@ -408,7 +428,7 @@ export class Ignoti {
     const jti = crypto.randomUUID();
     const signature = await this.signWithSessionKey({
       htm: 'GET',
-      htu: API_ENDPOINTS.DEVICES.LIST,
+      htu: this.backendHtu(API_ENDPOINTS.DEVICES.LIST),
       iat,
       jti,
       sessionId,
@@ -455,7 +475,7 @@ export class Ignoti {
     const jti = crypto.randomUUID();
     const signature = await this.signWithSessionKey({
       htm: 'GET',
-      htu: API_ENDPOINTS.SESSIONS.LIST,
+      htu: this.backendHtu(API_ENDPOINTS.SESSIONS.LIST),
       iat,
       jti,
       sessionId,
@@ -481,7 +501,7 @@ export class Ignoti {
     const { sessionId } = this.session;
     const iat = Math.floor(Date.now() / 1000);
     const jti = crypto.randomUUID();
-    const htu = `${API_ENDPOINTS.SESSIONS.REVOKE}/${targetSessionId}`;
+    const htu = this.backendHtu(`${API_ENDPOINTS.SESSIONS.REVOKE}/${targetSessionId}`);
     const signature = await this.signWithSessionKey({ htm: 'DELETE', htu, iat, jti, sessionId });
     await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature, jti);
     if (targetSessionId === sessionId) {
@@ -506,7 +526,7 @@ export class Ignoti {
     const jti = crypto.randomUUID();
     const signature = await this.signWithSessionKey({
       htm: 'DELETE',
-      htu: API_ENDPOINTS.SESSIONS.LIST,
+      htu: this.backendHtu(API_ENDPOINTS.SESSIONS.LIST),
       iat,
       jti,
       sessionId,
