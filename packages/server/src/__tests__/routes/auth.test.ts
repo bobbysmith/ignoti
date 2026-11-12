@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import {
   generateAuthenticationOptions,
@@ -392,6 +393,32 @@ describe('auth', () => {
           makeRegistrationVerification() as never
         );
         vi.mocked(insertDevice).mockResolvedValue({ id: VALID_DEVICE_ID });
+      });
+
+      it('expects the root signature to cover the SHA-256 of the submitted attestationObject', async () => {
+        await registerDevice();
+        expect(verifyDeviceBindingJWS).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          expect.objectContaining({
+            attestationHash: createHash('sha256')
+              .update(VALID_REGISTRATION_RESPONSE.response.attestationObject)
+              .digest('base64url'),
+          })
+        );
+      });
+
+      it('returns 401 ATTESTATION_VERIFICATION_FAILED when the attested credential id differs from the submitted id', async () => {
+        vi.mocked(verifyRegistrationResponse).mockResolvedValue({
+          verified: true,
+          registrationInfo: {
+            credential: { id: 'other-credential', publicKey: new Uint8Array([1]), counter: 0 },
+          },
+        } as never);
+        const res = await registerDevice();
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.ATTESTATION_VERIFICATION_FAILED });
+        expect(insertDevice).not.toHaveBeenCalled();
       });
 
       it('defaults purpose to "register-device" when decodeJwt throws', async () => {

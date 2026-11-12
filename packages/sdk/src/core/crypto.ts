@@ -86,6 +86,12 @@ export async function generateSessionSigningKeypair(): Promise<CryptoKeyPair> {
   return crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']);
 }
 
+/** base64url SHA-256 of the UTF-8 bytes of `value`. */
+export async function sha256Base64Url(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(value));
+  return bufferToBase64Url(digest);
+}
+
 export function stringToBytes(str: string): Uint8Array {
   return textEncoder.encode(str);
 }

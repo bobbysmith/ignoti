@@ -6,6 +6,11 @@ export interface ExpectedClaims {
   userId: string;
   credentialId: string;
   challenge: string;
+  /**
+   * base64url SHA-256 of the submitted `attestationObject` string. Required
+   * for register-device and recover-device; must be absent for revoke-device.
+   */
+  attestationHash?: string;
 }
 
 export { decodeJwt };
@@ -39,7 +44,8 @@ export async function verifyDeviceBindingJWS(
     payload.purpose !== expected.purpose ||
     payload.userId !== expected.userId ||
     payload.credentialId !== expected.credentialId ||
-    payload.challenge !== expected.challenge
+    payload.challenge !== expected.challenge ||
+    payload.attestationHash !== expected.attestationHash
   ) {
     throw new Error('claim mismatch');
   }

@@ -36,6 +36,7 @@ import {
   deriveRootKeysFromMnemonic,
   generateMnemonic,
   generateSessionSigningKeypair,
+  sha256Base64Url,
   toBase64,
 } from './core/crypto';
 import { ErrorCodes, IgnotiError } from './core/errors';
@@ -232,6 +233,7 @@ export class Ignoti {
         userId,
         credentialId: passkeyResponse.id,
         challenge: challengeB64Url,
+        attestationHash: await sha256Base64Url(passkeyResponse.response.attestationObject),
       },
       rootKeySet.signing.privateKey
     );
@@ -331,6 +333,7 @@ export class Ignoti {
         userId,
         credentialId: passkeyResponse.id,
         challenge: challengeB64Url,
+        attestationHash: await sha256Base64Url(passkeyResponse.response.attestationObject),
       },
       rootKeySet.signing.privateKey
     );

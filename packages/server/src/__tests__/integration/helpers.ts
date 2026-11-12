@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   canonicalRequestUrl,
@@ -33,7 +34,13 @@ export async function generateRootKeypair(): Promise<{
 }
 
 export async function signDeviceBindingJWS(
-  claims: { purpose: string; userId: string; credentialId: string; challenge: string },
+  claims: {
+    purpose: string;
+    userId: string;
+    credentialId: string;
+    challenge: string;
+    attestationHash?: string;
+  },
   privateKey: CryptoKey
 ): Promise<string> {
   return new SignJWT(claims as Record<string, unknown>)
@@ -91,6 +98,10 @@ export async function buildSessionHeadersForUrl(
     'X-Ignoti-Nonce': jti,
     'X-Ignoti-Signature': signature,
   };
+}
+
+export function hashAttestation(attestationObject: string): string {
+  return createHash('sha256').update(attestationObject).digest('base64url');
 }
 
 export function makeRegistrationResponse(credId: string, challenge: string) {

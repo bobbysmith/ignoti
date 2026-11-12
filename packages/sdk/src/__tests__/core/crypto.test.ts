@@ -10,6 +10,7 @@ import {
   generateNonce,
   generateSessionSigningKeypair,
   hash,
+  sha256Base64Url,
   sign,
   stringToBytes,
   toBase64,
@@ -216,6 +217,14 @@ describe('crypto', () => {
 
     it('returns false for different lengths', () => {
       expect(constantTimeEqual(new Uint8Array([1, 2]), new Uint8Array([1, 2, 3]))).toBe(false);
+    });
+  });
+
+  describe('sha256Base64Url', () => {
+    it('matches the SHA-256 test vector for "abc"', async () => {
+      await expect(sha256Base64Url('abc')).resolves.toBe(
+        'ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0'
+      );
     });
   });
 });

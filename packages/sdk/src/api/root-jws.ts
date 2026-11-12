@@ -17,6 +17,11 @@ export interface DeviceBindingClaims {
   userId: string;
   credentialId: string;
   challenge: string;
+  /**
+   * base64url SHA-256 of the submitted `attestationObject` string. Set for
+   * register-device and recover-device; omitted for revoke-device.
+   */
+  attestationHash?: string;
 }
 
 export async function signDeviceBindingJWS(

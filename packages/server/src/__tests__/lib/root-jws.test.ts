@@ -233,6 +233,41 @@ describe('verifyDeviceBindingJWS', () => {
       ).rejects.toThrow('claim mismatch');
     });
 
+    it('throws when attestationHash differs', async () => {
+      const jws = await signRootJWS({ ...VALID_CLAIMS, attestationHash: 'hash-a' }, keypair);
+      await expect(
+        verifyDeviceBindingJWS(jws, keypair.publicKeyB64, {
+          ...VALID_CLAIMS,
+          attestationHash: 'hash-b',
+        })
+      ).rejects.toThrow('claim mismatch');
+    });
+
+    it('throws when attestationHash is expected but not signed', async () => {
+      const jws = await signRootJWS(VALID_CLAIMS, keypair);
+      await expect(
+        verifyDeviceBindingJWS(jws, keypair.publicKeyB64, {
+          ...VALID_CLAIMS,
+          attestationHash: 'hash-a',
+        })
+      ).rejects.toThrow('claim mismatch');
+    });
+
+    it('throws when attestationHash is signed but not expected', async () => {
+      const jws = await signRootJWS({ ...VALID_CLAIMS, attestationHash: 'hash-a' }, keypair);
+      await expect(verifyDeviceBindingJWS(jws, keypair.publicKeyB64, VALID_CLAIMS)).rejects.toThrow(
+        'claim mismatch'
+      );
+    });
+
+    it('accepts a matching attestationHash', async () => {
+      const claims = { ...VALID_CLAIMS, attestationHash: 'hash-a' };
+      const jws = await signRootJWS(claims, keypair);
+      await expect(
+        verifyDeviceBindingJWS(jws, keypair.publicKeyB64, claims)
+      ).resolves.toMatchObject({ attestationHash: 'hash-a' });
+    });
+
     it('throws on challenge mismatch', async () => {
       const jws = await signRootJWS(VALID_CLAIMS, keypair);
       await expect(

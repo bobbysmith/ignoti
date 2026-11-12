@@ -96,6 +96,12 @@ This is enforced at the protocol level, not just by convention. The `purpose` fi
 payload and verified by the server on every request. An attacker who captures a valid signature from one flow 
 cannot repurpose it for another.
 
+## The root key approves one specific passkey
+
+When a device is registered or recovered, the root-key signature covers a SHA-256 hash of the passkey attestation 
+being submitted, and the server checks that the attested credential is the one named in the signature. A request 
+modified in transit to carry a different passkey public key fails signature verification.
+
 ## Account enumeration is blocked
 
 `/register` returns an identical response whether or not the mnemonic was seen before, so it never reveals prior 

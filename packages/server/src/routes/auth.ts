@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
@@ -84,8 +84,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   /**
    * POST /api/auth/register/device
    * Verifies (a) the WebAuthn attestation against the stored challenge, and
-   * (b) the root-key JWS whose claims (purpose, userId, credentialId, challenge)
-   * must match. Both must pass before we persist the device. The challenge row
+   * (b) the root-key JWS whose claims (purpose, userId, credentialId, challenge,
+   * attestationHash) must match. Both must pass before we persist the device. The challenge row
    * is marked consumed atomically so a captured request can't be replayed.
    */
   app.post(
@@ -145,6 +145,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
           userId,
           credentialId: registrationResponse.id,
           challenge: expectedChallenge,
+          attestationHash: createHash('sha256')
+            .update(registrationResponse.response.attestationObject)
+            .digest('base64url'),
         });
       } catch (err) {
         req.log.warn({ reason: errSummary(err) }, 'root signature verification failed');
@@ -170,6 +173,10 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       }
 
       const { credential } = verification.registrationInfo;
+      // The root signature covers registrationResponse.id, not the attested id.
+      if (credential.id !== registrationResponse.id) {
+        return sendError(reply, 401, ERROR_CODES.ATTESTATION_VERIFICATION_FAILED);
+      }
       const credentialIdB64 = credential.id;
       const credentialPubKeyB64 = Buffer.from(credential.publicKey).toString('base64url');
 

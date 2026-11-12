@@ -72,6 +72,7 @@ vi.mock('@/core/crypto.ts', () => ({
   generateMnemonic: mockGenerateMnemonic,
   deriveRootKeysFromMnemonic: mockDeriveRootKeys,
   generateSessionSigningKeypair: mockGenerateSessionKeypair,
+  sha256Base64Url: async (value: string) => `sha256(${value})`,
   toBase64: mockToBase64,
   bufferToBase64Url: mockBufferToBase64Url,
   base64UrlToBuffer: mockBase64UrlToBuffer,
@@ -236,6 +237,24 @@ describe('Ignoti', () => {
       expect(mockCreatePasskey).toHaveBeenCalled();
       expect(mockRegisterDevice).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1', rootSignature: 'root-sig' })
+      );
+    });
+
+    it('signs the hash of the attestationObject it submits', async () => {
+      stubCreateIdentityMocks();
+
+      await initializedSdk().createIdentity();
+
+      expect(mockSignDeviceBindingJWS).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose: 'register-device', attestationHash: 'sha256(ao)' }),
+        expect.anything()
+      );
+      expect(mockRegisterDevice).toHaveBeenCalledWith(
+        expect.objectContaining({
+          registrationResponse: expect.objectContaining({
+            response: expect.objectContaining({ attestationObject: 'ao' }),
+          }),
+        })
       );
     });
   });
@@ -524,6 +543,15 @@ describe('Ignoti', () => {
       await expect(
         g.revokeDevice('device-1', MNEMONIC, 'user-1', 'cred-id')
       ).resolves.toBeUndefined();
+      expect(mockSignDeviceBindingJWS).toHaveBeenCalledWith(
+        {
+          purpose: 'revoke-device',
+          userId: 'user-1',
+          credentialId: 'cred-id',
+          challenge: 'device-1',
+        },
+        expect.anything()
+      );
     });
 
     it('calls revokeDevice API with correct deviceId and root signature', async () => {
@@ -678,6 +706,10 @@ describe('Ignoti', () => {
 
       expect(result.userId).toBe('user-1');
       expect(result.deviceId).toBe('device-2');
+      expect(mockSignDeviceBindingJWS).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose: 'recover-device', attestationHash: 'sha256(ao)' }),
+        expect.anything()
+      );
     });
 
     it('maps a 404 to INVALID_INPUT and never prompts for a passkey', async () => {

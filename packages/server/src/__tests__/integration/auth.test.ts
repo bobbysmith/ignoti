@@ -21,6 +21,7 @@ import {
   cleanDatabase,
   generateRootKeypair,
   generateSessionKeypair,
+  hashAttestation,
   makeAssertionResponse,
   makeRegistrationResponse,
   runMigrations,
@@ -39,6 +40,9 @@ vi.mock('@simplewebauthn/server', async () => {
 
 const CRED_ID = 'test-cred-id-integration';
 const CRED_PUBLIC_KEY = new Uint8Array(65);
+const ATTESTATION_HASH = hashAttestation(
+  makeRegistrationResponse(CRED_ID, '').response.attestationObject
+);
 CRED_PUBLIC_KEY[0] = 4;
 
 async function registerAndLogin(app: FastifyInstance, credId = CRED_ID) {
@@ -60,7 +64,13 @@ async function registerAndLogin(app: FastifyInstance, credId = CRED_ID) {
   } as never);
 
   const rootSignature = await signDeviceBindingJWS(
-    { purpose: 'register-device', userId, credentialId: credId, challenge: regOptions.challenge },
+    {
+      purpose: 'register-device',
+      userId,
+      credentialId: credId,
+      challenge: regOptions.challenge,
+      attestationHash: ATTESTATION_HASH,
+    },
     rootPrivate
   );
 
@@ -415,6 +425,7 @@ describe('Integration: auth happy paths', () => {
               userId,
               credentialId: CRED_ID,
               challenge: regOptions.challenge,
+              attestationHash: ATTESTATION_HASH,
             },
             rootPrivate
           ),
@@ -454,6 +465,7 @@ describe('Integration: auth happy paths', () => {
               userId,
               credentialId: CRED_ID_2,
               challenge: recoverOptions.challenge,
+              attestationHash: ATTESTATION_HASH,
             },
             rootPrivate
           ),
@@ -638,6 +650,7 @@ describe('Integration: auth happy paths', () => {
           userId,
           credentialId: CRED_ID,
           challenge: regOptions.challenge,
+          attestationHash: ATTESTATION_HASH,
         },
         rootPrivate
       );
@@ -653,6 +666,77 @@ describe('Integration: auth happy paths', () => {
         },
       });
       expect(res.statusCode).toBe(401);
+    });
+
+    async function startRegistration() {
+      const { privateKey: rootPrivate, publicKeyB64: rootPublicKey } = await generateRootKeypair();
+      const registerRes = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { rootPublicKey },
+      });
+      const { userId, options } = registerRes.json<{
+        userId: string;
+        options: { challenge: string };
+      }>();
+      return { rootPrivate, userId, challenge: options.challenge };
+    }
+
+    it.each([
+      ['a different attestation than the one submitted', hashAttestation('other-attestation')],
+      ['no attestation', undefined],
+    ])('rejects a root signature that covers %s', async (_label, attestationHash) => {
+      const { rootPrivate, userId, challenge } = await startRegistration();
+      const rootSignature = await signDeviceBindingJWS(
+        { purpose: 'register-device', userId, credentialId: CRED_ID, challenge, attestationHash },
+        rootPrivate
+      );
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register/device',
+        payload: {
+          userId,
+          registrationResponse: makeRegistrationResponse(CRED_ID, challenge),
+          rootSignature,
+        },
+      });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'invalid_root_signature' });
+      expect(await sql`select 1 from devices`).toHaveLength(0);
+    });
+
+    it('rejects registration when the attested credential id differs from the signed one', async () => {
+      const { rootPrivate, userId, challenge } = await startRegistration();
+      vi.mocked(verifyRegistrationResponse).mockResolvedValueOnce({
+        verified: true,
+        registrationInfo: {
+          credential: { id: 'another-cred-id', publicKey: CRED_PUBLIC_KEY, counter: 0 },
+        },
+      } as never);
+      const rootSignature = await signDeviceBindingJWS(
+        {
+          purpose: 'register-device',
+          userId,
+          credentialId: CRED_ID,
+          challenge,
+          attestationHash: ATTESTATION_HASH,
+        },
+        rootPrivate
+      );
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register/device',
+        payload: {
+          userId,
+          registrationResponse: makeRegistrationResponse(CRED_ID, challenge),
+          rootSignature,
+        },
+      });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'attestation_verification_failed' });
+      expect(await sql`select 1 from devices`).toHaveLength(0);
     });
 
     it('rejects login when verified is false', async () => {
