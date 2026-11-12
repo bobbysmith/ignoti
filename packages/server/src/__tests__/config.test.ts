@@ -200,10 +200,10 @@ describe('config', () => {
   });
 
   describe('TRUST_PROXY', () => {
-    it('defaults to 1 (one proxy hop) when TRUST_PROXY is not set', async () => {
+    it('defaults to false (no proxy trusted) when TRUST_PROXY is not set', async () => {
       stubEnv();
       const config = await loadConfig();
-      expect(config.TRUST_PROXY).toBe(1);
+      expect(config.TRUST_PROXY).toBe(false);
     });
 
     it('parses an integer hop count', async () => {

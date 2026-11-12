@@ -8,6 +8,9 @@ primary_region = 'ewr'
 
 [build]
 
+[env]
+  TRUST_PROXY = '1'
+
 [http_service]
   internal_port = 8787
   force_https = true

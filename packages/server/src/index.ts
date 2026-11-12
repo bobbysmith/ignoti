@@ -25,7 +25,7 @@ export async function buildServer() {
   const app = Fastify({
     logger: { level: config.LOG_LEVEL, serializers: { req: reqLogSerializer } },
     // How much of X-Forwarded-For to trust when deriving the client IP for rate
-    // limiting. Defaults to one proxy hop; see TRUST_PROXY in config.ts. Trusting
+    // limiting. Defaults to none (socket address); see TRUST_PROXY in config.ts. Trusting
     // more hops than you actually run lets clients spoof their IP by prepending
     // fake XFF entries; trusting too few collapses everyone into one bucket.
     trustProxy: config.TRUST_PROXY,

@@ -17,6 +17,8 @@ services:
         value: production
       - key: DB_PREPARE
         value: false
+      - key: TRUST_PROXY
+        value: 1
 
 databases:
   - name: ignoti-db
