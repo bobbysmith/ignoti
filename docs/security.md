@@ -185,9 +185,9 @@ Registration, login, recovery, and session-restore endpoints are rate limited. A
 attempts to probe the system, enumerate accounts, or brute-force challenges.
 
 The one deliberate exception is `POST /api/sessions/verify`, the introspection endpoint your backend calls to 
-validate signed session headers. It is intentionally not rate limited, because it sits on your backend's hot path 
-(one call per authenticated request) and forging a positive result already requires a valid Ed25519 signature over 
-a server-issued session, so there is nothing for an unauthenticated caller to brute-force.
+validate signed session headers. It is not rate limited, because it sits on your backend's hot path (one call per 
+authenticated request). Instead it requires a shared secret (`INTROSPECTION_SECRET`) as a bearer token, compared in 
+constant time, and rejects every other caller before doing any work.
 
 ## What Ignoti cannot protect against
 

@@ -10,7 +10,11 @@ import {
 } from '../../constants';
 import { storeNonce } from '../../db/queries/nonces.js';
 import { getSessionWithUser, touchSession } from '../../db/queries/sessions.js';
-import { registerSessionAuthPlugin, requireSession } from '../../plugins/session-auth.js';
+import {
+  registerSessionAuthPlugin,
+  requireSession,
+  verifySessionAuth,
+} from '../../plugins/session-auth.js';
 
 const PUBLIC_URL = 'https://auth.example.com';
 
@@ -473,6 +477,25 @@ describe('session auth', () => {
         );
         await requireSession(req, makeMockReply() as never);
         expect(req.sessionContext?.sessionId).toBe(SESSION_ID);
+      });
+
+      it('returns MALFORMED_SESSION_HEADERS when the request URL cannot be parsed', async () => {
+        vi.mocked(getSessionWithUser).mockResolvedValue(makeSession(keypair.publicKeyB64) as never);
+        const iat = Math.floor(Date.now() / 1000);
+        const headers = makeSessionHeaders(SESSION_ID, iat, keypair.privateKey);
+        const result = await verifySessionAuth(
+          {
+            authorization: headers[AUTH_HEADERS.AUTHORIZATION],
+            nonce: headers[AUTH_HEADERS.SESSION_NONCE],
+            timestamp: headers[AUTH_HEADERS.SESSION_TIMESTAMP],
+            signature: headers[AUTH_HEADERS.SESSION_SIGNATURE],
+            method: DEFAULT_METHOD,
+            url: 'not a url',
+          },
+          { error: vi.fn() } as never
+        );
+        expect(result).toEqual({ ok: false, code: ERROR_CODES.MALFORMED_SESSION_HEADERS });
+        expect(storeNonce).not.toHaveBeenCalled();
       });
 
       it('returns 401 INVALID_SESSION_SIGNATURE when signature is valid base64url but wrong bytes', async () => {

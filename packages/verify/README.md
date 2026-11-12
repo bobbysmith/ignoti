@@ -13,6 +13,7 @@ import { IgnotiVerifier } from '@ignoti/verify';
 const verifier = new IgnotiVerifier({
   serverUrl: 'https://your-ignoti-server.example.com',
   publicUrl: 'https://api.example.com', // this backend, as the browser addresses it
+  introspectionSecret: process.env.INTROSPECTION_SECRET, // the Ignoti server's INTROSPECTION_SECRET
 });
 ```
 
@@ -59,6 +60,9 @@ Ed25519 signature, session revocation and expiry, timestamp window, and single-u
 authenticated identity. Verification is centralized by design: instant revocation and replay prevention
 require the Ignoti server's state, so sessions cannot be verified offline.
 
+The endpoint only answers callers that present the server's `INTROSPECTION_SECRET`. A wrong or missing secret
+makes `verify()` throw `IgnotiVerifyError` with `httpStatus` 401.
+
 The signature covers the method and the full request URL: host, path, and query string. Headers signed for
 another backend, another path, or another query are rejected. The host comes from `publicUrl`, never from the
 `Host` header, which the sender controls. The request body is not covered by the signature.
@@ -79,6 +83,7 @@ or a malformed response. An invalid session is a *successful* introspection and 
 |-------------|---------|---------------------------------------------------------|
 | `serverUrl` | -       | Base URL of your self-hosted Ignoti server. Required.  |
 | `publicUrl` | -       | Public base URL of your backend. Required.              |
+| `introspectionSecret` | - | The Ignoti server's `INTROSPECTION_SECRET`, sent as a bearer token. Required. Keep it out of client code. |
 | `timeoutMs` | `5000`  | Abort the verification request after this many ms.      |
 | `fetch`     | global  | Custom fetch implementation (tests, edge runtimes).     |
 

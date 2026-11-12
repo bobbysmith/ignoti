@@ -1,3 +1,4 @@
+import { INTROSPECTION_SECRET_RE } from '@ignoti/shared';
 import { z } from 'zod';
 
 const CHALLENGE_TTL_MIN_SECONDS = 30; // 30 seconds
@@ -10,6 +11,15 @@ const SESSION_TTL_DEFAULT_SECONDS = 60 * 60 * 24; // 24 hours
 
 const GC_INTERVAL_MAX_SECONDS = 60 * 60 * 24; // 1 day
 const GC_INTERVAL_DEFAULT_SECONDS = 60 * 60; // 1 hour
+
+// An empty value counts as unset.
+const introspectionSecret = z.preprocess(
+  v => (v === '' ? undefined : v),
+  z
+    .string()
+    .regex(INTROSPECTION_SECRET_RE, 'must be at least 32 characters of [A-Za-z0-9._~+/-]')
+    .optional()
+);
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(8787),
@@ -26,6 +36,10 @@ const envSchema = z.object({
     .url()
     .default('http://localhost:8787')
     .transform(v => v.replace(/\/+$/, '')),
+  // Bearer secret callers of POST /api/sessions/verify must present. The server
+  // does not start without it. The previous value stays accepted during rotation.
+  INTROSPECTION_SECRET: introspectionSecret,
+  INTROSPECTION_SECRET_PREVIOUS: introspectionSecret,
   RP_ID: z.string().default('localhost'),
   RP_NAME: z.string().default('Ignoti'),
   // Comma-separated list of allowed origins, e.g.

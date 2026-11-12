@@ -13,6 +13,7 @@
 import { verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { config } from '../../config.js';
 import { sql } from '../../db/client.js';
 import { buildServer } from '../../index.js';
 import {
@@ -531,6 +532,7 @@ describe('Integration: auth happy paths', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/sessions/verify',
+        headers: { authorization: `Bearer ${config.INTROSPECTION_SECRET}` },
         payload: {
           method: 'GET',
           url,
@@ -542,6 +544,27 @@ describe('Integration: auth happy paths', () => {
       });
       return res.json<{ valid: boolean; error?: string; userId?: string }>();
     }
+
+    it('returns 401 for valid session headers when the introspection secret is missing', async () => {
+      const { sessionId, sessionPrivate } = await registerAndLogin(app);
+      const headers = await buildSessionHeadersForUrl('GET', SIGNED_URL, sessionId, sessionPrivate);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/sessions/verify',
+        payload: {
+          method: 'GET',
+          url: SIGNED_URL,
+          authorization: headers.Authorization,
+          nonce: headers['X-Ignoti-Nonce'],
+          timestamp: headers['X-Ignoti-Timestamp'],
+          signature: headers['X-Ignoti-Signature'],
+        },
+      });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ error: 'invalid_introspection_credentials' });
+      // The rejected call did not consume the nonce.
+      expect(await verifyAs(SIGNED_URL, headers)).toMatchObject({ valid: true });
+    });
 
     it('accepts headers for the exact URL they were signed for', async () => {
       const { sessionId, sessionPrivate, userId } = await registerAndLogin(app);

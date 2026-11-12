@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { SERVER_ERROR_CODES } from '@ignoti/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,7 @@ import {
 
 const SERVER_URL = 'http://ignoti.internal:8787';
 const PUBLIC_URL = 'https://api.example.com';
+const INTROSPECTION_SECRET = 'test-introspection-secret-0123456789abcdef';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
 const USER_ID = '550e8400-e29b-41d4-a716-446655440002';
 const DEVICE_ID = '550e8400-e29b-41d4-a716-446655440003';
@@ -46,6 +48,7 @@ function makeVerifier(options: Partial<ConstructorParameters<typeof IgnotiVerifi
   return new IgnotiVerifier({
     serverUrl: SERVER_URL,
     publicUrl: PUBLIC_URL,
+    introspectionSecret: INTROSPECTION_SECRET,
     fetch: fetchMock as unknown as typeof fetch,
     ...options,
   });
@@ -58,15 +61,79 @@ beforeEach(() => {
 describe('IgnotiVerifier', () => {
   describe('constructor', () => {
     it('throws IgnotiVerifyError on an invalid serverUrl', () => {
-      expect(() => new IgnotiVerifier({ serverUrl: 'not a url', publicUrl: PUBLIC_URL })).toThrow(
-        IgnotiVerifyError
-      );
+      expect(() => makeVerifier({ serverUrl: 'not a url' })).toThrow(IgnotiVerifyError);
     });
 
     it('throws IgnotiVerifyError on an invalid publicUrl', () => {
-      expect(() => new IgnotiVerifier({ serverUrl: SERVER_URL, publicUrl: 'not a url' })).toThrow(
-        IgnotiVerifyError
+      expect(() => makeVerifier({ publicUrl: 'not a url' })).toThrow(IgnotiVerifyError);
+    });
+
+    it.each([
+      ['missing', undefined],
+      ['empty', ''],
+    ])('throws IgnotiVerifyError when introspectionSecret is %s', (_label, introspectionSecret) => {
+      expect(() =>
+        makeVerifier({ introspectionSecret: introspectionSecret as unknown as string })
+      ).toThrow('introspectionSecret is required');
+    });
+
+    it.each([
+      ['shorter than 32 characters', 'a'.repeat(31)],
+      ['containing a space', `${'a'.repeat(32)} b`],
+      ['containing a newline', `${'a'.repeat(32)}\nb`],
+    ])('throws IgnotiVerifyError when introspectionSecret is %s', (_label, introspectionSecret) => {
+      expect(() => makeVerifier({ introspectionSecret })).toThrow(
+        'introspectionSecret must be at least 32 characters'
       );
+    });
+
+    it('never includes the rejected secret in the error message', () => {
+      try {
+        makeVerifier({ introspectionSecret: 'short-secret-value' });
+        expect.unreachable();
+      } catch (err) {
+        expect((err as Error).message).not.toContain('short-secret-value');
+      }
+    });
+
+    it('does not expose the secret when the verifier is logged or serialized', () => {
+      const verifier = makeVerifier();
+      expect(inspect(verifier, { depth: null, showHidden: true })).not.toContain(
+        INTROSPECTION_SECRET
+      );
+      expect(JSON.stringify(verifier)).not.toContain(INTROSPECTION_SECRET);
+      expect(Object.values(verifier)).not.toContain(INTROSPECTION_SECRET);
+    });
+
+    it('uses the global fetch when none is injected', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ valid: false, error: 'session_not_found' }));
+      vi.stubGlobal('fetch', fetchMock);
+      try {
+        const verifier = makeVerifier({ fetch: undefined });
+        await verifier.verify({ method: 'GET', url: '/api/feed', headers: makeHeaders() });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('sends the introspection secret as a bearer token', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ valid: false, error: 'session_not_found' }));
+      await makeVerifier().verify({ method: 'GET', url: '/api/feed', headers: makeHeaders() });
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>).Authorization).toBe(
+        `Bearer ${INTROSPECTION_SECRET}`
+      );
+      expect(init.body as string).not.toContain(INTROSPECTION_SECRET);
+    });
+
+    it('throws IgnotiVerifyError when the server rejects the introspection secret', async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: 'invalid_introspection_credentials' }, 401)
+      );
+      await expect(
+        makeVerifier().verify({ method: 'GET', url: '/api/feed', headers: makeHeaders() })
+      ).rejects.toMatchObject({ name: 'IgnotiVerifyError', httpStatus: 401 });
     });
 
     it('strips a trailing slash from serverUrl', async () => {
@@ -240,6 +307,19 @@ describe('IgnotiVerifier', () => {
 
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(JSON.parse(init.body as string).url).toBe(`${PUBLIC_URL}/api/feed?page=2`);
+    });
+
+    it('falls back to req.url when originalUrl is absent', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ valid: false, error: 'session_not_found' }));
+      const res = makeRes();
+      makeVerifier().expressMiddleware()(
+        makeReq({ url: '/feed?page=3', originalUrl: undefined }),
+        res,
+        vi.fn()
+      );
+      await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(401));
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string).url).toBe(`${PUBLIC_URL}/feed?page=3`);
     });
 
     it('responds 401 with the error code on an invalid session', async () => {

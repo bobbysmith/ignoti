@@ -24,6 +24,8 @@ vi.mock('../../config.js', () => ({
     CHALLENGE_TTL_SECONDS: 300,
     SESSION_TTL_SECONDS: 86400,
     LOG_LEVEL: 'silent',
+    INTROSPECTION_SECRET: 'current-introspection-secret-0123456789',
+    INTROSPECTION_SECRET_PREVIOUS: 'previous-introspection-secret-012345678',
   },
 }));
 vi.mock('../../db/queries/sessions.js');
@@ -93,9 +95,62 @@ describe('sessions', () => {
       };
     }
 
-    function postVerify(body: Record<string, unknown>) {
-      return app.inject({ method: 'POST', url: '/api/sessions/verify', payload: body });
+    const SECRET = 'current-introspection-secret-0123456789';
+    const PREVIOUS_SECRET = 'previous-introspection-secret-012345678';
+
+    function postVerify(
+      body: Record<string, unknown>,
+      authorization: string | undefined = `Bearer ${SECRET}`
+    ) {
+      return app.inject({
+        method: 'POST',
+        url: '/api/sessions/verify',
+        payload: body,
+        headers: authorization === undefined ? {} : { authorization },
+      });
     }
+
+    describe('introspection credentials', () => {
+      it.each([
+        ['no Authorization header', undefined],
+        ['a wrong secret', 'Bearer wrong-introspection-secret-0123456789ab'],
+        ['a prefix of the secret', `Bearer ${SECRET.slice(0, -1)}`],
+        ['the secret with a suffix', `Bearer ${SECRET}x`],
+        ['an empty bearer token', 'Bearer '],
+        ['the bare secret without a scheme', SECRET],
+        ['another scheme', `Basic ${SECRET}`],
+      ])('returns 401 without verifying when sent %s', async (_label, authorization) => {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/sessions/verify',
+          payload: makeVerifyBody(),
+          headers: authorization === undefined ? {} : { authorization },
+        });
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ error: ERROR_CODES.INVALID_INTROSPECTION_CREDENTIALS });
+        expect(res.headers['www-authenticate']).toBe('Bearer');
+        expect(verifySessionAuth).not.toHaveBeenCalled();
+      });
+
+      it('rejects before the body is validated', async () => {
+        const res = await postVerify({}, 'Bearer wrong-introspection-secret-0123456789ab');
+        expect(res.statusCode).toBe(401);
+      });
+
+      it.each([
+        ['the current secret', `Bearer ${SECRET}`],
+        ['the previous secret', `Bearer ${PREVIOUS_SECRET}`],
+        ['a lowercase scheme', `bearer ${SECRET}`],
+      ])('accepts %s', async (_label, authorization) => {
+        vi.mocked(verifySessionAuth).mockResolvedValue({
+          ok: false,
+          code: ERROR_CODES.SESSION_NOT_FOUND,
+        } as never);
+        const res = await postVerify(makeVerifyBody(), authorization);
+        expect(res.statusCode).toBe(200);
+        expect(verifySessionAuth).toHaveBeenCalled();
+      });
+    });
 
     describe('body validation', () => {
       it.each([

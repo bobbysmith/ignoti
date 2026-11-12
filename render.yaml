@@ -11,6 +11,8 @@ services:
           property: connectionString
       - key: PUBLIC_URL
         sync: false
+      - key: INTROSPECTION_SECRET
+        generateValue: true
       - key: RP_ID
         sync: false
       - key: RP_ORIGIN

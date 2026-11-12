@@ -32,6 +32,9 @@ RP_ORIGIN=https://myapp.com
 
 # The public URL of this Ignoti server, the same value you pass to the SDK as backendUrl
 PUBLIC_URL=https://auth.myapp.com
+
+# Secret your backend presents when it verifies sessions. Generate with: openssl rand -base64 32
+INTROSPECTION_SECRET=
 ```
 
 Start the stack:
@@ -210,6 +213,8 @@ const verifier = new IgnotiVerifier({
   serverUrl: 'https://your-ignoti-server.example.com',
   // The public URL of this backend, as the browser addresses it
   publicUrl: 'https://api.myapp.com',
+  // The Ignoti server's INTROSPECTION_SECRET
+  introspectionSecret: process.env.INTROSPECTION_SECRET,
 });
 
 // Express: protect routes with one line
@@ -234,8 +239,8 @@ path and query string (or the full URL) - it returns
 `{ valid: true, userId, deviceId, sessionId, expiresAt }` or `{ valid: false, error }`.
 
 Under the hood this is one POST to your Ignoti server's `POST /api/sessions/verify` endpoint
-(RFC 7662-style introspection), so it works from any language - forward `{ method, url, authorization,
-nonce, timestamp, signature }` and read the same JSON back. `url` is the full URL the client requested, built
+(RFC 7662-style introspection), so it works from any language - send `Authorization: Bearer <INTROSPECTION_SECRET>`,
+forward `{ method, url, authorization, nonce, timestamp, signature }` and read the same JSON back. `url` is the full URL the client requested, built
 from your backend's configured public URL plus the request path and query. Do not build it from the `Host`
 header, which the sender controls.
 

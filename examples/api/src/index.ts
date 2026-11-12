@@ -8,7 +8,8 @@
  * and attaches the authenticated identity to req.ignoti.
  *
  * Run alongside the Ignoti server and demo:
- *   pnpm dev:api   (listens on :8788, expects Ignoti on :8787)
+ *   INTROSPECTION_SECRET=<the server's value> pnpm dev:api
+ *   (listens on :8788, expects Ignoti on :8787)
  */
 
 import cors from '@fastify/cors';
@@ -26,7 +27,13 @@ const DEMO_ORIGIN = process.env.DEMO_ORIGIN ?? 'http://localhost:5173';
 const PORT = Number(process.env.PORT ?? 8788);
 const PUBLIC_URL = process.env.PUBLIC_URL ?? `http://localhost:${PORT}`;
 
-const verifier = new IgnotiVerifier({ serverUrl: IGNOTI_URL, publicUrl: PUBLIC_URL });
+const INTROSPECTION_SECRET = process.env.INTROSPECTION_SECRET ?? '';
+
+const verifier = new IgnotiVerifier({
+  serverUrl: IGNOTI_URL,
+  publicUrl: PUBLIC_URL,
+  introspectionSecret: INTROSPECTION_SECRET,
+});
 const requireIgnoti = verifier.fastifyPreHandler();
 
 const app = Fastify({ logger: true });

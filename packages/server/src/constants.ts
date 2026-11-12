@@ -34,6 +34,8 @@ export const RATE_LIMITS = {
 export const ERROR_MESSAGES: Record<ServerErrorCode, string> = {
   [SERVER_ERROR_CODES.INTERNAL_ERROR]: 'Internal server error',
   [SERVER_ERROR_CODES.INVALID_INPUT]: 'Request validation failed',
+  [SERVER_ERROR_CODES.INVALID_INTROSPECTION_CREDENTIALS]:
+    'Missing or invalid introspection credentials',
   [SERVER_ERROR_CODES.USER_NOT_FOUND]: 'User not found',
   [SERVER_ERROR_CODES.DEVICE_NOT_FOUND]: 'Device not found',
   [SERVER_ERROR_CODES.CREDENTIAL_ALREADY_REGISTERED]: 'Credential is already registered',

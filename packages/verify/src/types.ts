@@ -8,6 +8,8 @@ export interface IgnotiVerifierOptions {
   serverUrl: string;
   // Public base URL of your backend as clients address it, e.g. `https://api.example.com`.
   publicUrl: string;
+  // The Ignoti server's INTROSPECTION_SECRET. Keep it server-side only.
+  introspectionSecret: string;
   // Abort the verification request after this many milliseconds. Default: 5000.
   timeoutMs?: number;
   // Custom fetch implementation (dependency injection for tests/edge runtimes).

@@ -73,6 +73,9 @@ export const PROTOCOL_VALIDATION = {
 
 // Error codes returned by the server in the `error` field of every error response.
 // The SDK imports these to surface structured errors instead of opaque strings.
+// Introspection secret format: RFC 6750 token68, at least 32 characters.
+export const INTROSPECTION_SECRET_RE = /^[A-Za-z0-9._~+/-]{32,}=*$/;
+
 export const SERVER_ERROR_CODES = {
   ASSERTION_VERIFICATION_FAILED: 'assertion_verification_failed',
   ATTESTATION_VERIFICATION_FAILED: 'attestation_verification_failed',
@@ -81,6 +84,7 @@ export const SERVER_ERROR_CODES = {
   INVALID_AUTHORIZATION_SCHEME: 'invalid_authorization_scheme',
   INTERNAL_ERROR: 'internal_error',
   INVALID_INPUT: 'invalid_input',
+  INVALID_INTROSPECTION_CREDENTIALS: 'invalid_introspection_credentials',
   INVALID_OR_EXPIRED_CHALLENGE: 'invalid_or_expired_challenge',
   INVALID_OR_EXPIRED_SESSION_CHALLENGE: 'invalid_or_expired_session_challenge',
   INVALID_ROOT_SIGNATURE: 'invalid_root_signature',

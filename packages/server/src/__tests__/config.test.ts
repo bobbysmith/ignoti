@@ -218,6 +218,38 @@ describe('config', () => {
     });
   });
 
+  describe('INTROSPECTION_SECRET', () => {
+    const SECRET = 'q83vJ0m1Zt5lWcXk2PpR7sYhB4nDfGaE9uKxLoTi6Cw=';
+
+    it('is undefined when unset or empty', async () => {
+      stubEnv({ INTROSPECTION_SECRET: '' });
+      const config = await loadConfig();
+      expect(config.INTROSPECTION_SECRET).toBeUndefined();
+      expect(config.INTROSPECTION_SECRET_PREVIOUS).toBeUndefined();
+    });
+
+    it('accepts a base64 value of 32 or more characters', async () => {
+      stubEnv({ INTROSPECTION_SECRET: SECRET, INTROSPECTION_SECRET_PREVIOUS: SECRET });
+      const config = await loadConfig();
+      expect(config.INTROSPECTION_SECRET).toBe(SECRET);
+      expect(config.INTROSPECTION_SECRET_PREVIOUS).toBe(SECRET);
+    });
+
+    it.each([
+      ['shorter than 32 characters', 'a'.repeat(31)],
+      ['containing a space', `${'a'.repeat(32)} b`],
+      ['containing a newline', `${'a'.repeat(32)}\nb`],
+    ])('throws when it is %s', async (_label, value) => {
+      stubEnv({ INTROSPECTION_SECRET: value });
+      await expect(loadConfig()).rejects.toThrow();
+    });
+
+    it('throws when the previous secret is too short', async () => {
+      stubEnv({ INTROSPECTION_SECRET: SECRET, INTROSPECTION_SECRET_PREVIOUS: 'short' });
+      await expect(loadConfig()).rejects.toThrow();
+    });
+  });
+
   describe('TRUST_PROXY', () => {
     it('defaults to false (no proxy trusted) when TRUST_PROXY is not set', async () => {
       stubEnv();

@@ -12,7 +12,7 @@
  * a positive result across requests.
  */
 
-import { IGNOTI_HEADERS, SERVER_ERROR_CODES } from '@ignoti/shared';
+import { IGNOTI_HEADERS, INTROSPECTION_SECRET_RE, SERVER_ERROR_CODES } from '@ignoti/shared';
 
 import { IgnotiVerifyError } from './errors.js';
 import type {
@@ -50,6 +50,8 @@ function pluckHeader(headers: IncomingHeaders, wantedLower: string): string | un
 export class IgnotiVerifier {
   private readonly serverUrl: string;
   private readonly publicUrl: string;
+  // Runtime-private: absent from console.log and JSON.stringify output.
+  readonly #introspectionSecret: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
@@ -64,6 +66,15 @@ export class IgnotiVerifier {
     } catch {
       throw new IgnotiVerifyError(`Invalid publicUrl: ${options.publicUrl}`);
     }
+    if (typeof options.introspectionSecret !== 'string' || options.introspectionSecret === '') {
+      throw new IgnotiVerifyError('introspectionSecret is required');
+    }
+    if (!INTROSPECTION_SECRET_RE.test(options.introspectionSecret)) {
+      throw new IgnotiVerifyError(
+        'introspectionSecret must be at least 32 characters of [A-Za-z0-9._~+/-]'
+      );
+    }
+    this.#introspectionSecret = options.introspectionSecret;
     this.serverUrl = options.serverUrl.replace(/\/$/, '');
     this.publicUrl = options.publicUrl.replace(/\/+$/, '');
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -95,7 +106,10 @@ export class IgnotiVerifier {
     try {
       response = await this.fetchImpl(`${this.serverUrl}${VERIFY_PATH}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.#introspectionSecret}`,
+        },
         body: JSON.stringify({
           method: input.method,
           // Paths resolve against publicUrl; the Host header is client-controlled.

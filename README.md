@@ -65,7 +65,7 @@ together and runs migrations automatically on first boot.
 ```bash
 curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/docker-compose.yml
 
-# Set RP_ID and RP_ORIGIN for your domain - see Environment variables below
+# Set RP_ID, RP_ORIGIN, and INTROSPECTION_SECRET - see Environment variables below
 cp .env.example .env
 
 docker compose up -d
@@ -130,6 +130,8 @@ your infrastructure. Ignoti never has access to it.
 | `DATABASE_URL`          | Yes      | -                       | Postgres connection string.                                                                                                                                                                                                                                                   |
 | `RP_ID`                 | Yes      | `localhost`             | WebAuthn relying party ID - the hostname of your app, no scheme or port, ex. `mycoolapp.com`.                                                                                                                                                                                 |
 | `PUBLIC_URL`            | Yes      | `http://localhost:8787` | Public base URL of this server, the same value the SDK uses as `backendUrl`. Session request signatures cover the full URL, so a mismatch rejects every signed request with `invalid_session_signature`.                                                                      |
+| `INTROSPECTION_SECRET`  | Yes      | -                       | Secret your backend sends as a bearer token to `POST /api/sessions/verify` (the verifier's `introspectionSecret`). At least 32 characters; generate with `openssl rand -base64 32`. The server does not start without it.                                                     |
+| `INTROSPECTION_SECRET_PREVIOUS`| No       | -                       | Previous secret, still accepted while you rotate `INTROSPECTION_SECRET`.                                                                                                                                                                                                      |
 | `RP_NAME`               | No       | `Ignoti`                | Display name shown to users in passkey dialogs.                                                                                                                                                                                                                               |
 | `RP_ORIGIN`             | Yes      | `http://localhost:5173` | Allowed origin(s). Must match your frontend exactly (scheme and host and port). Comma-separated for multiple origins.                                                                                                                                                         |
 | `CHALLENGE_TTL_SECONDS` | No       | `300` (5 min)           | How long a WebAuthn challenge stays valid. Min: 30, max: 3600.                                                                                                                                                                                                                |

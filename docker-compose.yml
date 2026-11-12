@@ -32,6 +32,8 @@ services:
     environment:
       DATABASE_URL: postgres://ignoti:ignoti@db:5432/ignoti
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8787}
+      INTROSPECTION_SECRET: ${INTROSPECTION_SECRET:?set INTROSPECTION_SECRET, e.g. openssl rand -base64 32}
+      INTROSPECTION_SECRET_PREVIOUS: ${INTROSPECTION_SECRET_PREVIOUS:-}
       RP_ID: ${RP_ID:-localhost}
       RP_NAME: ${RP_NAME:-Ignoti}
       RP_ORIGIN: ${RP_ORIGIN:-http://localhost:5173}
