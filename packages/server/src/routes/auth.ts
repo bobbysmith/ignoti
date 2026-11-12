@@ -355,16 +355,18 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
       const expiresAt = new Date(Date.now() + config.SESSION_TTL_SECONDS * 1000);
       const { secret, hash } = generateRestoreToken();
+      const family = generateRestoreToken();
       const session = await insertSession({
         deviceId: challenge.device_id,
         sessionPublicKey: verified.sessionPublicKey,
         restoreTokenHash: hash,
+        restoreFamilyHash: family.hash,
         expiresAt,
       });
 
       reply.setCookie(
         SESSION_COOKIE_NAME,
-        buildSessionCookie(session.id, secret),
+        buildSessionCookie(session.id, family.secret, secret),
         sessionCookieOptions()
       );
 
@@ -378,7 +380,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
   /**
    * POST /api/auth/session/restore
-   * Cookie: ignoti_session=<sessionId>.<secret>
+   * Cookie: ignoti_session=<sessionId>.<family>.<secret>
    * Body: { sessionBinding }  (compact JWS, EdDSA — same shape as /session)
    * Returns: { sessionId, userId, deviceId, expiresAt }
    *
@@ -389,11 +391,11 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    * session and carries a rotating restore secret.
    *
    * Refresh-token rotation with reuse detection (RFC 9700): the cookie is
-   * `${sessionId}.${secret}`. A successful restore rebinds the public key and
-   * rotates to a fresh secret, invalidating the old cookie. If a secret is
-   * presented that does not match the current one on an otherwise-active
-   * session, the cookie was stolen and replayed — the session is revoked so a
-   * thief and the real user cannot both hold a working cookie.
+   * `${sessionId}.${family}.${secret}`. A successful restore rebinds the public
+   * key and rotates to a fresh secret, invalidating the old cookie; the family
+   * secret is fixed for the life of the session. A cookie with the right family
+   * but a non-current secret is an earlier cookie being replayed, so the session
+   * is revoked: a thief and the real user cannot both hold a working cookie.
    */
   app.post(
     ROUTES.AUTH.SESSION_RESTORE,
@@ -405,7 +407,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         reply.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);
       }
-      const { sessionId, secret } = parsedCookie;
+      const { sessionId, family, secret } = parsedCookie;
 
       const parsed = sessionBody.safeParse(req.body);
       if (!parsed.success) {
@@ -421,19 +423,21 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         return sendError(reply, 401, ERROR_CODES.INVALID_SESSION_BINDING);
       }
 
+      const familyHash = hashRestoreToken(family);
       const presentedHash = hashRestoreToken(secret);
       const rotated = generateRestoreToken();
       const session = await rotateSessionOnRestore(
         sessionId,
+        familyHash,
         presentedHash,
         rotated.hash,
         verified.sessionPublicKey
       );
 
       if (!session) {
-        // Revoke only on a replayed superseded secret. Session ids are not secret,
-        // so revoking on any mismatch would be a remote DoS.
-        const reuseDetected = await revokeSessionOnRestoreReuse(sessionId, presentedHash);
+        // Revoke only on a replayed earlier cookie (family matches). Session ids
+        // are not secret, so revoking on any mismatch would be a remote DoS.
+        const reuseDetected = await revokeSessionOnRestoreReuse(sessionId, familyHash);
         if (reuseDetected) {
           req.log.warn({ sessionId }, 'session restore token reuse detected; session revoked');
         }
@@ -443,7 +447,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
       reply.setCookie(
         SESSION_COOKIE_NAME,
-        buildSessionCookie(sessionId, rotated.secret),
+        buildSessionCookie(sessionId, family, rotated.secret),
         sessionCookieOptions()
       );
 

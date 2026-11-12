@@ -4,6 +4,7 @@ interface InsertSessionParams {
   deviceId: string;
   sessionPublicKey: string;
   restoreTokenHash: string;
+  restoreFamilyHash: string;
   expiresAt: Date;
 }
 
@@ -36,11 +37,14 @@ interface SessionRow {
 
 export async function insertSession(params: InsertSessionParams): Promise<SessionRow> {
   const [session] = await sql<SessionRow[]>`
-    insert into sessions (device_id, session_public_key, restore_token_hash, expires_at)
+    insert into sessions (
+      device_id, session_public_key, restore_token_hash, restore_family_hash, expires_at
+    )
     values (
       ${params.deviceId},
       ${params.sessionPublicKey},
       ${params.restoreTokenHash},
+      ${params.restoreFamilyHash},
       ${params.expiresAt}
     )
     returning id, expires_at
@@ -83,13 +87,13 @@ export async function getSessionsForUser(userId: string): Promise<SessionListRow
 
 /**
  * Restore with rotation: atomically rebinds the session public key AND rotates
- * the restore-token hash, but only when the presented hash matches the current
- * one on an active session. Returns undefined on any mismatch (wrong/replayed
- * secret, revoked, or expired) - the caller treats a mismatch on a still active
- * session as token reuse.
+ * the restore-token hash, but only when both the family hash and the presented
+ * secret hash match an active session. Returns undefined on any mismatch
+ * (wrong/replayed secret, wrong family, revoked, or expired).
  */
 export async function rotateSessionOnRestore(
   sessionId: string,
+  familyHash: string,
   presentedHash: string,
   newHash: string,
   newPublicKey: string
@@ -97,11 +101,11 @@ export async function rotateSessionOnRestore(
   const [row] = await sql<RotateRow[]>`
     update sessions s
     set session_public_key = ${newPublicKey},
-        prev_restore_token_hash = s.restore_token_hash,
         restore_token_hash = ${newHash}
     from devices d
     where s.id = ${sessionId}
       and s.device_id = d.id
+      and s.restore_family_hash = ${familyHash}
       and s.restore_token_hash = ${presentedHash}
       and s.revoked_at is null
       and s.expires_at > now()
@@ -111,21 +115,21 @@ export async function rotateSessionOnRestore(
 }
 
 /**
- * Restore-token reuse detection (single-generation: tracks the immediately-prior
- * hash, not a full token family). Revokes only when the presented secret matches
- * the superseded hash. A secret matching neither hash must not revoke: session ids
- * are not secret, so that would be a remote DoS.
+ * Restore-token reuse detection. Call only after rotateSessionOnRestore has
+ * rejected the cookie: a matching family then means an earlier cookie of this
+ * session is being replayed. A wrong family must not revoke: session ids are
+ * not secret, so that would be a remote DoS.
  */
 export async function revokeSessionOnRestoreReuse(
   sessionId: string,
-  presentedHash: string
+  familyHash: string
 ): Promise<boolean> {
   const [row] = await sql<{ id: string }[]>`
     update sessions set revoked_at = now()
     where id = ${sessionId}
       and revoked_at is null
       and expires_at > now()
-      and prev_restore_token_hash = ${presentedHash}
+      and restore_family_hash = ${familyHash}
     returning id
   `;
   return row !== undefined;

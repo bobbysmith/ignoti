@@ -286,10 +286,27 @@ describe('Integration: auth happy paths', () => {
       expect(afterReuse.statusCode).toBe(401);
     });
 
+    it('revokes when the original cookie is replayed after the thief restored twice', async () => {
+      const { sessionCookie: stolen } = await registerAndLogin(app);
+
+      const thiefFirst = await restoreWithCookie(app, stolen);
+      expect(thiefFirst.statusCode).toBe(200);
+      const thiefSecond = await restoreWithCookie(app, setCookieHeader(thiefFirst));
+      expect(thiefSecond.statusCode).toBe(200);
+      const thiefCookie = setCookieHeader(thiefSecond);
+
+      // The original cookie is now two generations old: still reuse, revoke.
+      const victim = await restoreWithCookie(app, stolen);
+      expect(victim.statusCode).toBe(401);
+
+      const thiefAfter = await restoreWithCookie(app, thiefCookie);
+      expect(thiefAfter.statusCode).toBe(401);
+    });
+
     it('does NOT revoke on a garbage secret for a known session id (revocation DoS guard)', async () => {
       const { sessionCookie, sessionId } = await registerAndLogin(app);
 
-      const garbageCookie = `ignoti_session=${sessionId}.not-the-real-secret-000000000000`;
+      const garbageCookie = `ignoti_session=${sessionId}.not-the-real-family-0000.not-the-real-secret-0000`;
       const attack = await restoreWithCookie(app, garbageCookie);
       expect(attack.statusCode).toBe(401);
 

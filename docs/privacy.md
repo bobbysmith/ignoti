@@ -26,7 +26,7 @@ Here is the complete list of what ends up in the database.
 - A random UUID
 - The ID of the device it belongs to
 - The ephemeral session public key
-- The SHA-256 hash of the current rotating restore-cookie secret, and of the immediately-prior one (never the secrets themselves)
+- The SHA-256 hash of the current rotating restore-cookie secret, and of the session's fixed restore-family secret (never the secrets themselves)
 - Created, expiry, last-used, and revoked timestamps
 
 **Operational tables (not per-user data):**

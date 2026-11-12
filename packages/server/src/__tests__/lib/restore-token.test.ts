@@ -35,31 +35,30 @@ describe('restore-token', () => {
 
   describe('buildSessionCookie / parseSessionCookie', () => {
     const sessionId = '550e8400-e29b-41d4-a716-446655440001';
+    const family = 'ZmFtaWx5LXNlY3JldA';
     const secret = 'cmVzdG9yZS1zZWNyZXQ';
 
-    it('round-trips a session id and secret', () => {
-      const cookie = buildSessionCookie(sessionId, secret);
-      expect(parseSessionCookie(cookie)).toEqual({ sessionId, secret });
+    it('round-trips a session id, family, and secret', () => {
+      const cookie = buildSessionCookie(sessionId, family, secret);
+      expect(parseSessionCookie(cookie)).toEqual({ sessionId, family, secret });
     });
 
-    it('returns null for a bare session id (old format, no secret)', () => {
+    it('returns null for a bare session id (oldest format)', () => {
       expect(parseSessionCookie(sessionId)).toBeNull();
     });
 
-    it('returns null when the secret is empty', () => {
-      expect(parseSessionCookie(`${sessionId}.`)).toBeNull();
+    it('returns null for the previous two-part format (no family)', () => {
+      expect(parseSessionCookie(`${sessionId}.${secret}`)).toBeNull();
     });
 
-    it('returns null when there is no session id before the dot', () => {
-      expect(parseSessionCookie(`.${secret}`)).toBeNull();
+    it('returns null when any part is empty', () => {
+      expect(parseSessionCookie(`.${family}.${secret}`)).toBeNull();
+      expect(parseSessionCookie(`${sessionId}..${secret}`)).toBeNull();
+      expect(parseSessionCookie(`${sessionId}.${family}.`)).toBeNull();
     });
 
-    it('keeps a secret that itself contains dots intact', () => {
-      const dotted = 'a.b.c';
-      expect(parseSessionCookie(`${sessionId}.${dotted}`)).toEqual({
-        sessionId,
-        secret: dotted,
-      });
+    it('returns null when there are more than three parts', () => {
+      expect(parseSessionCookie(`${sessionId}.${family}.${secret}.extra`)).toBeNull();
     });
   });
 });

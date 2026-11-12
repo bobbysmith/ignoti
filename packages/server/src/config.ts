@@ -69,9 +69,6 @@ const envSchema = z.object({
   //   - a comma-separated list of trusted proxy IPs/CIDRs
   // Getting this wrong lets clients spoof their IP (too trusting) or collapses
   // every client behind the proxy into one rate-limit bucket (not trusting enough).
-  // Proxy trust is opt-in: with no proxy in front, any trusted hop means the
-  // client's own X-Forwarded-For header picks its rate-limit bucket, which
-  // defeats every limit. Deployments behind a proxy must set this explicitly.
   TRUST_PROXY: z
     .string()
     .default('false')

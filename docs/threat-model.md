@@ -79,9 +79,11 @@ cookie and generates a fresh ephemeral keypair; the private key is never written
 The cookie is a bearer credential *for session restore* - like an OAuth refresh token. Whoever presents it can bind 
 a new session keypair and obtain a working session, so it is protected the way refresh tokens are: httpOnly + Secure 
 + SameSite, plus **rotation with reuse detection** (RFC 9700). The cookie carries a rotating secret; every restore 
-issues a new one and invalidates the old. If a secret is ever presented that does not match the current one on an 
-otherwise-active session - the signature that a stolen, already-rotated cookie was replayed by a second party - the 
-server revokes the session, so a thief and the legitimate user cannot both hold a working cookie. This detects and 
+issues a new one and invalidates the old. It also carries a family secret that is fixed for the life of the session, 
+so the server can recognise any cookie it ever issued for that session. If an earlier cookie is presented on an 
+otherwise-active session, however many rotations ago it was issued - the signature that a stolen, already-rotated 
+cookie was replayed by a second party - the server revokes the session, so a thief and the legitimate user cannot 
+both hold a working cookie. This detects and 
 kills cookie theft after the fact; it does not prevent an attacker who has live XSS on the page from acting within 
 that page, which is game-over for any browser session regardless of storage mechanism (httpOnly prevents 
 exfiltration, not in-page use).

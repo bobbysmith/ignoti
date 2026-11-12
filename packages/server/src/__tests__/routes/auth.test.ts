@@ -27,6 +27,7 @@ import {
 } from '../../db/queries/sessions.js';
 import { getUserById, getUserByRootPublicKey, upsertUser } from '../../db/queries/users.js';
 import { buildRegistrationOptions, extractChallenge } from '../../helpers/auth.js';
+import { hashRestoreToken } from '../../lib/restore-token.js';
 import { decodeJwt, verifyDeviceBindingJWS } from '../../lib/root-jws.js';
 import { verifySessionBindingJWS } from '../../lib/session-jws.js';
 import { registerAuthRoutes } from '../../routes/auth.js';
@@ -75,7 +76,8 @@ const SESSION_RESTORE_URL = '/api/auth/session/restore';
 const RECOVER_URL = '/api/auth/recover';
 const VALID_SESSION_ID = '550e8400-e29b-41d4-a716-446655440001';
 const VALID_RESTORE_SECRET = 'cmVzdG9yZS1zZWNyZXQtdmFsdWU';
-const VALID_SESSION_COOKIE = `${VALID_SESSION_ID}.${VALID_RESTORE_SECRET}`;
+const VALID_RESTORE_FAMILY = 'cmVzdG9yZS1mYW1pbHktdmFsdWU';
+const VALID_SESSION_COOKIE = `${VALID_SESSION_ID}.${VALID_RESTORE_FAMILY}.${VALID_RESTORE_SECRET}`;
 
 const VALID_REGISTRATION_RESPONSE = {
   id: VALID_CREDENTIAL_ID,
@@ -956,22 +958,25 @@ describe('auth', () => {
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
 
-      it('checks for reuse with the presented secret hash, not the bare session id', async () => {
+      it('checks for reuse with the family hash, not the bare session id', async () => {
         vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(true);
         await postRestore(undefined, VALID_SESSION_COOKIE);
-        // Reuse detection is gated on the presented secret's hash matching the
-        // superseded hash — never on the session id alone.
+        // Reuse detection is gated on the hash of the cookie's family secret,
+        // never on the session id alone and never on the raw secret.
         expect(revokeSessionOnRestoreReuse).toHaveBeenCalledWith(
           VALID_SESSION_ID,
-          expect.any(String)
+          hashRestoreToken(VALID_RESTORE_FAMILY)
         );
       });
 
       it('does NOT revoke on a garbage secret for a known session id (DoS guard)', async () => {
-        // rotate fails (wrong current hash) AND reuse check finds no superseded
-        // match — the endpoint must reject without revoking.
+        // rotate fails AND the reuse check finds no family match: the endpoint
+        // must reject without revoking.
         vi.mocked(revokeSessionOnRestoreReuse).mockResolvedValue(false);
-        const res = await postRestore(undefined, `${VALID_SESSION_ID}.not-the-real-secret`);
+        const res = await postRestore(
+          undefined,
+          `${VALID_SESSION_ID}.not-the-real-family.not-the-real-secret`
+        );
         expect(res.statusCode).toBe(401);
         expect(res.json()).toMatchObject({ error: ERROR_CODES.SESSION_NOT_FOUND });
       });
@@ -1000,11 +1005,12 @@ describe('auth', () => {
         vi.mocked(rotateSessionOnRestore).mockResolvedValue(ROTATE_ROW);
       });
 
-      it('rotates with the sessionId, a hashed secret, a new hash, and the new public key', async () => {
+      it('rotates with the sessionId, hashed family and secret, a new hash, and the new public key', async () => {
         await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(rotateSessionOnRestore).toHaveBeenCalledWith(
           VALID_SESSION_ID,
-          expect.any(String),
+          hashRestoreToken(VALID_RESTORE_FAMILY),
+          hashRestoreToken(VALID_RESTORE_SECRET),
           expect.any(String),
           VALID_SESSION_PUBLIC_KEY
         );
@@ -1014,7 +1020,7 @@ describe('auth', () => {
         const res = await postRestore(undefined, VALID_SESSION_COOKIE);
         const raw = res.headers['set-cookie'];
         const cookieStr = Array.isArray(raw) ? raw[0] : (raw as string);
-        expect(cookieStr).toContain(`ignoti_session=${VALID_SESSION_ID}.`);
+        expect(cookieStr).toContain(`ignoti_session=${VALID_SESSION_ID}.${VALID_RESTORE_FAMILY}.`);
         expect(cookieStr).not.toContain(VALID_RESTORE_SECRET);
       });
 
