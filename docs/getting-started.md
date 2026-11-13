@@ -77,7 +77,8 @@ export const ignoti = new Ignoti({
 ignoti.init();
 ```
 
-`init()` is synchronous. The session private key stays in memory only, nothing is written to disk or localStorage.
+`init()` is synchronous. Nothing is written to localStorage. The only thing the SDK stores is the session keypair,
+kept in IndexedDB as a non-extractable key that scripts can use but cannot read.
 
 ---
 
@@ -103,21 +104,24 @@ showMnemonicScreen(mnemonic); // your UI
 ## 5. Log in
 
 `login()` requests a WebAuthn challenge from the server, prompts the user to authenticate with their passkey, and
-establishes an in-memory session.
+establishes a session.
 
 ```ts
 const { sessionId, expiresAt } = await ignoti.login();
 ```
 
-The session private key exists only in memory. Call `restoreSession()` on page load to re-establish the session from
-the httpOnly cookie, no passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
+Call `restoreSession()` on page load to resume the session from the httpOnly cookie and the stored session key, no
+passkey prompt needed. If the session has expired or been revoked, `restoreSession()` throws and `getSession()` returns `null`.
 
 ---
 
 ## 6. Handle returning users
 
-On page load, call `restoreSession()` before rendering any authenticated UI. It sends a fresh keypair binding to the
-server, which validates the session cookie and re-establishes the in-memory session, no passkey prompt needed.
+On page load, call `restoreSession()` before rendering any authenticated UI. It proves possession of the session key
+to the server, which validates the session cookie and resumes the session, no passkey prompt needed. A session keeps
+the same key for its whole life, so a restore from a browser that does not hold that key is rejected. If the stored
+key is gone (site data cleared, or a browser that blocks IndexedDB), `restoreSession()` throws and the user logs in
+again.
 
 ```ts
 ignoti.init();
@@ -189,7 +193,7 @@ const response = await fetch(url, { headers });
 ```
 
 The session key signs a short-lived timestamp on every call. A stolen session ID alone cannot be replayed - the
-attacker would also need the in-memory private key.
+attacker would also need the session private key.
 
 The `method` and `url` you pass to `getSessionHeaders()` are baked into the signature: host, path, and query
 string. The headers are only valid for that exact request, so sign the same URL you fetch. A relative URL
@@ -318,7 +322,7 @@ try {
 }
 ```
 
-The session is revoked server-side (which clears the httpOnly cookie), and only then is the in-memory key wiped and
+The session is revoked server-side (which clears the httpOnly cookie), and only then is the session key deleted and
 `onSessionChange(null)` fired. If the server call fails, the error is thrown and the session is left intact — the
 user stays logged in. Ignoti does not hide the failure or clear state optimistically; handle the error and retry if
 you want. Only treat the user as logged out after `logout()` resolves.

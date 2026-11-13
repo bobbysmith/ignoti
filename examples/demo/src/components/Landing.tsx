@@ -38,7 +38,7 @@ export function Landing() {
           <dd>WebAuthn passkey - registered per device</dd>
           <dd className="layer-arrow">↓</dd>
           <dt>session key</dt>
-          <dd>ephemeral Ed25519 (WebCrypto) - lives in memory, signs requests</dd>
+          <dd>ephemeral Ed25519 (WebCrypto) - non-extractable, signs requests</dd>
         </dl>
         <p>
           You create your identity through a generated 12-word mnemonic. From that a root keypair is

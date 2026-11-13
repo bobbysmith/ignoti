@@ -1102,7 +1102,7 @@ describe('auth', () => {
         vi.mocked(rotateSessionOnRestore).mockResolvedValue(ROTATE_ROW);
       });
 
-      it('rotates with the sessionId, hashed family and secret, a new hash, and the new public key', async () => {
+      it('rotates with the sessionId, hashed family and secret, a new hash, and the proven public key', async () => {
         await postRestore(undefined, VALID_SESSION_COOKIE);
         expect(rotateSessionOnRestore).toHaveBeenCalledWith(
           VALID_SESSION_ID,

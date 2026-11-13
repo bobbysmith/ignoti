@@ -4,12 +4,13 @@
  *   2. Device identity (WebAuthn passkey) - daily auth.
  *   3. Session identity (ephemeral Ed25519) - silent request signing.
  *
- * The SDK persists nothing. Session identity lives in an httpOnly cookie set by
- * the server; the session private key lives only in memory. On page reload,
- * call restoreSession() to rebind a fresh keypair to the existing session.
+ * Session identity lives in an httpOnly cookie set by the server plus a session
+ * keypair generated via WebCrypto at login. The keypair is kept in IndexedDB so
+ * that restoreSession() can resume the session after a page reload; a session
+ * keeps the same key for its whole life. The SDK persists nothing else.
  *
- * Session identity: ephemeral Ed25519 keypair generated via WebCrypto. The
- * private key is non-extractable - its bytes never enter the JS heap. Root key
+ * The session private key is non-extractable - its bytes never enter the JS
+ * heap, in memory or in storage. Root key
  * bytes are zeroed after use as a best-effort measure; JavaScript cannot
  * guarantee secure erasure (GC may copy buffers before they are zeroed).
  */
@@ -40,6 +41,7 @@ import {
   toBase64,
 } from './core/crypto';
 import { ErrorCodes, IgnotiError } from './core/errors';
+import { createSessionKeyStore, type SessionKeyStore } from './core/session-key-store';
 import type {
   CreateIdentityResult,
   DeviceInfo,
@@ -55,6 +57,7 @@ interface ActiveSession {
   deviceId: string;
   expiresAt: number;
   sessionPrivateKey: CryptoKey;
+  sessionPublicKey: CryptoKey;
 }
 
 export class Ignoti {
@@ -63,6 +66,7 @@ export class Ignoti {
   private readonly defaultDeviceName?: string;
   private initialized = false;
   private session: ActiveSession | null = null;
+  private readonly sessionKeys: SessionKeyStore;
   private restorePromise: Promise<void> | null = null;
   private restoreFailures = 0;
   private sessionChangeCallback: ((session: SessionInfo | null) => void) | null = null;
@@ -74,6 +78,7 @@ export class Ignoti {
       onUnauthorized: (m, p) => this.handleUnauthorized(m, p),
     });
     this.backendUrl = options.backendUrl.replace(/\/$/, '');
+    this.sessionKeys = createSessionKeyStore(this.backendUrl);
     this.defaultDeviceName = options.defaultDeviceName;
   }
 
@@ -105,14 +110,14 @@ export class Ignoti {
   }
 
   /**
-   * Single-flights the restore so concurrent callers — multiple tabs, a
+   * Single-flights the restore so concurrent callers on this instance (a
    * StrictMode double-invoke, or an automatic recovery overlapping an explicit
-   * restoreSession() — share one attempt and one keypair, and cannot race to
-   * bind mismatched keys. Failure count increments once per attempt.
+   * restoreSession()) share one attempt and rotate the restore cookie once.
+   * Failure count increments once per attempt.
    */
   private dedupedRestore(): Promise<void> {
     if (!this.restorePromise) {
-      this.restorePromise = this.performRestore()
+      this.restorePromise = this.withRestoreLock(() => this.performRestore())
         .then(() => {
           this.restoreFailures = 0;
         })
@@ -125,6 +130,19 @@ export class Ignoti {
         });
     }
     return this.restorePromise;
+  }
+
+  /**
+   * Serializes restores across tabs. Each restore rotates the session cookie,
+   * and the server revokes a session when a superseded cookie is presented.
+   * Runs unlocked where the Web Locks API is unavailable.
+   */
+  private async withRestoreLock(restore: () => Promise<void>): Promise<void> {
+    const locks = globalThis.navigator?.locks;
+    if (!locks) {
+      return restore();
+    }
+    await locks.request(`ignoti:restore:${this.backendUrl}`, restore);
   }
 
   private async handleUnauthorized(method: string, path: string): Promise<Record<string, string>> {
@@ -168,14 +186,28 @@ export class Ignoti {
     await this.dedupedRestore();
   }
 
+  /**
+   * Resumes the session bound to the stored keypair. Falls back to the
+   * in-memory keypair when storage holds none. Never generates a new key:
+   * the server only accepts the key the session was created with.
+   */
   private async performRestore(): Promise<void> {
-    const sessionKeyPair = await generateSessionSigningKeypair();
+    const stored = await this.sessionKeys.load();
+    const keyPair =
+      stored ??
+      (this.session && {
+        privateKey: this.session.sessionPrivateKey,
+        publicKey: this.session.sessionPublicKey,
+      });
+    if (!keyPair) {
+      throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
+    }
     try {
       const nonce = crypto.randomUUID();
       const sessionBinding = await signSessionBindingJWS(
         { sessionChallenge: nonce },
-        sessionKeyPair.privateKey,
-        sessionKeyPair.publicKey
+        keyPair.privateKey,
+        keyPair.publicKey
       );
       const response = await this.apiClient.auth.restoreSession(sessionBinding);
       this.session = {
@@ -183,15 +215,26 @@ export class Ignoti {
         userId: response.userId,
         deviceId: response.deviceId,
         expiresAt: response.expiresAt,
-        sessionPrivateKey: sessionKeyPair.privateKey,
+        sessionPrivateKey: keyPair.privateKey,
+        sessionPublicKey: keyPair.publicKey,
       };
       this.notifySessionChange();
     } catch (error) {
       if (error instanceof IgnotiError && error.httpStatus === 401) {
+        if (stored) {
+          await this.sessionKeys.clear();
+        }
         throw new IgnotiError(ERROR_MESSAGES.NO_ACTIVE_SESSION, ErrorCodes.NO_KEYS);
       }
       throw error;
     }
+  }
+
+  /** Ends the local session after the server has revoked it. */
+  private async endSession(): Promise<void> {
+    this.session = null;
+    await this.sessionKeys.clear();
+    this.notifySessionChange();
   }
 
   private ensureInitialized(): void {
@@ -284,7 +327,9 @@ export class Ignoti {
       deviceId: loginResponse.deviceId,
       expiresAt: sessionResponse.expiresAt,
       sessionPrivateKey: sessionKeyPair.privateKey,
+      sessionPublicKey: sessionKeyPair.publicKey,
     };
+    await this.sessionKeys.save(sessionKeyPair);
     this.restoreFailures = 0;
     this.notifySessionChange();
 
@@ -417,8 +462,7 @@ export class Ignoti {
     // throws, the session stays intact (the user is still logged in) and the
     // error propagates so the caller can surface it and retry.
     await this.apiClient.sessions.revokeSession(sessionId, sessionId, iat, signature, jti);
-    this.session = null;
-    this.notifySessionChange();
+    await this.endSession();
   }
 
   async getDevices(): Promise<DeviceInfo[]> {
@@ -463,8 +507,7 @@ export class Ignoti {
     // Revoking a device also revokes its sessions server-side; if it backed the
     // current session, that session is now dead, so clear local state.
     if (this.session?.deviceId === deviceId) {
-      this.session = null;
-      this.notifySessionChange();
+      await this.endSession();
     }
   }
 
@@ -508,8 +551,7 @@ export class Ignoti {
     const signature = await this.signWithSessionKey({ htm: 'DELETE', htu, iat, jti, sessionId });
     await this.apiClient.sessions.revokeSession(targetSessionId, sessionId, iat, signature, jti);
     if (targetSessionId === sessionId) {
-      this.session = null;
-      this.notifySessionChange();
+      await this.endSession();
     }
   }
 
@@ -535,8 +577,7 @@ export class Ignoti {
       sessionId,
     });
     await this.apiClient.sessions.revokeAllSessions(sessionId, iat, signature, jti);
-    this.session = null;
-    this.notifySessionChange();
+    await this.endSession();
   }
 
   /**

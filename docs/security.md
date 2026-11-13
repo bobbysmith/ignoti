@@ -55,9 +55,9 @@ Ignoti is self-hosted. Your auth is only as compromised as your own server.
 ## Session hijacking is much harder than it sounds
 
 After login, sessions are bound to an ephemeral keypair generated in the browser. Every subsequent API request is 
-signed with the session private key, which only exists in memory and never touches disk, localStorage, or any 
-server. A stolen session token alone is useless because the attacker does not have the key needed to produce valid 
-request signatures.
+signed with the session private key, which is never sent to any server and never placed in localStorage. A stolen 
+session token alone is useless because the attacker does not have the key needed to produce valid request 
+signatures, and the cookie cannot be used to attach a different key to the session.
 
 The session token itself is stored in an `httpOnly` cookie. JavaScript on your page cannot read it. Even a 
 successful XSS attack cannot steal the cookie directly.
@@ -66,14 +66,14 @@ successful XSS attack cannot steal the cookie directly.
 
 Many auth systems store session tokens or JWTs in `localStorage`. Any script running on your page can read 
 `localStorage`, including third-party analytics, chat widgets, and injected ads. Ignoti stores the session token 
-in an `httpOnly` cookie that JavaScript cannot access. The session signing key lives in memory only and is gone 
-when the page closes.
+in an `httpOnly` cookie that JavaScript cannot access. The session signing key is held as a non-extractable key in 
+IndexedDB: scripts can ask the browser to sign with it, but cannot read it.
 
 ## CSRF is blocked by design
 
-Every authenticated request must include a live Ed25519 signature produced by the session private key, which exists 
-only in memory on the user's page. A malicious page on a different origin cannot read that key and cannot produce a 
-valid signature. A forged request without a valid signature is rejected by the server regardless of whether the 
+Every authenticated request must include a live Ed25519 signature produced by the session private key, which is 
+only usable by pages on your origin. A malicious page on a different origin cannot reach that key and cannot produce 
+a valid signature. A forged request without a valid signature is rejected by the server regardless of whether the 
 session cookie was sent.
 
 In production, the session cookie is `SameSite=None; Secure`, which is required for cross-origin deployments where 
@@ -134,11 +134,19 @@ by the session private key. There is no token to guess because a token alone is 
 
 ## The session private key cannot be exfiltrated
 
-The session keypair is generated with the Web Crypto API using `extractable: false`. If an attacker gets script 
-execution on your page while a user is logged in, they can use the key to make authenticated requests during that 
-session. They cannot, however, export the raw key bytes, serialize the key, or send it to another server. Once the 
-session ends and the tab closes, the key is gone. There is nothing to persist, copy, or reuse later. The damage is 
-bounded to the active session window.
+The session keypair is generated with the Web Crypto API using `extractable: false`, and a session keeps that one 
+key for its whole life. If an attacker gets script execution on your page while a user is logged in, they can use 
+the key to make authenticated requests from that page. They cannot, however, export the raw key bytes, serialize 
+the key, or send it to another server.
+
+They also cannot swap in a key of their own. Restoring a session after a reload requires a signature from the key 
+the session was created with; a restore signed by any other key is rejected and the session is revoked. Starting a 
+new session requires a passkey prompt the user must approve. So the session cannot be moved off the device: the 
+damage is bounded to what the script can do from the user's own browser while it is running there.
+
+The key is stored in the browser's IndexedDB so it survives a page reload. It is deleted on logout and when its 
+session is revoked. It stays non-extractable in storage, but like the session cookie it lives in the browser 
+profile on disk, so it is not protected from malware that controls the device itself.
 
 ## Biometric or PIN is always required
 
@@ -191,10 +199,10 @@ constant time, and rejects every other caller before doing any work.
 
 ## What Ignoti cannot protect against
 
-**Malicious JavaScript on your own page.** If an attacker injects script into your site, they can use the in-memory 
-session key while the user is logged in and make API calls for the duration of that session. Ignoti's `httpOnly` 
-cookie prevents cookie theft and `extractable: false` prevents the key bytes from being exfiltrated, but neither 
-stops an attacker who already has code execution on your origin from making calls during the session window.
+**Malicious JavaScript on your own page.** If an attacker injects script into your site, they can use the session 
+key while their script is running in the user's browser and make API calls as that user. Ignoti's `httpOnly` cookie 
+prevents cookie theft and `extractable: false` prevents the key from being copied to another machine, but neither 
+stops an attacker who already has code execution on your origin from making calls from that page.
 
 The defense is preventing XSS in the first place. At minimum:
 

@@ -37,10 +37,10 @@ A WebAuthn passkey bound to the user's authenticator - Touch ID, Face ID, Window
 Hardware-backed, phishing-resistant. This is how users log in day to day.
 
 **Session identity (ephemeral)**
-An Ed25519 keypair generated in memory at login. Every subsequent API request is signed with the session private key.
-A stolen session ID alone cannot be replayed - the attacker would also need the in-memory private key. The session
-survives page reloads via an httpOnly cookie, the private key is never persisted, only a session token that
-JavaScript cannot read.
+An Ed25519 keypair generated in the browser at login. Every subsequent API request is signed with the session private
+key. A stolen session ID alone cannot be replayed - the attacker would also need the private key, which is
+non-extractable: scripts can sign with it but cannot read or copy it. The session survives page reloads via an
+httpOnly cookie that JavaScript cannot read, plus that same key, kept in the browser's IndexedDB.
 
 The server stores only opaque public keys and UUIDs. No email, no phone, no OAuth token, no PII of any kind.
 
@@ -211,7 +211,7 @@ Ignoti's cryptographic design is documented in [docs/threat-model.md](./docs/thr
 - **Phishing-resistant** - WebAuthn origin binding means passkeys only work on the registered domain
 - **Replay-resistant** - all challenges are single-use, scoped, and short-lived
 - **Signed requests** - session keys sign every API call; a stolen session ID alone cannot be replayed
-- **Private keys never stored** - sessions survive page reloads via an httpOnly cookie; the private key stays ephemeral
+- **Private keys never readable** - sessions survive page reloads via an httpOnly cookie and a non-extractable session key; no script can export it
 
 ---
 

@@ -38,6 +38,16 @@ const { mockSignSessionBindingJWS } = vi.hoisted(() => ({
 }));
 vi.mock('@/api/session-jws.ts', () => ({ signSessionBindingJWS: mockSignSessionBindingJWS }));
 
+const { mockCreateKeyStore, mockKeyStoreLoad, mockKeyStoreSave, mockKeyStoreClear } = vi.hoisted(
+  () => ({
+    mockCreateKeyStore: vi.fn(),
+    mockKeyStoreLoad: vi.fn(),
+    mockKeyStoreSave: vi.fn(),
+    mockKeyStoreClear: vi.fn(),
+  })
+);
+vi.mock('@/core/session-key-store.ts', () => ({ createSessionKeyStore: mockCreateKeyStore }));
+
 const {
   mockApiClientSignRequest,
   mockRegisterUser,
@@ -198,9 +208,23 @@ describe('Ignoti', () => {
     mockSignDeviceBindingJWS.mockResolvedValue('root-sig');
     mockSignSessionBindingJWS.mockResolvedValue('session-binding');
     mockApiClientSignRequest.mockResolvedValue('sig-abc');
+    mockKeyStoreLoad.mockResolvedValue({
+      privateKey: SESSION_PRIVATE_KEY,
+      publicKey: SESSION_PUBLIC_KEY,
+    });
+    mockKeyStoreSave.mockResolvedValue(true);
+    mockKeyStoreClear.mockResolvedValue(undefined);
+    mockCreateKeyStore.mockReturnValue({
+      load: mockKeyStoreLoad,
+      save: mockKeyStoreSave,
+      clear: mockKeyStoreClear,
+    });
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
 
   describe('ensureInitialized', () => {
     it('throws NOT_INITIALIZED before init()', async () => {
@@ -281,6 +305,131 @@ describe('Ignoti', () => {
     });
   });
 
+  describe('cross-tab restore lock', () => {
+    function stubRestoreSuccess() {
+      mockRestoreSession.mockResolvedValue({
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        deviceId: 'device-1',
+        expiresAt: Date.now() + 3_600_000,
+      });
+    }
+
+    // Queues callbacks per lock name, like navigator.locks in exclusive mode.
+    function stubLocks() {
+      const tails = new Map<string, Promise<unknown>>();
+      const request = vi.fn((name: string, callback: () => Promise<unknown>) => {
+        const run = (tails.get(name) ?? Promise.resolve()).then(callback);
+        tails.set(
+          name,
+          run.catch(() => undefined)
+        );
+        return run;
+      });
+      vi.stubGlobal('navigator', { locks: { request } });
+      return request;
+    }
+
+    it('takes a lock named after the backend URL', async () => {
+      const request = stubLocks();
+      stubRestoreSuccess();
+      await initializedSdk().restoreSession();
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.calls[0][0]).toBe('ignoti:restore:http://localhost');
+    });
+
+    it('runs restores from separate instances one at a time', async () => {
+      stubLocks();
+      const events: string[] = [];
+      let release: (() => void) | undefined;
+      mockRestoreSession
+        .mockImplementationOnce(async () => {
+          events.push('first start');
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+          events.push('first end');
+          return { sessionId: 's', userId: 'u', deviceId: 'd', expiresAt: Date.now() + 1000 };
+        })
+        .mockImplementationOnce(async () => {
+          events.push('second start');
+          return { sessionId: 's', userId: 'u', deviceId: 'd', expiresAt: Date.now() + 1000 };
+        });
+
+      const tabA = initializedSdk().restoreSession();
+      const tabB = initializedSdk().restoreSession();
+      await vi.waitFor(() => expect(events).toEqual(['first start']));
+      release?.();
+      await Promise.all([tabA, tabB]);
+
+      expect(events).toEqual(['first start', 'first end', 'second start']);
+    });
+
+    it('releases the lock when a restore fails', async () => {
+      stubLocks();
+      mockRestoreSession.mockRejectedValueOnce(new Error('network error'));
+      await expect(initializedSdk().restoreSession()).rejects.toThrow('network error');
+      stubRestoreSuccess();
+      await expect(initializedSdk().restoreSession()).resolves.toBeUndefined();
+    });
+
+    it.each([
+      ['navigator has no locks', {}],
+      ['navigator does not exist', undefined],
+    ])('restores without a lock when %s', async (_label, navigatorValue) => {
+      vi.stubGlobal('navigator', navigatorValue);
+      stubRestoreSuccess();
+      const g = initializedSdk();
+      await g.restoreSession();
+      expect(g.getSession()).toMatchObject({ sessionId: 'sess-1' });
+    });
+  });
+
+  describe('session keypair persistence', () => {
+    it('scopes the stored keypair to the backend URL', () => {
+      new Ignoti({ backendUrl: 'https://auth.example.com/' });
+      expect(mockCreateKeyStore).toHaveBeenCalledWith('https://auth.example.com');
+    });
+
+    it('stores the keypair after the server creates the session', async () => {
+      await withSession();
+      expect(mockKeyStoreSave).toHaveBeenCalledTimes(1);
+      expect(mockKeyStoreSave).toHaveBeenCalledWith({
+        privateKey: SESSION_PRIVATE_KEY,
+        publicKey: SESSION_PUBLIC_KEY,
+      });
+      expect(mockCreateSession.mock.invocationCallOrder[0]).toBeLessThan(
+        mockKeyStoreSave.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('does not store a keypair when session creation fails', async () => {
+      stubLoginMocks();
+      mockCreateSession.mockRejectedValue(new Error('rejected'));
+      await expect(initializedSdk().login()).rejects.toThrow('rejected');
+      expect(mockKeyStoreSave).not.toHaveBeenCalled();
+    });
+
+    it('logs in with an in-memory session when the keypair cannot be stored', async () => {
+      mockKeyStoreSave.mockResolvedValue(false);
+      const { g, sessionId } = await withSession();
+      expect(g.getSession()).toMatchObject({ sessionId });
+    });
+
+    it('keeps the stored keypair when the session expires by the local clock', async () => {
+      const { g } = await withSession({ expiresAt: Date.now() - 1000 });
+      expect(g.getSession()).toBeNull();
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
+    });
+
+    it('clears the stored keypair on revokeAllSessions', async () => {
+      const { g } = await withSession();
+      mockRevokeAllSessions.mockResolvedValue({ revoked: 1 });
+      await g.revokeAllSessions();
+      expect(mockKeyStoreClear).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('logout', () => {
     it('revokes session server-side, wipes key, and clears session', async () => {
       const { g, sessionId } = await withSession();
@@ -295,6 +444,7 @@ describe('Ignoti', () => {
         expect.any(String)
       );
       expect(g.getSession()).toBeNull();
+      expect(mockKeyStoreClear).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the session and rethrows when server revocation fails', async () => {
@@ -308,6 +458,7 @@ describe('Ignoti', () => {
       // Still logged in: server never confirmed revocation, so nothing is hidden.
       expect(g.getSession()).toMatchObject({ sessionId });
       expect(cb).not.toHaveBeenCalled();
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
     });
 
     it('is a no-op when no session is active', async () => {
@@ -405,14 +556,14 @@ describe('Ignoti', () => {
 
     it('propagates restore error when session is expired and restore fails', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
       await expect(g.getSessionHeaders('GET', DATA_URL)).rejects.toThrow('restore failed');
     });
 
     it('stops attempting restore after the failure cap, same as the 401 interceptor', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      mockGenerateSessionKeypair.mockClear();
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockClear();
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
 
       for (let i = 0; i < 3; i++) {
         await expect(g.getSessionHeaders('GET', DATA_URL)).rejects.toThrow('restore failed');
@@ -420,7 +571,7 @@ describe('Ignoti', () => {
 
       const err = (await g.getSessionHeaders('GET', DATA_URL).catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
-      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+      expect(mockKeyStoreLoad).toHaveBeenCalledTimes(3);
     });
 
     it('returns Authorization, Nonce, Timestamp, and Signature headers', async () => {
@@ -436,7 +587,7 @@ describe('Ignoti', () => {
 
     it('proactively restores when expired and returns headers from the new session', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -457,7 +608,7 @@ describe('Ignoti', () => {
 
     it('throws NO_KEYS if a concurrent logout clears the session during the restore', async () => {
       const { g } = await withSession({ expiresAt: Date.now() - 1000 });
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -489,9 +640,9 @@ describe('Ignoti', () => {
   describe('restoreSession single-flight', () => {
     it('deduplicates concurrent restoreSession() calls into one attempt', async () => {
       const g = initializedSdk();
-      mockGenerateSessionKeypair.mockClear();
+      mockKeyStoreLoad.mockClear();
       mockRestoreSession.mockClear();
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -507,9 +658,8 @@ describe('Ignoti', () => {
 
       await Promise.all([g.restoreSession(), g.restoreSession(), g.restoreSession()]);
 
-      // One shared attempt: one keypair, one network call, one notification —
-      // so concurrent callers cannot bind mismatched keys.
-      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(1);
+      // One shared attempt: one key load, one network call, one notification.
+      expect(mockKeyStoreLoad).toHaveBeenCalledTimes(1);
       expect(mockRestoreSession).toHaveBeenCalledTimes(1);
       expect(cb).toHaveBeenCalledTimes(1);
     });
@@ -575,6 +725,7 @@ describe('Ignoti', () => {
 
       expect(cb).toHaveBeenCalledWith(null);
       expect(g.getSession()).toBeNull();
+      expect(mockKeyStoreClear).toHaveBeenCalledTimes(1);
     });
 
     it('leaves the current session intact when revoking a different device', async () => {
@@ -588,6 +739,7 @@ describe('Ignoti', () => {
 
       expect(cb).not.toHaveBeenCalled();
       expect(g.getSession()?.sessionId).toBe(sessionId);
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
     });
   });
 
@@ -648,6 +800,7 @@ describe('Ignoti', () => {
         expect.any(String)
       );
       expect(g.getSession()).not.toBeNull();
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
     });
 
     it('wipes session key and clears session when revoking own session', async () => {
@@ -655,6 +808,7 @@ describe('Ignoti', () => {
       mockRevokeSession.mockResolvedValue({ ok: true });
       await g.revokeSession(sessionId);
       expect(g.getSession()).toBeNull();
+      expect(mockKeyStoreClear).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -764,7 +918,7 @@ describe('Ignoti', () => {
       const cb = vi.fn();
       const g = initializedSdk();
       g.onSessionChange(cb);
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -837,7 +991,7 @@ describe('Ignoti', () => {
     }
 
     function stubRestoreSuccess(sessionId = 'sess-restored') {
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -894,7 +1048,7 @@ describe('Ignoti', () => {
 
     it('propagates restore failure to the caller', async () => {
       await withSession();
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
       const onUnauthorized = capturedOnUnauthorized();
 
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
@@ -912,8 +1066,8 @@ describe('Ignoti', () => {
 
     it('stops attempting restore after three consecutive failures', async () => {
       await withSession();
-      mockGenerateSessionKeypair.mockClear();
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockClear();
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
       const onUnauthorized = capturedOnUnauthorized();
 
       for (let i = 0; i < 3; i++) {
@@ -922,13 +1076,13 @@ describe('Ignoti', () => {
 
       const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
-      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+      expect(mockKeyStoreLoad).toHaveBeenCalledTimes(3);
     });
 
     it('counts one failure per restore attempt, not per concurrent caller', async () => {
       await withSession();
-      mockGenerateSessionKeypair.mockClear();
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockClear();
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
       const onUnauthorized = capturedOnUnauthorized();
 
       // Three concurrent 401s share one failed restore attempt
@@ -938,21 +1092,21 @@ describe('Ignoti', () => {
         onUnauthorized('DELETE', '/api/sessions/sess-1'),
       ]);
       expect(results.every(r => r.status === 'rejected')).toBe(true);
-      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(1);
+      expect(mockKeyStoreLoad).toHaveBeenCalledTimes(1);
 
       // Two more real attempts remain before the cap trips
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
       const err = (await onUnauthorized('GET', '/api/devices').catch(e => e)) as IgnotiError;
       expect(err.code).toBe('NO_KEYS');
-      expect(mockGenerateSessionKeypair).toHaveBeenCalledTimes(3);
+      expect(mockKeyStoreLoad).toHaveBeenCalledTimes(3);
     });
 
     it('resets the failure count after a successful restore', async () => {
       await withSession();
       const onUnauthorized = capturedOnUnauthorized();
 
-      mockGenerateSessionKeypair
+      mockKeyStoreLoad
         .mockRejectedValueOnce(new Error('restore failed'))
         .mockRejectedValueOnce(new Error('restore failed'));
       await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
@@ -962,7 +1116,7 @@ describe('Ignoti', () => {
       await onUnauthorized('GET', '/api/devices');
 
       // Three more real attempts are allowed, proving the count was reset
-      mockGenerateSessionKeypair.mockRejectedValue(new Error('restore failed'));
+      mockKeyStoreLoad.mockRejectedValue(new Error('restore failed'));
       for (let i = 0; i < 3; i++) {
         await expect(onUnauthorized('GET', '/api/devices')).rejects.toThrow('restore failed');
       }
@@ -976,7 +1130,7 @@ describe('Ignoti', () => {
     });
 
     function stubRestoreMocks(serverResult: 'success' | 'failure') {
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -1017,7 +1171,7 @@ describe('Ignoti', () => {
     });
 
     it('converts a 401 API error to NO_ACTIVE_SESSION IgnotiError', async () => {
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -1034,7 +1188,7 @@ describe('Ignoti', () => {
     });
 
     it('rethrows non-401 errors unchanged', async () => {
-      mockGenerateSessionKeypair.mockResolvedValue({
+      mockKeyStoreLoad.mockResolvedValue({
         privateKey: SESSION_PRIVATE_KEY,
         publicKey: SESSION_PUBLIC_KEY,
       });
@@ -1047,6 +1201,76 @@ describe('Ignoti', () => {
       expect(err).toBeInstanceOf(Error);
       expect(err).not.toBeInstanceOf(IgnotiError);
       expect(err.message).toBe('network error');
+    });
+
+    it('signs with the stored keypair and never generates a new one', async () => {
+      stubRestoreMocks('success');
+      await initializedSdk().restoreSession();
+      expect(mockSignSessionBindingJWS).toHaveBeenCalledWith(
+        expect.anything(),
+        SESSION_PRIVATE_KEY,
+        SESSION_PUBLIC_KEY
+      );
+      expect(mockGenerateSessionKeypair).not.toHaveBeenCalled();
+      expect(mockKeyStoreSave).not.toHaveBeenCalled();
+    });
+
+    it('throws NO_KEYS without calling the server when no keypair is stored', async () => {
+      mockKeyStoreLoad.mockResolvedValue(null);
+      const err = (await initializedSdk()
+        .restoreSession()
+        .catch(e => e)) as IgnotiError;
+      expect(err.code).toBe('NO_KEYS');
+      expect(mockRestoreSession).not.toHaveBeenCalled();
+      expect(mockGenerateSessionKeypair).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the in-memory keypair when storage holds none', async () => {
+      const memoryPrivate = new Uint8Array(32).fill(7);
+      const memoryPublic = new Uint8Array(32).fill(8);
+      stubLoginMocks();
+      mockGenerateSessionKeypair.mockResolvedValue({
+        privateKey: memoryPrivate,
+        publicKey: memoryPublic,
+      });
+      const g = initializedSdk();
+      await g.login();
+      stubRestoreMocks('success');
+      mockKeyStoreLoad.mockResolvedValue(null);
+      mockSignSessionBindingJWS.mockClear();
+
+      await g.restoreSession();
+
+      expect(mockSignSessionBindingJWS).toHaveBeenCalledWith(
+        expect.anything(),
+        memoryPrivate,
+        memoryPublic
+      );
+      expect(g.getSession()).toMatchObject({ sessionId: 'sess-old' });
+    });
+
+    it('clears the stored keypair when the server rejects it with a 401', async () => {
+      mockRestoreSession.mockRejectedValue(
+        new IgnotiError('unauthorized', ErrorCodes.API_ERROR, undefined, 401)
+      );
+      await expect(initializedSdk().restoreSession()).rejects.toMatchObject({ code: 'NO_KEYS' });
+      expect(mockKeyStoreClear).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not clear storage when a 401 rejects the in-memory keypair', async () => {
+      const { g } = await withSession();
+      mockKeyStoreLoad.mockResolvedValue(null);
+      mockRestoreSession.mockRejectedValue(
+        new IgnotiError('unauthorized', ErrorCodes.API_ERROR, undefined, 401)
+      );
+      await expect(g.restoreSession()).rejects.toMatchObject({ code: 'NO_KEYS' });
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
+    });
+
+    it('keeps the stored keypair on a non-401 failure', async () => {
+      mockRestoreSession.mockRejectedValue(new Error('network error'));
+      await expect(initializedSdk().restoreSession()).rejects.toThrow('network error');
+      expect(mockKeyStoreClear).not.toHaveBeenCalled();
     });
 
     it('leaves session null when restore fails', async () => {

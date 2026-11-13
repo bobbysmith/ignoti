@@ -162,7 +162,7 @@ describe('sessions db queries', () => {
   });
 
   describe('rotateSessionOnRestore', () => {
-    const NEW_PUBLIC_KEY = 'new-session-pub-key-b64';
+    const PUBLIC_KEY = 'session-pub-key-b64';
     const FAMILY_HASH = 'family-hash-b64';
     const PRESENTED_HASH = 'presented-hash-b64';
     const NEW_HASH = 'new-hash-b64';
@@ -172,41 +172,29 @@ describe('sessions db queries', () => {
     it('returns the rotated row when the presented hash matches an active session', async () => {
       vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
       await expect(
-        rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY)
+        rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY)
       ).resolves.toEqual(rotateRow);
     });
 
     it('returns undefined when the hash does not match, or session is revoked/expired', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
       await expect(
-        rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY)
+        rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY)
       ).resolves.toBeUndefined();
     });
 
-    it('passes sessionId, family hash, presented hash, new hash, and new public key to the query', async () => {
+    it('passes sessionId, family hash, presented hash, new hash, and the public key to the query', async () => {
       vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
-      await rotateSessionOnRestore(
-        SESSION_ID,
-        FAMILY_HASH,
-        PRESENTED_HASH,
-        NEW_HASH,
-        NEW_PUBLIC_KEY
-      );
+      await rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY);
       const args = vi.mocked(sql).mock.calls[0];
       expect(args).toEqual(
-        expect.arrayContaining([SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, NEW_PUBLIC_KEY])
+        expect.arrayContaining([SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY])
       );
     });
 
     it('query matches on both the family hash and the current restore_token_hash', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await rotateSessionOnRestore(
-        SESSION_ID,
-        FAMILY_HASH,
-        PRESENTED_HASH,
-        NEW_HASH,
-        NEW_PUBLIC_KEY
-      );
+      await rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY);
       const query = vi.mocked(sql).mock.calls[0][0] as readonly string[];
       expect(query.join('')).toContain('restore_token_hash =');
       expect(query.join('')).toContain('restore_family_hash =');
@@ -214,28 +202,25 @@ describe('sessions db queries', () => {
 
     it('query guards against revoked and expired sessions', async () => {
       vi.mocked(sql).mockResolvedValueOnce([] as never);
-      await rotateSessionOnRestore(
-        SESSION_ID,
-        FAMILY_HASH,
-        PRESENTED_HASH,
-        NEW_HASH,
-        NEW_PUBLIC_KEY
-      );
+      await rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY);
       const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
       expect(query).toContain('s.revoked_at is null');
       expect(query).toContain('d.revoked_at is null');
       expect(query).toContain('expires_at > now()');
     });
 
+    it('requires the stored session public key to match and never rewrites it', async () => {
+      vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
+      await rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY);
+      const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
+      const setClause = query.slice(query.indexOf('set '), query.indexOf('from devices'));
+      expect(setClause).not.toContain('session_public_key');
+      expect(query.slice(query.indexOf('where'))).toContain('s.session_public_key =');
+    });
+
     it('never rotates the family hash', async () => {
       vi.mocked(sql).mockResolvedValueOnce([rotateRow] as never);
-      await rotateSessionOnRestore(
-        SESSION_ID,
-        FAMILY_HASH,
-        PRESENTED_HASH,
-        NEW_HASH,
-        NEW_PUBLIC_KEY
-      );
+      await rotateSessionOnRestore(SESSION_ID, FAMILY_HASH, PRESENTED_HASH, NEW_HASH, PUBLIC_KEY);
       const query = (vi.mocked(sql).mock.calls[0][0] as readonly string[]).join('');
       const setClause = query.slice(query.indexOf('set '), query.indexOf('from devices'));
       expect(setClause).not.toContain('restore_family_hash');

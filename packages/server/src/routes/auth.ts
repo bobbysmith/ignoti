@@ -381,18 +381,17 @@ export async function registerAuthRoutes(app: FastifyInstance) {
    * Body: { sessionBinding }  (compact JWS, EdDSA — same shape as /session)
    * Returns: { sessionId, userId, deviceId, expiresAt }
    *
-   * After a page reload the SDK has lost its ephemeral session private key but
-   * the browser still holds the httpOnly session cookie. This endpoint lets the
-   * SDK generate a fresh ephemeral keypair and re-bind it to the existing live
+   * Resumes a session after a page reload. The JWS must be signed by the key
+   * the session was created with; the key never changes for the life of a
    * session. The JWS `exp` (60 s) provides freshness; the cookie identifies the
    * session and carries a rotating restore secret.
    *
    * Refresh-token rotation with reuse detection (RFC 9700): the cookie is
-   * `${sessionId}.${family}.${secret}`. A successful restore rebinds the public
-   * key and rotates to a fresh secret, invalidating the old cookie; the family
-   * secret is fixed for the life of the session. A cookie with the right family
-   * but a non-current secret is an earlier cookie being replayed, so the session
-   * is revoked: a thief and the real user cannot both hold a working cookie.
+   * `${sessionId}.${family}.${secret}`. A successful restore rotates to a fresh
+   * secret, invalidating the old cookie; the family secret is fixed for the life
+   * of the session. A cookie with the right family that fails to restore (an
+   * earlier secret, or a JWS signed by another key) is held by someone other
+   * than the session's owner, so the session is revoked.
    */
   app.post(
     ROUTES.AUTH.SESSION_RESTORE,
@@ -432,11 +431,14 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       );
 
       if (!session) {
-        // Revoke only on a replayed earlier cookie (family matches). Session ids
-        // are not secret, so revoking on any mismatch would be a remote DoS.
-        const reuseDetected = await revokeSessionOnRestoreReuse(sessionId, familyHash);
-        if (reuseDetected) {
-          req.log.warn({ sessionId }, 'session restore token reuse detected; session revoked');
+        // Revoke only when the family matches. Session ids are not secret, so
+        // revoking on any mismatch would be a remote DoS.
+        const revoked = await revokeSessionOnRestoreReuse(sessionId, familyHash);
+        if (revoked) {
+          req.log.warn(
+            { sessionId },
+            'session restore rejected for a live session; session revoked'
+          );
         }
         clearSessionCookie(reply);
         return sendError(reply, 401, ERROR_CODES.SESSION_NOT_FOUND);

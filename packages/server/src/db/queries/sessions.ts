@@ -89,27 +89,27 @@ export async function getSessionsForUser(userId: string): Promise<SessionListRow
 }
 
 /**
- * Restore with rotation: atomically rebinds the session public key AND rotates
- * the restore-token hash, but only when both the family hash and the presented
- * secret hash match an active session. Returns undefined on any mismatch
- * (wrong/replayed secret, wrong family, revoked, or expired).
+ * Restore with rotation: rotates the restore-token hash, but only when the
+ * family hash, the presented secret hash, and the session public key all match
+ * an active session. The public key is never changed. Returns undefined on any
+ * mismatch (wrong/replayed secret, wrong family, wrong key, revoked, or expired).
  */
 export async function rotateSessionOnRestore(
   sessionId: string,
   familyHash: string,
   presentedHash: string,
   newHash: string,
-  newPublicKey: string
+  sessionPublicKey: string
 ): Promise<RotateRow | undefined> {
   const [row] = await sql<RotateRow[]>`
     update sessions s
-    set session_public_key = ${newPublicKey},
-        restore_token_hash = ${newHash}
+    set restore_token_hash = ${newHash}
     from devices d
     where s.id = ${sessionId}
       and s.device_id = d.id
       and s.restore_family_hash = ${familyHash}
       and s.restore_token_hash = ${presentedHash}
+      and s.session_public_key = ${sessionPublicKey}
       and d.revoked_at is null
       and s.revoked_at is null
       and s.expires_at > now()
@@ -119,10 +119,11 @@ export async function rotateSessionOnRestore(
 }
 
 /**
- * Restore-token reuse detection. Call only after rotateSessionOnRestore has
- * rejected the cookie: a matching family then means an earlier cookie of this
- * session is being replayed. A wrong family must not revoke: session ids are
- * not secret, so that would be a remote DoS.
+ * Revokes a session whose cookie failed to restore. Call only after
+ * rotateSessionOnRestore has rejected the request: a matching family then means
+ * an earlier cookie is being replayed, or the caller lacks the session key.
+ * A wrong family must not revoke: session ids are not secret, so that would be
+ * a remote DoS.
  */
 export async function revokeSessionOnRestoreReuse(
   sessionId: string,

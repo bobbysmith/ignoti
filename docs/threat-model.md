@@ -14,7 +14,7 @@ Ignoti uses a self-sovereign identity protocol with three layers:
   high-stakes operations, ex. revoking devices. Never stored.
 - **Device identity** - A WebAuthn passkey bound to the user agent's authenticator (TPM, Secure Enclave, hardware 
   key). Used for daily login.
-- **Session identity** - Ephemeral Ed25519 keypair generated in memory at login. Signs all subsequent API requests 
+- **Session identity** - Ephemeral, non-extractable Ed25519 keypair generated in the browser at login. Signs all subsequent API requests 
   until expiry.
 
 The backend stores only opaque public keys, opaque IDs (UUIDs), single-use challenges, and session metadata. It 
@@ -33,9 +33,9 @@ in the DB but is never echoed back to clients or included in tokens.
 | Mnemonic phrase           | User's head / paper / password manager  | Critical                  | Critical  | High (loss = account loss)  |
 | Root private key          | Derived in memory only, wiped after use | Critical                  | Critical  | N/A (re-derivable)          |
 | Passkey private key       | Authenticator's secure enclave          | Critical (hardware-bound) | Critical  | Medium (per-device)         |
-| Session private key       | Browser memory only, wiped on logout    | High                      | High      | Low (re-creatable on login) |
+| Session private key       | Non-extractable, in browser IndexedDB   | High                      | High      | Low (re-creatable on login) |
 | Session token (cookie)    | httpOnly browser cookie                 | High                      | N/A       | Low (re-creatable on login) |
-| User pseudonym (`userId`) | Backend DB only (SDK persists nothing)  | Medium                    | High      | High                        |
+| User pseudonym (`userId`) | Backend DB only                         | Medium                    | High      | High                        |
 | Device list               | Backend DB                              | Medium                    | High      | High                        |
 
 ## 3. Attacker model
@@ -70,15 +70,18 @@ pseudonymous UUIDs; nothing that can be replayed against another service or used
 ### Session hijacking (A1, A2)
 Sessions are bound to an ephemeral public key registered at login. Every authorized request is signed with the 
 corresponding private key, which never leaves the client. A stolen session ID alone cannot be replayed - the 
-attacker would also need the in-memory private key.
+attacker would also need the session private key.
 
-Session persistence across page reloads is handled by an httpOnly, Secure cookie. JavaScript on the page cannot 
-read this cookie - a successful XSS cannot exfiltrate it. On reload, the SDK calls the restore endpoint with the 
-cookie and generates a fresh ephemeral keypair; the private key is never written to disk or localStorage.
+Session persistence across page reloads is handled by an httpOnly, Secure cookie together with the session key. 
+JavaScript on the page cannot read the cookie - a successful XSS cannot exfiltrate it. The session keypair is 
+stored in IndexedDB as a non-extractable key; script can sign with it but cannot read it, and it is never written 
+to localStorage. On reload, the SDK calls the restore endpoint with the cookie and a proof signed by that key.
 
-The cookie is a bearer credential *for session restore* - like an OAuth refresh token. Whoever presents it can bind 
-a new session keypair and obtain a working session, so it is protected the way refresh tokens are: httpOnly + Secure 
-+ SameSite, plus **rotation with reuse detection** (RFC 9700). The cookie carries a rotating secret; every restore 
+The cookie is sender-constrained, like a DPoP-bound OAuth refresh token (RFC 9449): it only restores a session when 
+presented with a signature from the key that session was created with, and a session never changes its key. A 
+stolen cookie on its own restores nothing, and presenting it with any other key revokes the session. On top of 
+that it is protected the way refresh tokens are: httpOnly + Secure + SameSite, plus **rotation with reuse 
+detection** (RFC 9700). The cookie carries a rotating secret; every restore 
 issues a new one and invalidates the old. It also carries a family secret that is fixed for the life of the session, 
 so the server can recognise any cookie it ever issued for that session. If an earlier cookie is presented on an 
 otherwise-active session, however many rotations ago it was issued - the signature that a stolen, already-rotated 
@@ -89,12 +92,12 @@ that page, which is game-over for any browser session regardless of storage mech
 exfiltration, not in-page use).
 
 Outside of restore, a stolen session ID cannot be used to forge signed API requests: every request also requires a 
-live Ed25519 signature from the session private key, which exists only in memory on the original page. The SameSite 
+live Ed25519 signature from the session private key, which cannot leave the original browser. The SameSite 
 policy is `None` in production (required for cross-origin deployments where the frontend and the Ignoti server run 
 on different domains) and `Lax` in local development. CSRF protection comes from the per-request signature, not the 
 SameSite attribute; a forged request without a valid signature is rejected regardless of whether the cookie was 
-sent. **Mitigation: signed-request sessions with ephemeral keys; httpOnly restore cookie with refresh-token 
-rotation and reuse detection.**
+sent. **Mitigation: signed-request sessions with non-extractable keys; httpOnly restore cookie bound to the 
+session key, with refresh-token rotation and reuse detection.**
 
 One operational note: because restore rotates the cookie, two page contexts (e.g. multiple tabs) restoring the same 
 session concurrently can race - the second restore presents an already-rotated secret and the session is revoked, 
@@ -126,9 +129,10 @@ mnemonic, adding one would reintroduce a centralized authority. Users must store
 like a private key.
 
 ### Active XSS on the integrating site (A4)
-If an attacker injects script into a page that hosts the Ignoti SDK, they can read the in-memory session key while 
-the user is logged in and forge requests for the lifetime of that session. **They cannot exfiltrate the passkey 
-private key or the mnemonic.** Mitigations are the integrator's responsibility: strict content security policy, 
+If an attacker injects script into a page that hosts the Ignoti SDK, they can use the session key from that page 
+while their script is running and forge requests as the user. They cannot export the session key, and they cannot 
+bind a key of their own to the session, so the session cannot be continued from another machine. **They cannot 
+exfiltrate the passkey private key or the mnemonic.** Mitigations are the integrator's responsibility: strict content security policy, 
 dependency review, Subresource Integrity, no `dangerouslySetInnerHTML` near auth surfaces.
 
 ### Compromised authenticator firmware (A5, advanced)

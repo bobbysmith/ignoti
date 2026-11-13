@@ -33,6 +33,10 @@ Here is the complete list of what ends up in the database.
 - `challenges` - single-use login/register/recover nonces with an expiry, deleted once expired
 - `session_nonces` - per-request replay-prevention IDs (a UUID and an expiry), deleted once expired
 
+**In the user's browser:**
+- The httpOnly session cookie
+- The session keypair, in IndexedDB, as a non-extractable key (deleted on logout)
+
 That is the entire schema. No email. No phone number. No IP address. No user agent. No geolocation. No device fingerprint. No real-world identifier of any kind.
 
 ## Your users are invisible to every third party

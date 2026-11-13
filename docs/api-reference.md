@@ -133,7 +133,7 @@ Throws: same as `recoverIdentity()` and `login()`
 
 ### `ignoti.login()`
 
-Authenticates with the registered passkey on this device. Prompts the user to verify with biometric or PIN, generates an ephemeral session keypair, and binds it to the server.
+Authenticates with the registered passkey on this device. Prompts the user to verify with biometric or PIN, generates a non-extractable session keypair, binds it to the server, and stores it in IndexedDB so the session can be restored after a reload.
 
 ```ts
 const session = await ignoti.login();
@@ -174,7 +174,7 @@ Throws:
 
 ### `ignoti.restoreSession()`
 
-Restores a session after a page reload using the httpOnly session cookie. Generates a fresh ephemeral keypair and binds it to the server. Concurrent calls within a page are single-flighted (they share one attempt), so calling it more than once is safe.
+Restores a session after a page reload using the httpOnly session cookie and the session keypair stored at login. The session keeps the same key; no new key is generated. Throws `NO_KEYS` without contacting the server when no keypair is stored (site data cleared, or IndexedDB unavailable), in which case the user logs in again. Concurrent calls within a page are single-flighted (they share one attempt), so calling it more than once is safe.
 
 In React, a `useRef` guard is optional — it avoids a redundant second call under Strict Mode double-invocation:
 

@@ -127,15 +127,21 @@ async function registerAndLogin(app: FastifyInstance, credId = CRED_ID) {
     sessionId,
     returnedUserId,
     sessionPrivate,
+    sessionKeys: { privateKey: sessionPrivate, publicKey: sessionPublic },
     sessionCookie,
     rootPrivate,
   };
 }
 
-// Posts /session/restore with a fresh, valid session-binding JWS over any keypair.
-async function restoreWithCookie(app: FastifyInstance, cookie: string) {
-  const { privateKey, publicKey } = await generateSessionKeypair();
-  const sessionBinding = await signSessionBindingJWS(crypto.randomUUID(), privateKey, publicKey);
+type SessionKeys = { privateKey: CryptoKey; publicKey: CryptoKey };
+
+// Posts /session/restore with a fresh session-binding JWS signed by `keys`.
+async function restoreWithCookie(app: FastifyInstance, cookie: string, keys: SessionKeys) {
+  const sessionBinding = await signSessionBindingJWS(
+    crypto.randomUUID(),
+    keys.privateKey,
+    keys.publicKey
+  );
   return app.inject({
     method: 'POST',
     url: '/api/auth/session/restore',
@@ -225,30 +231,56 @@ describe('Integration: auth happy paths', () => {
   });
 
   describe('session restore', () => {
-    it('restores a session from the httpOnly cookie', async () => {
-      const { sessionCookie, userId } = await registerAndLogin(app);
+    it('restores a session with its own key and keeps that key valid', async () => {
+      const { sessionCookie, userId, sessionId, sessionKeys } = await registerAndLogin(app);
 
-      const { privateKey: newPrivate, publicKey: newPublic } = await generateSessionKeypair();
-      const nonce = crypto.randomUUID();
-      const sessionBinding = await signSessionBindingJWS(nonce, newPrivate, newPublic);
-
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/auth/session/restore',
-        headers: { cookie: sessionCookie },
-        payload: { sessionBinding },
-      });
+      const res = await restoreWithCookie(app, sessionCookie, sessionKeys);
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ userId: string; sessionId: string }>();
-      expect(body.userId).toBe(userId);
-      expect(typeof body.sessionId).toBe('string');
+      expect(res.json()).toMatchObject({ userId, sessionId });
+      expect(setCookieHeader(res)).not.toBe(sessionCookie);
+
+      const headers = await buildSessionHeaders(
+        'GET',
+        '/api/sessions',
+        sessionId,
+        sessionKeys.privateKey
+      );
+      const signed = await app.inject({ method: 'GET', url: '/api/sessions', headers });
+      expect(signed.statusCode).toBe(200);
+    });
+
+    it('rejects a restore signed by another key and revokes the session', async () => {
+      const { sessionCookie, sessionId, sessionKeys } = await registerAndLogin(app);
+      const attackerKeys = await generateSessionKeypair();
+
+      const attack = await restoreWithCookie(app, sessionCookie, attackerKeys);
+      expect(attack.statusCode).toBe(401);
+      expect(setCookieHeader(attack)).toMatch(/^ignoti_session=;/);
+
+      // The attacker's key was never bound to the session.
+      const forged = await buildSessionHeaders(
+        'GET',
+        '/api/sessions',
+        sessionId,
+        attackerKeys.privateKey
+      );
+      const forgedRes = await app.inject({ method: 'GET', url: '/api/sessions', headers: forged });
+      expect(forgedRes.statusCode).toBe(401);
+
+      const owner = await restoreWithCookie(app, sessionCookie, sessionKeys);
+      expect(owner.statusCode).toBe(401);
+      const [row] = await sql`select revoked_at from sessions where id = ${sessionId}`;
+      expect(row.revoked_at).not.toBeNull();
     });
 
     it('returns 401 when no session cookie is present', async () => {
-      const { privateKey: newPrivate, publicKey: newPublic } = await generateSessionKeypair();
-      const nonce = crypto.randomUUID();
-      const sessionBinding = await signSessionBindingJWS(nonce, newPrivate, newPublic);
+      const keys = await generateSessionKeypair();
+      const sessionBinding = await signSessionBindingJWS(
+        crypto.randomUUID(),
+        keys.privateKey,
+        keys.publicKey
+      );
 
       const res = await app.inject({
         method: 'POST',
@@ -260,70 +292,57 @@ describe('Integration: auth happy paths', () => {
     });
 
     it('returns 401 when the session has been revoked', async () => {
-      const { sessionCookie, sessionId, sessionPrivate } = await registerAndLogin(app);
+      const { sessionCookie, sessionId, sessionPrivate, sessionKeys } = await registerAndLogin(app);
 
       const url = `/api/sessions/${sessionId}`;
       const revokeHeaders = await buildSessionHeaders('DELETE', url, sessionId, sessionPrivate);
       await app.inject({ method: 'DELETE', url, headers: revokeHeaders });
 
-      const { privateKey: newPrivate, publicKey: newPublic } = await generateSessionKeypair();
-      const sessionBinding = await signSessionBindingJWS(
-        crypto.randomUUID(),
-        newPrivate,
-        newPublic
-      );
-
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/auth/session/restore',
-        headers: { cookie: sessionCookie },
-        payload: { sessionBinding },
-      });
+      const res = await restoreWithCookie(app, sessionCookie, sessionKeys);
       expect(res.statusCode).toBe(401);
     });
 
     it('revokes the session when a superseded (already-rotated) secret is replayed', async () => {
-      const { sessionCookie } = await registerAndLogin(app);
+      const { sessionCookie, sessionKeys } = await registerAndLogin(app);
 
-      const first = await restoreWithCookie(app, sessionCookie);
+      const first = await restoreWithCookie(app, sessionCookie, sessionKeys);
       expect(first.statusCode).toBe(200);
       const rotatedCookie = setCookieHeader(first);
 
       // Replaying the original (now-superseded) cookie is reuse: revoke.
-      const replay = await restoreWithCookie(app, sessionCookie);
+      const replay = await restoreWithCookie(app, sessionCookie, sessionKeys);
       expect(replay.statusCode).toBe(401);
 
       // The rotated secret no longer restores, confirming the session was revoked.
-      const afterReuse = await restoreWithCookie(app, rotatedCookie);
+      const afterReuse = await restoreWithCookie(app, rotatedCookie, sessionKeys);
       expect(afterReuse.statusCode).toBe(401);
     });
 
-    it('revokes when the original cookie is replayed after the thief restored twice', async () => {
-      const { sessionCookie: stolen } = await registerAndLogin(app);
+    it('revokes when the original cookie is replayed two rotations later', async () => {
+      const { sessionCookie: original, sessionKeys } = await registerAndLogin(app);
 
-      const thiefFirst = await restoreWithCookie(app, stolen);
-      expect(thiefFirst.statusCode).toBe(200);
-      const thiefSecond = await restoreWithCookie(app, setCookieHeader(thiefFirst));
-      expect(thiefSecond.statusCode).toBe(200);
-      const thiefCookie = setCookieHeader(thiefSecond);
+      const first = await restoreWithCookie(app, original, sessionKeys);
+      expect(first.statusCode).toBe(200);
+      const second = await restoreWithCookie(app, setCookieHeader(first), sessionKeys);
+      expect(second.statusCode).toBe(200);
+      const currentCookie = setCookieHeader(second);
 
-      // The original cookie is now two generations old: still reuse, revoke.
-      const victim = await restoreWithCookie(app, stolen);
-      expect(victim.statusCode).toBe(401);
+      const replay = await restoreWithCookie(app, original, sessionKeys);
+      expect(replay.statusCode).toBe(401);
 
-      const thiefAfter = await restoreWithCookie(app, thiefCookie);
-      expect(thiefAfter.statusCode).toBe(401);
+      const afterReuse = await restoreWithCookie(app, currentCookie, sessionKeys);
+      expect(afterReuse.statusCode).toBe(401);
     });
 
     it('does NOT revoke on a garbage secret for a known session id (revocation DoS guard)', async () => {
-      const { sessionCookie, sessionId } = await registerAndLogin(app);
+      const { sessionCookie, sessionId, sessionKeys } = await registerAndLogin(app);
 
       const garbageCookie = `ignoti_session=${sessionId}.not-the-real-family-0000.not-the-real-secret-0000`;
-      const attack = await restoreWithCookie(app, garbageCookie);
+      const attack = await restoreWithCookie(app, garbageCookie, await generateSessionKeypair());
       expect(attack.statusCode).toBe(401);
 
       // The live session survives the garbage attempt: the real cookie still restores.
-      const legit = await restoreWithCookie(app, sessionCookie);
+      const legit = await restoreWithCookie(app, sessionCookie, sessionKeys);
       expect(legit.statusCode).toBe(200);
     });
   });
@@ -618,10 +637,10 @@ describe('Integration: auth happy paths', () => {
     });
 
     it('rejects session restore', async () => {
-      const { deviceId, sessionCookie } = await registerAndLogin(app);
+      const { deviceId, sessionCookie, sessionKeys } = await registerAndLogin(app);
       await revokeDeviceOnly(deviceId);
 
-      const res = await restoreWithCookie(app, sessionCookie);
+      const res = await restoreWithCookie(app, sessionCookie, sessionKeys);
       expect(res.statusCode).toBe(401);
     });
   });
