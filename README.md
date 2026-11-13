@@ -64,6 +64,7 @@ together and runs migrations automatically on first boot.
 
 ```bash
 curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/.env.example
 
 # Set RP_ID, RP_ORIGIN, and INTROSPECTION_SECRET - see Environment variables below
 cp .env.example .env

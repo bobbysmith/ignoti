@@ -17,7 +17,7 @@ Download the Docker Compose file and configure it for your domain:
 
 ```bash
 curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/packages/server/.env.example
+curl -O https://raw.githubusercontent.com/bobbysmith/ignoti/main/.env.example
 mv .env.example .env
 ```
 
