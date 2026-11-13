@@ -83,6 +83,10 @@ typings/
 # Claude files
 .claude/
 
+# Agent skills
+.agents/
+skills-lock.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
