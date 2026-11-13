@@ -1,6 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { errSummary, reqLogSerializer } from '../../lib/logging.js';
+import { errDetail, errSummary, reqLogSerializer } from '../../lib/logging.js';
 
 describe('reqLogSerializer', () => {
   it('keeps only method and url', () => {
@@ -57,5 +57,24 @@ describe('errSummary', () => {
 
   it('does not serialize non-Error values', () => {
     expect(errSummary({ secret: 'x' })).toEqual({ message: 'non-error thrown' });
+  });
+});
+
+describe('errDetail', () => {
+  it('adds the stack and no other field', () => {
+    const err = Object.assign(new Error('duplicate key'), {
+      code: '23505',
+      detail: 'Key (credential_id)=(cred-1) already exists.',
+    });
+    expect(errDetail(err)).toEqual({
+      name: 'Error',
+      code: '23505',
+      message: 'duplicate key',
+      stack: err.stack,
+    });
+  });
+
+  it('does not serialize non-Error values', () => {
+    expect(errDetail({ secret: 'x' })).toEqual({ message: 'non-error thrown' });
   });
 });

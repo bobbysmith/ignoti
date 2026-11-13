@@ -17,3 +17,8 @@ export function errSummary(err: unknown): { name?: string; code?: string; messag
     message: err.message,
   };
 }
+
+// errSummary plus the stack trace, for unexpected errors.
+export function errDetail(err: unknown): ReturnType<typeof errSummary> & { stack?: string } {
+  return err instanceof Error ? { ...errSummary(err), stack: err.stack } : errSummary(err);
+}

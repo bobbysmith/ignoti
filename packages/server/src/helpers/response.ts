@@ -1,6 +1,7 @@
 import type { ServerErrorResponse } from '@ignoti/shared';
 import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
 import { ERROR_CODES, ERROR_MESSAGES, type ServerErrorCode } from '../constants.js';
+import { errDetail } from '../lib/logging.js';
 
 /**
  * Sends a consistent error envelope: { error, message, details? }.
@@ -27,7 +28,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (typeof status === 'number' && status >= 400 && status < 500) {
       return reply.code(status).send(error);
     }
-    req.log.error({ err: error }, 'unhandled error');
+    req.log.error({ reason: errDetail(error) }, 'unhandled error');
     return sendError(reply, 500, ERROR_CODES.INTERNAL_ERROR);
   });
 }

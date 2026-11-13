@@ -67,6 +67,8 @@ The signature covers the method and the full request URL: host, path, and query 
 another backend, another path, or another query are rejected. The host comes from `publicUrl`, never from the
 `Host` header, which the sender controls. The request body is not covered by the signature.
 
+The middlewares reject a request whose target is a full URL instead of a path.
+
 Rules:
 
 - **Verify each request exactly once.** The nonce is consumed on verification; verifying the same headers

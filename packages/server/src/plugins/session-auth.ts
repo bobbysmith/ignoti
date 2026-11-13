@@ -13,6 +13,7 @@ import {
 import { storeNonce } from '../db/queries/nonces.js';
 import { getSessionWithUser, touchSession } from '../db/queries/sessions.js';
 import { sendError } from '../helpers/response.js';
+import { errDetail } from '../lib/logging.js';
 
 export interface SessionContext {
   sessionId: string;
@@ -153,7 +154,7 @@ export async function verifySessionAuth(
   }
 
   touchSession(sessionId).catch(err => {
-    log.error({ err, sessionId }, 'touchSession failed');
+    log.error({ reason: errDetail(err), sessionId }, 'touchSession failed');
   });
 
   return {

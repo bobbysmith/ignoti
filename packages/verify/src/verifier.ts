@@ -146,6 +146,25 @@ export class IgnotiVerifier {
   }
 
   /**
+   * Verifies a request received by a framework. The request target must be a
+   * path: an absolute-form target (`GET https://other.example/x HTTP/1.1`) is
+   * client-controlled and would otherwise replace `publicUrl` as the signed origin.
+   */
+  private verifyIncoming(
+    method: string,
+    url: string,
+    headers: IncomingHeaders
+  ): Promise<VerifyResult> {
+    if (!url.startsWith('/')) {
+      return Promise.resolve({
+        valid: false,
+        error: SERVER_ERROR_CODES.INVALID_SESSION_SIGNATURE,
+      });
+    }
+    return this.verify({ method, url, headers });
+  }
+
+  /**
    * Express-style middleware. On success, attaches the session to
    * `req.ignoti` and calls `next()`. On an invalid session, responds
    * 401 `{ error }`. On introspection failure, forwards the error to `next`.
@@ -155,11 +174,7 @@ export class IgnotiVerifier {
    */
   expressMiddleware(): (req: AuthRequest, res: AuthResponse, next: NextFunction) => void {
     return (req, res, next) => {
-      this.verify({
-        method: req.method,
-        url: req.originalUrl ?? req.url,
-        headers: req.headers,
-      })
+      this.verifyIncoming(req.method, req.originalUrl ?? req.url, req.headers)
         .then(result => {
           if (!result.valid) {
             res.status(401).json({ error: result.error });
@@ -182,11 +197,7 @@ export class IgnotiVerifier {
    */
   fastifyPreHandler(): (req: AuthRequest, reply: AuthReply) => Promise<unknown> {
     return async (req, reply) => {
-      const result = await this.verify({
-        method: req.method,
-        url: req.url,
-        headers: req.headers,
-      });
+      const result = await this.verifyIncoming(req.method, req.url, req.headers);
       if (!result.valid) {
         reply.code(401).send({ error: result.error });
         return reply;

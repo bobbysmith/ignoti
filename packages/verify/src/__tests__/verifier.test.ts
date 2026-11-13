@@ -337,6 +337,23 @@ describe('IgnotiVerifier', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
+    it('rejects an absolute-form request target without calling the server', async () => {
+      const res = makeRes();
+      const next = vi.fn();
+      makeVerifier().expressMiddleware()(
+        makeReq({ url: '/api/feed', originalUrl: 'https://other.example.com/api/feed' }),
+        res,
+        next
+      );
+      await vi.waitFor(() => expect(res.status).toHaveBeenCalledWith(401));
+
+      expect(res.json).toHaveBeenCalledWith({
+        error: SERVER_ERROR_CODES.INVALID_SESSION_SIGNATURE,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+    });
+
     it('forwards introspection failures to next(err)', async () => {
       fetchMock.mockRejectedValue(new TypeError('fetch failed'));
       const middleware = makeVerifier().expressMiddleware();
@@ -391,6 +408,24 @@ describe('IgnotiVerifier', () => {
       expect(reply.code).toHaveBeenCalledWith(401);
       expect(reply.send).toHaveBeenCalledWith({ error: SERVER_ERROR_CODES.SESSION_NONCE_USED });
       expect(returned).toBe(reply);
+    });
+
+    it('rejects an absolute-form request target without calling the server', async () => {
+      const reply = makeReply();
+      const req = {
+        method: 'GET',
+        url: 'https://other.example.com/api/feed',
+        headers: makeHeaders(),
+      };
+
+      await makeVerifier().fastifyPreHandler()(req, reply);
+
+      expect(reply.code).toHaveBeenCalledWith(401);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: SERVER_ERROR_CODES.INVALID_SESSION_SIGNATURE,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(req).not.toHaveProperty('ignoti');
     });
 
     it('propagates introspection failures', async () => {

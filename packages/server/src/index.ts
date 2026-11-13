@@ -8,7 +8,7 @@ import { RATE_LIMITS } from './constants.js';
 import { sql } from './db/client.js';
 import { runGc } from './db/queries/gc.js';
 import { registerErrorHandler } from './helpers/response.js';
-import { reqLogSerializer } from './lib/logging.js';
+import { errDetail, reqLogSerializer } from './lib/logging.js';
 import { registerSessionAuthPlugin } from './plugins/session-auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
@@ -78,7 +78,7 @@ async function start() {
         .then(ran => {
           if (ran) app.log.debug('gc sweep complete');
         })
-        .catch(err => app.log.error({ err }, 'gc sweep failed'));
+        .catch(err => app.log.error({ reason: errDetail(err) }, 'gc sweep failed'));
     };
     sweep();
     gcTimer = setInterval(sweep, config.GC_INTERVAL_SECONDS * 1000);
@@ -93,7 +93,7 @@ async function start() {
       await sql.end();
       process.exit(0);
     } catch (err) {
-      app.log.error({ err }, 'error during shutdown');
+      app.log.error({ reason: errDetail(err) }, 'error during shutdown');
       process.exit(1);
     }
   };
